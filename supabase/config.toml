@@ -19,6 +19,12 @@ port = 54323
 [auth]
 enabled = true
 site_url = "albumoftheday://"
-additional_redirect_urls = ["albumoftheday://"]
+additional_redirect_urls = ["albumoftheday://**", "exp://**"]
 jwt_expiry = 3600
 enable_signup = true
+
+[functions.upsert-streaming-connection]
+verify_jwt = false
+
+[functions.refresh-spotify-token]
+verify_jwt = false

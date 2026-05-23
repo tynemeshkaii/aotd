@@ -2,6 +2,7 @@ import 'react-native-url-polyfill/auto';
 
 import { createClient } from '@supabase/supabase-js';
 import * as SecureStore from 'expo-secure-store';
+import { AppState } from 'react-native';
 
 import type { Database } from '@/types/database';
 
@@ -19,5 +20,18 @@ export const supabase = createClient<Database>(env.supabaseUrl, env.supabaseAnon
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: false,
+    flowType: 'pkce',
   },
+});
+
+if (AppState.currentState === 'active') {
+  supabase.auth.startAutoRefresh();
+}
+
+AppState.addEventListener('change', (state) => {
+  if (state === 'active') {
+    supabase.auth.startAutoRefresh();
+  } else {
+    supabase.auth.stopAutoRefresh();
+  }
 });

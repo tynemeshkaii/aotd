@@ -10,6 +10,7 @@
       "**",
       "!**/node_modules",
       "!**/.expo",
+      "!supabase/.temp",
       "!**/ios",
       "!**/android",
       "!**/dist",

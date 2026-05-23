@@ -28,6 +28,7 @@ const config: ExpoConfig = {
   plugins: [
     'expo-router',
     'expo-secure-store',
+    'expo-web-browser',
     [
       'expo-splash-screen',
       {
@@ -43,6 +44,7 @@ const config: ExpoConfig = {
   extra: {
     supabaseUrl: process.env.EXPO_PUBLIC_SUPABASE_URL,
     supabaseAnonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
+    spotifyClientId: process.env.EXPO_PUBLIC_SPOTIFY_CLIENT_ID,
     sentryDsn: process.env.EXPO_PUBLIC_SENTRY_DSN,
     env: process.env.EXPO_PUBLIC_ENV ?? 'development',
   },

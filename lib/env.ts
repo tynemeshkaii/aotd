@@ -4,6 +4,7 @@ import { z } from 'zod';
 const EnvSchema = z.object({
   supabaseUrl: z.string().url(),
   supabaseAnonKey: z.string().min(10),
+  spotifyClientId: z.string().optional(),
   sentryDsn: z
     .string()
     .optional()
