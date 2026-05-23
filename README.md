@@ -12,18 +12,20 @@ The project is in **Phase 1: App Skeleton**.
 
 Current baseline:
 
-- Expo + React Native + TypeScript app scaffolded
-- Expo SDK 55 selected for Expo Go compatibility on iPhone
-- Git repository initialized
-- Product and technical plans committed in [`plans/`](plans/)
+- Expo SDK 55 + React Native + TypeScript (strict)
+- `expo-router` with four tabs: Home, Library, Friends, Profile
+- NativeWind v4 with dark theme + UI primitives (`Screen`, `Text`, `Button`, `PlaceholderCard`)
+- Supabase client wired with `expo-secure-store` session adapter
+- TanStack Query provider at root
+- Biome for lint + format
+- `zod`-validated env via `app.config.ts` → `lib/env.ts`
+- Initial Supabase migration for `profiles` (lives in `supabase/migrations/`)
+- Sentry stub — activates when `EXPO_PUBLIC_SENTRY_DSN` is set and `@sentry/react-native` is installed
 
-Next Phase 1 milestones:
+Pending Phase 1 work:
 
-- `expo-router` with four placeholder tabs: Home, Library, Friends, Profile
-- NativeWind theme and reusable UI primitives
-- Supabase client and initial `profiles` schema
-- React Query setup
-- Sentry error tracking
+- Apply Supabase migration (run `supabase login`, then `npm run db:push` and `npm run db:types`)
+- Wire real Sentry once a DSN is available
 
 ## Product Idea
 
@@ -62,7 +64,9 @@ The core loop:
 ### Install
 
 ```bash
-npm install
+npm install --legacy-peer-deps
+cp .env.example .env.local
+# fill in EXPO_PUBLIC_SUPABASE_URL, EXPO_PUBLIC_SUPABASE_ANON_KEY, optional SENTRY DSN
 ```
 
 ### Run
@@ -73,50 +77,53 @@ npm run start -- --go
 
 Then scan the QR code with Expo Go.
 
-For local-only Metro verification:
-
-```bash
-npm run start -- --localhost
-```
-
 ## Scripts
 
 ```bash
-npm run start
-npm run ios
-npm run android
-npm run web
+npm run start       # expo start
+npm run ios         # expo start --ios
+npm run android     # expo start --android
+npm run web         # expo start --web
+npm run lint        # biome check
+npm run format      # biome format --write
+npm run typecheck   # tsc --noEmit
+npm run db:push     # supabase db push (requires supabase login)
+npm run db:types    # regenerate types/database.ts from linked project
+npm run db:new      # create a new migration file
 ```
-
-More scripts will be added as Phase 1 introduces linting, formatting, type checking, Supabase migrations, and generated database types.
 
 ## Project Structure
-
-Current scaffold:
-
-```text
-.
-├── App.tsx
-├── app.json
-├── assets/
-├── index.ts
-├── package.json
-├── plans/
-└── tsconfig.json
-```
-
-Target Phase 1 structure:
 
 ```text
 .
 ├── app/
-│   ├── _layout.tsx
+│   ├── _layout.tsx              # QueryClientProvider + Stack + Sentry init
+│   ├── +not-found.tsx
 │   └── (tabs)/
+│       ├── _layout.tsx          # Tab bar (Home / Library / Friends / Profile)
+│       ├── index.tsx
+│       ├── library.tsx
+│       ├── friends.tsx
+│       └── profile.tsx
 ├── components/
+│   ├── ui/                      # Screen, Text, Button
+│   └── PlaceholderCard.tsx
 ├── lib/
+│   ├── env.ts                   # zod-validated environment
+│   ├── queryClient.ts
+│   ├── sentry.ts
+│   └── supabase.ts
 ├── supabase/
+│   ├── config.toml
+│   └── migrations/
 ├── types/
-└── plans/
+│   └── database.ts              # regenerate with `npm run db:types`
+├── app.config.ts
+├── babel.config.js
+├── biome.json
+├── global.css
+├── metro.config.js
+└── tailwind.config.js
 ```
 
 ## Roadmap
