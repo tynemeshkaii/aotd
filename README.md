@@ -12,7 +12,7 @@ The project is in **Phase 1: App Skeleton**.
 
 Current baseline:
 
-- Expo SDK 56 + React Native + TypeScript (strict)
+- Expo SDK 54 + React Native + TypeScript (strict)
 - `expo-router` with four tabs: Home, Library, Friends, Profile
 - NativeWind v4 with dark theme + UI primitives (`Screen`, `Text`, `Button`, `PlaceholderCard`)
 - Supabase client wired with `expo-secure-store` session adapter
@@ -140,7 +140,7 @@ The detailed roadmap lives in [`plans/master-plan.md`](plans/master-plan.md).
 
 ## Development Notes
 
-- Expo SDK 56 is intentional for now: it keeps the app compatible with Expo Go on a physical iPhone during early development.
+- Expo SDK 54 is intentional for now: it keeps the app compatible with Expo Go on a physical iPhone during early development.
 - Environment files are ignored by git. Commit `.env.example`, never local secrets.
 - Supabase service role keys must never be shipped to the app or committed to the repository.
 
