@@ -361,6 +361,8 @@ activity_feed
 
 **Точка проверки:** logout/login работает, токен обновляется автоматически.
 
+**Статус:** ✅ Выполнено (2026-05-23). Детали в [phase-2-spotify-auth.md](./phase-2-spotify-auth.md) и [phase-2-session-verification.md](./phase-2-session-verification.md).
+
 ### Фаза 3 — Импорт библиотеки (1–2 недели)
 
 - Edge Function `sync-spotify-library`:

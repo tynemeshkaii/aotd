@@ -39,6 +39,54 @@ export type Database = {
   }
   public: {
     Tables: {
+      library_sync_status: {
+        Row: {
+          aggregated_albums_count: number | null
+          completed_at: string | null
+          error_code: string | null
+          error_message: string | null
+          processed_count: number
+          provider: string
+          saved_albums_count: number | null
+          saved_tracks_count: number | null
+          started_at: string | null
+          status: string
+          total_estimate: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          aggregated_albums_count?: number | null
+          completed_at?: string | null
+          error_code?: string | null
+          error_message?: string | null
+          processed_count?: number
+          provider: string
+          saved_albums_count?: number | null
+          saved_tracks_count?: number | null
+          started_at?: string | null
+          status: string
+          total_estimate?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          aggregated_albums_count?: number | null
+          completed_at?: string | null
+          error_code?: string | null
+          error_message?: string | null
+          processed_count?: number
+          provider?: string
+          saved_albums_count?: number | null
+          saved_tracks_count?: number | null
+          started_at?: string | null
+          status?: string
+          total_estimate?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -108,6 +156,57 @@ export type Database = {
         }
         Relationships: []
       }
+      user_library: {
+        Row: {
+          added_at_provider: string | null
+          album_name: string
+          artist_name: string
+          cover_url: string | null
+          id: string
+          mb_release_group_id: string | null
+          provider: string
+          provider_album_id: string
+          release_year: number | null
+          removed_at: string | null
+          source: Json
+          synced_at: string
+          total_tracks: number | null
+          user_id: string
+        }
+        Insert: {
+          added_at_provider?: string | null
+          album_name: string
+          artist_name: string
+          cover_url?: string | null
+          id?: string
+          mb_release_group_id?: string | null
+          provider: string
+          provider_album_id: string
+          release_year?: number | null
+          removed_at?: string | null
+          source?: Json
+          synced_at?: string
+          total_tracks?: number | null
+          user_id: string
+        }
+        Update: {
+          added_at_provider?: string | null
+          album_name?: string
+          artist_name?: string
+          cover_url?: string | null
+          id?: string
+          mb_release_group_id?: string | null
+          provider?: string
+          provider_album_id?: string
+          release_year?: number | null
+          removed_at?: string | null
+          source?: Json
+          synced_at?: string
+          total_tracks?: number | null
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       streaming_connections_safe: {
@@ -136,6 +235,54 @@ export type Database = {
           provider?: string | null
           provider_user_id?: string | null
           scopes?: string[] | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      user_library_active: {
+        Row: {
+          added_at_provider: string | null
+          album_name: string | null
+          artist_name: string | null
+          cover_url: string | null
+          id: string | null
+          mb_release_group_id: string | null
+          provider: string | null
+          provider_album_id: string | null
+          release_year: number | null
+          source: Json | null
+          synced_at: string | null
+          total_tracks: number | null
+          user_id: string | null
+        }
+        Insert: {
+          added_at_provider?: string | null
+          album_name?: string | null
+          artist_name?: string | null
+          cover_url?: string | null
+          id?: string | null
+          mb_release_group_id?: string | null
+          provider?: string | null
+          provider_album_id?: string | null
+          release_year?: number | null
+          source?: Json | null
+          synced_at?: string | null
+          total_tracks?: number | null
+          user_id?: string | null
+        }
+        Update: {
+          added_at_provider?: string | null
+          album_name?: string | null
+          artist_name?: string | null
+          cover_url?: string | null
+          id?: string | null
+          mb_release_group_id?: string | null
+          provider?: string | null
+          provider_album_id?: string | null
+          release_year?: number | null
+          source?: Json | null
+          synced_at?: string | null
+          total_tracks?: number | null
           user_id?: string | null
         }
         Relationships: []
