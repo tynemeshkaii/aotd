@@ -20,14 +20,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let mounted = true;
 
-    supabase.auth.getSession().then(({ data }) => {
-      if (!mounted) {
-        return;
-      }
+    supabase.auth
+      .getSession()
+      .then(({ data }) => {
+        if (!mounted) {
+          return;
+        }
 
-      setSession(data.session);
-      setLoading(false);
-    });
+        setSession(data.session);
+      })
+      .catch((error: unknown) => {
+        if (__DEV__) {
+          console.warn('[auth] Failed to restore Supabase session:', error);
+        }
+
+        if (mounted) {
+          setSession(null);
+        }
+      })
+      .finally(() => {
+        if (mounted) {
+          setLoading(false);
+        }
+      });
 
     const {
       data: { subscription },

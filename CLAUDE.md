@@ -25,12 +25,14 @@ The Claude Code sandbox blocks a few things relevant to this repo:
 
 - Schema lives in `supabase/migrations/`. Phase 1 ships only the `profiles` table + `handle_new_user` trigger.
 - To regenerate types from the live DB: `supabase login` (interactive — user must do this), then `npm run db:types`.
-- Until then, `types/database.ts` is hand-written to match the migration. If you change a migration, update the types file too.
+- `types/database.ts` should normally be generated from the linked Supabase project. If CLI/login is unavailable, hand-written updates are only a temporary fallback; regenerate after migrations are applied.
 - Service role keys never go in the app or repo. Only the `anon` key belongs in `.env.local`.
 - Phase 2 adds `streaming_connections` for Spotify tokens. Do **not** grant client `SELECT` on the base table and do **not** add a `select_own` RLS policy there; that would expose `access_token` and `refresh_token`. Client code reads only `public.streaming_connections_safe`.
+- Keep `public.streaming_connections_safe` as default/security definer (`security_invoker = false`) with the explicit `where auth.uid() = user_id` filter. Do not set `security_invoker = true` unless you also redesign base-table grants/RLS, because authenticated users intentionally cannot `SELECT` from `streaming_connections`.
 - Edge Functions under `supabase/functions/` use Deno and per-function `deno.json` import maps. They are excluded from the app `tsconfig.json`; validate them with Supabase/Deno tooling, not the Expo app `tsc`.
 - `upsert-streaming-connection` and `refresh-spotify-token` have `verify_jwt = false` in `supabase/config.toml` because they handle CORS preflight and validate `Authorization` themselves. Keep that validation in the function code if changing them.
 - Spotify refresh tokens may not be returned on every OAuth login. Preserve the existing DB refresh token when `provider_refresh_token` is absent.
+- `refresh-spotify-token` must tolerate an empty request body for authenticated user refreshes and derive `user_id` from JWT. Invalid JSON should return `400 invalid_json_body`.
 
 ## Conventions
 
@@ -40,7 +42,7 @@ The Claude Code sandbox blocks a few things relevant to this repo:
 - UI primitives in `components/ui/` (`Screen`, `Text`, `Button`) — extend these rather than touching `react-native` components directly in screens.
 - Env reads go through `lib/env.ts` (zod-validated). Don't `process.env.*` in app code.
 - Supabase Auth in React Native uses SecureStore, `detectSessionInUrl: false`, `flowType: 'pkce'`, and AppState-driven `startAutoRefresh` / `stopAutoRefresh` in `lib/supabase.ts`.
-- OAuth callback handling lives in `lib/auth.ts` and `app/auth/callback.tsx`: PKCE callbacks use `exchangeCodeForSession(code)`, with `setSession` only as an implicit-flow fallback. Keep the explicit `auth/callback` path so Expo Router can finish deep links that arrive outside the `openAuthSessionAsync` promise.
+- OAuth callback handling lives in `lib/auth.ts` and `app/auth/callback.tsx`: PKCE callbacks use `exchangeCodeForSession(code)`, with `setSession` only as an implicit-flow fallback. Keep the explicit `auth/callback` path so Expo Router can finish deep links that arrive outside the `openAuthSessionAsync` promise. Callback parsing must accept OAuth params from both query strings and hash fragments, and dev logs should print only param keys, never callback codes or tokens.
 - `components/ui/Button` takes `title`, not `label`. The Spotify sign-in button is a dedicated `components/auth/SpotifyButton.tsx`.
 
 ## Phase plans

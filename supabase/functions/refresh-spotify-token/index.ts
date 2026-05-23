@@ -7,6 +7,15 @@ type RefreshBody = {
   user_id?: string;
 };
 
+async function parseJsonBody(req: Request): Promise<RefreshBody> {
+  const text = await req.text();
+  if (!text.trim()) {
+    return {};
+  }
+
+  return JSON.parse(text) as RefreshBody;
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -29,7 +38,13 @@ Deno.serve(async (req) => {
     const apiKey = req.headers.get('apikey');
     const isServiceRequest = authHeader === `Bearer ${serviceRoleKey}` || apiKey === serviceRoleKey;
 
-    const body = (await req.json()) as RefreshBody;
+    let body: RefreshBody;
+    try {
+      body = await parseJsonBody(req);
+    } catch {
+      return jsonError(400, 'invalid_json_body');
+    }
+
     let userId = body.user_id;
 
     if (!isServiceRequest) {

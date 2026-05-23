@@ -70,7 +70,7 @@ supabase/
 │       └── deno.json
 
 types/
-└── database.ts                    # ← обновляется вручную до live db:types
+└── database.ts                    # ← генерируется из live Supabase через npm run db:types
 ```
 
 ### 1.2. Изменения в существующих файлах
@@ -79,7 +79,7 @@ types/
 - `.env.example` / `.env.local` — добавить `EXPO_PUBLIC_SPOTIFY_CLIENT_ID`
 - `lib/env.ts` — расширить `EnvSchema`
 - `lib/supabase.ts` — включить `flowType: 'pkce'` и AppState auto-refresh hooks для React Native
-- `package.json` / `package-lock.json` — добавить SDK 54 совместимые `expo-auth-session`, `expo-crypto`, `expo-web-browser`
+- `package.json` / `package-lock.json` — добавить SDK 54 совместимые `expo-auth-session`, `expo-web-browser`; `expo-crypto` приходит зависимостью `expo-auth-session` в установленном SDK 54 пакете, но после любых изменений обязательно проверять `npx expo install --check`
 - `tsconfig.json` — исключить `supabase/functions` из app `tsc`, потому что они типизируются Deno runtime'ом отдельно
 - `app/(tabs)/profile.tsx` — переписать целиком
 - `app/_layout.tsx` — обернуть в `AuthProvider`, добавить redirect logic
@@ -186,6 +186,12 @@ create view public.streaming_connections_safe as
 grant select on public.streaming_connections_safe to authenticated;
 ```
 
+**Важно про `security_invoker`:** для этой архитектуры view должна оставаться default/security definer (`security_invoker = false`). Базовая таблица намеренно не имеет client `SELECT` grant, поэтому `security_invoker = true` заставит view выполняться правами `authenticated` пользователя и может сломать чтение `streaming_connections_safe`. Если ранее была применена миграция с `security_invoker = true`, добавить новую corrective migration:
+
+```sql
+alter view public.streaming_connections_safe set (security_invoker = false);
+```
+
 **Применить:**
 ```bash
 supabase migration new streaming_connections
@@ -196,7 +202,7 @@ npm run db:types
 
 **Точка проверки:** в Supabase Dashboard → Table Editor видна `streaming_connections`. Из клиента `supabase.from('streaming_connections').select('*')` вернёт ошибку прав (это норма). `supabase.from('streaming_connections_safe').select('*')` вернёт пустой массив или одну строку текущего пользователя.
 
-**Важно:** до `supabase link` / `npm run db:types` файл `types/database.ts` обновляем вручную под миграцию. После привязки проекта его можно заменить сгенерированным типом.
+**Важно:** после `supabase link` / применения миграций перегенерировать `types/database.ts` через `npm run db:types`. Ручное обновление типов допустимо только как временный fallback, если CLI/логин недоступны.
 
 ---
 
@@ -341,7 +347,8 @@ function jsonError(status: number, code: string, detail?: string) {
 import { createClient } from '@supabase/supabase-js';
 
 Deno.serve(async (req) => {
-  const { user_id } = await req.json();
+  const text = await req.text();
+  const { user_id } = text.trim() ? JSON.parse(text) : {};
 
   // Если запрос не service role, валидируем JWT и запрещаем refresh чужого user_id.
   // Service-role вызов нужен другим Edge Functions в фазе 3+.
@@ -395,6 +402,8 @@ Deno.serve(async (req) => {
 **Деплой:** `supabase functions deploy refresh-spotify-token`
 
 **Тест:** через `supabase functions invoke refresh-spotify-token --body '{"user_id":"<твой uuid>"}'` после первого логина.
+
+Функция также должна принимать пустой JSON body от authenticated клиента: в этом случае `user_id` вычисляется из JWT. Невалидный JSON возвращает `400 invalid_json_body`, а не `500 unexpected`.
 
 ---
 
@@ -540,12 +549,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
-      setLoading(false);
-    });
+    supabase.auth
+      .getSession()
+      .then(({ data }) => {
+        setSession(data.session);
+      })
+      .catch((error: unknown) => {
+        if (__DEV__) {
+          console.warn('[auth] Failed to restore Supabase session:', error);
+        }
+        setSession(null);
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+
     const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => {
       setSession(s);
+      setLoading(false);
     });
     return () => { sub.subscription.unsubscribe(); };
   }, []);
@@ -791,10 +812,11 @@ export default function ProfileScreen() {
 | Риск | Митигация |
 |---|---|
 | Supabase OAuth redirect не пробивается обратно в Expo Go | Перепроверить redirect-схемы в Supabase Allow List: `exp://**`, точный `exp://.../--/auth/callback` из Metro лога и `albumoftheday://**` для будущих сборок. `AuthSession.makeRedirectUri({ path: 'auth/callback', native: 'albumoftheday://auth/callback' })` даёт `exp://.../--/auth/callback` в Expo Go и native scheme в dev/prod build |
-| Expo Router перехватывает OAuth callback раньше `openAuthSessionAsync` | Использовать route `app/auth/callback.tsx`, который завершает `exchangeCodeForSession` и делает `syncSpotifyConnection`. Router guard должен пропускать сегмент `auth` без сессии |
+| Expo Router перехватывает OAuth callback раньше `openAuthSessionAsync` | Использовать route `app/auth/callback.tsx`, который завершает `exchangeCodeForSession` и делает `syncSpotifyConnection`. Router guard должен пропускать сегмент `auth` без сессии. Callback route должен принимать OAuth параметры и из query, и из hash-fragment; в dev logs печатать только ключи параметров, не значения `code`/tokens |
 | `provider_token` отсутствует в сессии после signInWithOAuth | Это бывает если в Dashboard выключен "Return tokens to client" или используется неподходящий flow type. Проверка: после `signInWithOAuth` в `session.provider_token` должна быть строка. Если null — Supabase разлогинить и пересоздать сессию |
 | `provider_refresh_token` отсутствует при повторном логине | Это нормальный сценарий у OAuth-провайдеров: refresh token может вернуться только при первом consent. `upsert-streaming-connection` должен переиспользовать уже сохранённый refresh token |
 | Клиент случайно читает токены из `streaming_connections` | Не добавлять `SELECT` policy на базовую таблицу. Клиент читает только `streaming_connections_safe`, где нет `access_token`/`refresh_token` |
+| `streaming_connections_safe` не читается из authenticated клиента | Проверить, что view не переведена в `security_invoker = true`. При текущей модели доступа base table закрыта для клиента, поэтому safe view должна быть security definer плюс явный фильтр `where auth.uid() = user_id` |
 | Spotify возвращает 403 на /me с правильным токеном | Скорее всего юзер не в списке Users and Access (Dev Mode limitation). Сообщение об ошибке в UI должно прямо это говорить |
 | Spotify Client Secret попал в репо | До первого push: `git grep -i 'spotify_client_secret'` и `git log -p` — если попал, ротация через Spotify Dashboard "Reset Client Secret" |
 | PKCE vs implicit flow путаница в Supabase JS | Использовать **последнюю стабильную версию** `@supabase/supabase-js` v2.x. Перед написанием кода Claude Code должен прочитать актуальные доки `signInWithOAuth` для React Native — API мог поменяться |

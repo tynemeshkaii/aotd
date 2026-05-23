@@ -16,25 +16,33 @@ function getErrorMessage(error: unknown) {
 }
 
 type CallbackParams = Record<string, string | string[] | undefined>;
+const OAUTH_PARAM_KEYS = ['code', 'access_token', 'refresh_token', 'error'] as const;
 
 function getParam(params: CallbackParams, key: string) {
   const value = params[key];
   return Array.isArray(value) ? value[0] : value;
 }
 
-function hasOAuthParams(url: string | null, params: CallbackParams) {
-  const query = url ? new URL(url, 'https://phony.example').searchParams : null;
+function getUrlParam(url: string | null, key: string) {
+  if (!url) {
+    return null;
+  }
 
-  return Boolean(
-    query?.get('code') ||
-      query?.get('access_token') ||
-      query?.get('refresh_token') ||
-      query?.get('error') ||
-      getParam(params, 'code') ||
-      getParam(params, 'access_token') ||
-      getParam(params, 'refresh_token') ||
-      getParam(params, 'error'),
-  );
+  const parsedUrl = new URL(url, 'https://phony.example');
+  const queryValue = parsedUrl.searchParams.get(key);
+  if (queryValue) {
+    return queryValue;
+  }
+
+  return new URLSearchParams(parsedUrl.hash.replace(/^#/, '')).get(key);
+}
+
+function getParamKeys(params: CallbackParams) {
+  return Object.keys(params).sort();
+}
+
+function hasOAuthParams(url: string | null, params: CallbackParams) {
+  return OAUTH_PARAM_KEYS.some((key) => getUrlParam(url, key) || getParam(params, key));
 }
 
 function buildCallbackUrl(url: string | null, params: CallbackParams) {
@@ -77,7 +85,7 @@ export default function AuthCallbackScreen() {
     async function finish() {
       if (__DEV__) {
         console.info('[auth] Callback linkingUrl:', linkingUrl);
-        console.info('[auth] Callback params:', params);
+        console.info('[auth] Callback param keys:', getParamKeys(params));
       }
 
       if (!hasOAuthParams(linkingUrl, params)) {
