@@ -8,11 +8,6 @@ const config: ExpoConfig = {
   orientation: 'portrait',
   userInterfaceStyle: 'dark',
   icon: './assets/icon.png',
-  splash: {
-    image: './assets/splash-icon.png',
-    resizeMode: 'contain',
-    backgroundColor: '#0a0a0a',
-  },
   ios: {
     bundleIdentifier: 'com.pesnya.albumoftheday',
     supportsTablet: false,
@@ -30,7 +25,18 @@ const config: ExpoConfig = {
   web: {
     favicon: './assets/favicon.png',
   },
-  plugins: ['expo-router', 'expo-secure-store'],
+  plugins: [
+    'expo-router',
+    'expo-secure-store',
+    [
+      'expo-splash-screen',
+      {
+        image: './assets/splash-icon.png',
+        resizeMode: 'contain',
+        backgroundColor: '#0a0a0a',
+      },
+    ],
+  ],
   experiments: {
     typedRoutes: true,
   },
