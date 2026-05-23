@@ -140,7 +140,7 @@
 - `pg_net` — для HTTP-вызовов из БД (опционально)
 
 **Внешние:**
-- Sentry — error tracking (с фазы 1)
+- Sentry — error tracking. **Отложено до фазы 5–6** (см. §5, фаза 6). В фазе 1 заведён только stub `lib/sentry.ts` без установленного `@sentry/react-native` — подключим перед closed beta, когда появятся реальные пользователи и ошибки, которые имеет смысл ловить.
 - PostHog или Amplitude — аналитика (с фазы 5)
 - RevenueCat — на будущее, для подписки (структура учитывается, но не интегрируется)
 
@@ -344,10 +344,12 @@ activity_feed
 - Структура папок: `app/` (роуты), `components/`, `lib/` (api, supabase client), `types/`
 - 4 базовых экрана-заглушки: Home, Library, Friends, Profile
 - Supabase подключён, базовая схема (см. §3) создана через миграции
-- Sentry интегрирован
+- Sentry — **только stub** `lib/sentry.ts`, без установки `@sentry/react-native`. Полная интеграция перенесена в фазу 6 (перед closed beta)
 - Запускается через Expo Go на личном iPhone
 
 **Точка проверки:** на телефоне открывается, переключается между экранами.
+
+**Статус:** ✅ Выполнено (2026-05-23). Детали в [phase-1-skeleton.md](./phase-1-skeleton.md). Известные отложенные пункты: полная интеграция Sentry → фаза 6; генерация `types/database.ts` через `supabase gen types` после `supabase login` (сейчас hand-written placeholder).
 
 ### Фаза 2 — Spotify Auth + базовый профиль (1–2 недели)
 
@@ -404,6 +406,7 @@ activity_feed
 - Онбординг (3–4 экрана): что это / connect Spotify / выбор времени push / done
 - Error handling: нет интернета, токен истёк, sync упал
 - Иконка + сплеш
+- **Sentry: полная интеграция** (`@sentry/react-native` + `sentry-expo` config plugin, source maps, тестовый event, замена stub `lib/sentry.ts` рабочим init). Перенесено сюда из фазы 1
 - PostHog/Amplitude: ключевые события (login, sync, album_opened, rated, retention)
 - **TestFlight closed beta** (10–20 знакомых меломанов)
 - Сбор фидбека в Notion 2 недели
