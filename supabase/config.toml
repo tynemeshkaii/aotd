@@ -28,3 +28,6 @@ verify_jwt = false
 
 [functions.refresh-spotify-token]
 verify_jwt = false
+
+[functions.sync-spotify-library]
+verify_jwt = false
