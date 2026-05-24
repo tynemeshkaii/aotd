@@ -63,7 +63,7 @@ Deno.serve(async (req) => {
 
 async function runSync(admin: SupabaseClient, userId: string, startedAt: string) {
   try {
-    await upsertSyncStatus(admin, userId, { status: 'syncing', processed_count: 0 });
+    await patchSyncStatus(admin, userId, { status: 'syncing', processed_count: 0 });
 
     const token = await getValidSpotifyToken(admin, userId);
 
@@ -75,7 +75,7 @@ async function runSync(admin: SupabaseClient, userId: string, startedAt: string)
       token,
       async (page) => {
         savedAlbums.push(...page.items);
-        await upsertSyncStatus(admin, userId, {
+        await patchSyncStatus(admin, userId, {
           total_estimate: page.total,
           processed_count: savedAlbums.length,
           saved_albums_count: savedAlbums.length,
@@ -89,7 +89,7 @@ async function runSync(admin: SupabaseClient, userId: string, startedAt: string)
       token,
       async (page) => {
         savedTracks.push(...page.items);
-        await upsertSyncStatus(admin, userId, {
+        await patchSyncStatus(admin, userId, {
           total_estimate: savedAlbums.length + page.total,
           processed_count: savedAlbums.length + savedTracks.length,
           saved_tracks_count: savedTracks.length,
@@ -143,13 +143,13 @@ async function runSync(admin: SupabaseClient, userId: string, startedAt: string)
       .eq('user_id', userId)
       .eq('provider', 'spotify');
 
-    await upsertSyncStatus(admin, userId, {
+    await patchSyncStatus(admin, userId, {
       status: 'completed',
       completed_at: reconcileAt,
       aggregated_albums_count: aggregated.length,
     });
   } catch (e) {
-    await upsertSyncStatus(admin, userId, {
+    await patchSyncStatus(admin, userId, {
       status: 'failed',
       error_code: 'sync_failed',
       error_message: e instanceof Error ? e.message : String(e),
@@ -168,5 +168,21 @@ async function upsertSyncStatus(
     .upsert({ user_id: userId, provider: 'spotify', ...patch }, { onConflict: 'user_id' });
   if (error && error.code !== '23505') {
     console.warn('[sync-spotify-library] upsertSyncStatus failed', error.message);
+  }
+}
+
+/**
+ * Partial update of the existing sync-status row. Use this for incremental
+ * progress writes — UPSERT validates NOT NULL at INSERT time before resolving
+ * ON CONFLICT, so patches without `status` would otherwise fail.
+ */
+async function patchSyncStatus(
+  admin: SupabaseClient,
+  userId: string,
+  patch: Record<string, unknown>,
+) {
+  const { error } = await admin.from('library_sync_status').update(patch).eq('user_id', userId);
+  if (error) {
+    console.warn('[sync-spotify-library] patchSyncStatus failed', error.message);
   }
 }

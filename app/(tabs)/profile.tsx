@@ -2,11 +2,14 @@ import { useQuery } from '@tanstack/react-query';
 import { Alert, View } from 'react-native';
 
 import { useSession } from '@/components/auth/AuthProvider';
+import { SyncBanner } from '@/components/library/SyncBanner';
 import { Avatar } from '@/components/ui/Avatar';
 import { Button } from '@/components/ui/Button';
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
 import { signOut } from '@/lib/auth';
+import { useLibrarySyncStatus } from '@/lib/hooks/useLibrarySyncStatus';
+import { useTriggerLibrarySync } from '@/lib/hooks/useTriggerLibrarySync';
 import { supabase } from '@/lib/supabase';
 
 export default function ProfileScreen() {
@@ -53,6 +56,19 @@ export default function ProfileScreen() {
     },
   });
 
+  const triggerSync = useTriggerLibrarySync();
+  const { status: syncStatus } = useLibrarySyncStatus();
+  const isSyncing =
+    triggerSync.isPending || syncStatus?.status === 'queued' || syncStatus?.status === 'syncing';
+
+  const handleSyncNow = () => {
+    triggerSync.mutate(undefined, {
+      onError: (error) => {
+        Alert.alert('Sync failed', error instanceof Error ? error.message : String(error));
+      },
+    });
+  };
+
   const handleSignOut = () => {
     Alert.alert('Log out?', 'Your Spotify connection stays saved for the next login.', [
       { text: 'Cancel', style: 'cancel' },
@@ -89,6 +105,18 @@ export default function ProfileScreen() {
           )}
         </View>
       )}
+
+      <View className="mt-6">
+        <SyncBanner />
+      </View>
+
+      <Button
+        className="mt-2"
+        disabled={isSyncing}
+        onPress={handleSyncNow}
+        title={isSyncing ? 'Syncing…' : 'Sync library now'}
+        variant="secondary"
+      />
 
       <Button className="mt-8" title="Log out" variant="ghost" onPress={handleSignOut} />
     </Screen>

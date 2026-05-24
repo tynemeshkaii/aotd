@@ -5,6 +5,7 @@ import { SpotifyButton } from '@/components/auth/SpotifyButton';
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
 import { signInWithSpotify, syncSpotifyConnection } from '@/lib/auth';
+import { triggerLibrarySync } from '@/lib/library';
 
 function getErrorMessage(error: unknown) {
   if (error instanceof Error) {
@@ -30,6 +31,12 @@ export default function SignInScreen() {
       setLoading(true);
       const session = await signInWithSpotify();
       await syncSpotifyConnection(session);
+      // Initial library sync — fire-and-forget, user lands on Home and sees the banner.
+      void triggerLibrarySync().catch((error) => {
+        if (__DEV__) {
+          console.warn('[initial-sync] failed:', error);
+        }
+      });
     } catch (error) {
       Alert.alert('Could not sign in', getErrorMessage(error));
     } finally {

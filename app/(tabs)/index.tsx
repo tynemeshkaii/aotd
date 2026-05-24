@@ -1,3 +1,4 @@
+import { SyncBanner } from '@/components/library/SyncBanner';
 import { PlaceholderCard } from '@/components/PlaceholderCard';
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
@@ -9,6 +10,7 @@ export default function HomeScreen() {
       <Text variant="caption" className="mt-1 mb-6">
         Завтрашний пик ждёт твоего открытия
       </Text>
+      <SyncBanner />
       <PlaceholderCard
         title="Тут будет карточка альбома"
         description="Подключим алгоритм и Spotify в фазах 2–4"
