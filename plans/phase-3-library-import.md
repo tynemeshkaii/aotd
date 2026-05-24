@@ -3,6 +3,8 @@
 > Детальный план реализации. Опирается на [master-plan.md](./master-plan.md) §5 (фаза 3).
 > Сроки: 1.5–2 недели (10–14 рабочих сессий).
 > Цель: после успешного OAuth (фаза 2) приложение в фоне импортирует библиотеку юзера из Spotify (сохранённые альбомы + сохранённые треки, агрегированные в альбомы). Пользователь сразу видит Home/Library, наверху — банер прогресса с реальным числом. По окончании банер исчезает, в Library — отсортированный список альбомов с поиском. Кнопка "Sync" в Profile запускает повторную синхронизацию. Автосинк раз в 24 часа при открытии приложения.
+>
+> **Post-pivot 2026-05-24:** UI-вкладка Library удалена. Импорт библиотеки остаётся backend-сигналом для алгоритма; пользователю видны Discoveries, initial sync splash и статус библиотеки в Profile. Актуальные изменения описаны в [discoveries-pivot.md](./discoveries-pivot.md).
 
 ---
 
@@ -877,6 +879,13 @@ void triggerLibrarySync().catch((e) => {
 - [ ] E2E прогон 11 шагов из §2 шаг 11
 - [ ] Коммит `feat(phase-3): spotify library import with background sync`
 - [ ] Коммит `docs(phase-3): plan and verification doc`
+
+### Post-pivot (применили после ретроспективы):
+
+- [ ] UI-вкладка Library удалена, заменена на заглушку Discoveries
+- [ ] Sync banner вынесен только в Profile
+- [ ] Initial sync блокирует табы full-screen splash'ем
+- [ ] Статус библиотеки виден в Profile (`X albums tracked · synced Yh ago`)
 
 ---
 

@@ -44,7 +44,9 @@ async function maybeAutoSync(userId: string) {
       .select('last_synced_at')
       .eq('provider', 'spotify')
       .maybeSingle();
-    const lastSyncedAt = connection?.last_synced_at ?? null;
+    if (!connection) return;
+
+    const lastSyncedAt = connection.last_synced_at;
     const stale =
       !lastSyncedAt || Date.now() - new Date(lastSyncedAt).getTime() > AUTO_SYNC_STALE_MS;
     if (!stale) return;

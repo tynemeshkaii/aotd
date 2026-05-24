@@ -8,7 +8,7 @@ export function useTriggerLibrarySync() {
     mutationFn: triggerLibrarySync,
     onSettled: () => {
       qc.invalidateQueries({ queryKey: ['library-sync-status'] });
-      qc.invalidateQueries({ queryKey: ['library'] });
+      qc.invalidateQueries({ queryKey: ['library-stats'] });
     },
   });
 }

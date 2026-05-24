@@ -8,6 +8,8 @@ import { Button } from '@/components/ui/Button';
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
 import { signOut } from '@/lib/auth';
+import { relativeTime } from '@/lib/format';
+import { useLibraryStats } from '@/lib/hooks/useLibraryStats';
 import { useLibrarySyncStatus } from '@/lib/hooks/useLibrarySyncStatus';
 import { useTriggerLibrarySync } from '@/lib/hooks/useTriggerLibrarySync';
 import { supabase } from '@/lib/supabase';
@@ -42,9 +44,14 @@ export default function ProfileScreen() {
     queryKey: ['streaming-connection', userId],
     enabled: !!userId,
     queryFn: async () => {
+      if (!userId) {
+        throw new Error('missing_user_id');
+      }
+
       const { data, error } = await supabase
         .from('streaming_connections_safe')
         .select('provider, connected_at')
+        .eq('user_id', userId)
         .eq('provider', 'spotify')
         .maybeSingle();
 
@@ -56,6 +63,7 @@ export default function ProfileScreen() {
     },
   });
 
+  const { data: libraryStats, isLoading: libraryStatsLoading } = useLibraryStats();
   const triggerSync = useTriggerLibrarySync();
   const { status: syncStatus } = useLibrarySyncStatus();
   const isSyncing =
@@ -94,15 +102,27 @@ export default function ProfileScreen() {
           {connection ? (
             <Text variant="caption" className="mt-2 text-center">
               Spotify connected
-              {connection.connected_at
-                ? ` · ${new Date(connection.connected_at).toLocaleDateString()}`
-                : ''}
+              {connection.connected_at ? ` · ${relativeTime(connection.connected_at)}` : ''}
             </Text>
           ) : (
             <Text variant="caption" className="mt-2 text-center">
               Spotify connection is syncing
             </Text>
           )}
+
+          <View className="mt-6 w-full border-t border-surface-2 pt-5">
+            <Text variant="caption" className="text-center">
+              Library:{' '}
+              {libraryStatsLoading
+                ? 'loading...'
+                : libraryStats?.albumsTracked == null
+                  ? 'not synced yet'
+                  : `${libraryStats.albumsTracked} albums tracked`}
+            </Text>
+            <Text variant="caption" className="mt-2 text-center">
+              Last synced: {relativeTime(libraryStats?.lastSyncedAt ?? null)}
+            </Text>
+          </View>
         </View>
       )}
 

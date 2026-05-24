@@ -10,6 +10,7 @@ import {
   getSpotifyRedirectTo,
   syncSpotifyConnection,
 } from '@/lib/auth';
+import { triggerLibrarySync } from '@/lib/library';
 
 function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error);
@@ -102,6 +103,12 @@ export default function AuthCallbackScreen() {
       try {
         const session = await completeSpotifyOAuthFromUrl(callbackUrl);
         await syncSpotifyConnection(session);
+        // Initial sync is fire-and-forget. The splash picks up status via Realtime.
+        triggerLibrarySync().catch((error) => {
+          if (__DEV__) {
+            console.warn('[initial-sync] failed:', error);
+          }
+        });
 
         if (mounted) {
           router.replace('/(tabs)');

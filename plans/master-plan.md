@@ -365,14 +365,14 @@ activity_feed
 
 ### Фаза 3 — Импорт библиотеки (1–2 недели)
 
-- Edge Function `sync-spotify-library`:
-  - Постранично (limit=50) тянет `/me/albums`
-  - Также `/me/playlists` → саундтрек проектов "слышал"? — **обсуждаем, нужно ли**
-  - Записывает в `user_library`
-  - Дедуплицирует через MusicBrainz lookup (по artist+title)
-- Экран Library: список с поиском
+- Edge Function `sync-spotify-library` импортирует Saved Albums + Saved Tracks
+- Агрегация через `TRACK_THRESHOLD = 4`
+- Background-выполнение через `EdgeRuntime.waitUntil`, прогресс через Realtime
+- **Discoveries pivot:** UI-вкладки Library нет — данные используются только алгоритмом
+  и видны в Profile как статус
+- Initial sync блокирует доступ к табам full-screen splash'ем
 - Кнопка "Sync" в Profile
-- Автосинк раз в 24 часа
+- Автосинк раз в 24ч в фоне (без UI)
 
 **Точка проверки:** библиотека юзера полностью в приложении.
 
@@ -391,6 +391,9 @@ activity_feed
 
 ### Фаза 5 — Карточка альбома и оценки (1–2 недели)
 
+- Реализация полноценного Discoveries screen: список прошлых `albums_of_the_day`
+  с LEFT JOIN на ratings, статус-бейджи (rated/skipped/listening/pending),
+  сортировка по date desc
 - Дизайн карточки (обложка большая, метаданные, рейтинги)
 - Deep link в Spotify (`spotify:album:xxx`)
 - UI оценки 1–10 (слайдер или звёзды — A/B на бете)
@@ -498,7 +501,11 @@ activity_feed
 ## 9. Открытые вопросы (решаем по ходу)
 
 - [ ] Стиль UI: минимализм (типа Things 3) vs богатый визуал (типа Marvis)? → решаем в фазе 5 с дизайн-моками
-- [ ] Учитывать ли Spotify playlists юзера, не только "Saved albums"? → решаем в фазе 3
+- [x] Структура нижней навигации: Home / Discoveries / Friends / Profile.
+      "Library" удалён как продуктово бесполезный. Импорт виден в Profile
+      как статус (2026-05-24).
+- [x] Учитывать ли Spotify playlists юзера: решено в фазе 3 — только Saved Albums
+      + Saved Tracks с агрегацией через TRACK_THRESHOLD=4.
 - [ ] Скейл оценки: 1–10, 1–5 звёзд, или 1–100? → A/B на бете
 - [ ] Streak-механика? → решаем после первых данных retention
 - [ ] Локализация: только английский, или сразу RU+EN? → решаем перед App Store submission

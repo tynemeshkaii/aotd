@@ -33,6 +33,9 @@ The Claude Code sandbox blocks a few things relevant to this repo:
 - `upsert-streaming-connection` and `refresh-spotify-token` have `verify_jwt = false` in `supabase/config.toml` because they handle CORS preflight and validate `Authorization` themselves. Keep that validation in the function code if changing them.
 - Spotify refresh tokens may not be returned on every OAuth login. Preserve the existing DB refresh token when `provider_refresh_token` is absent.
 - `refresh-spotify-token` must tolerate an empty request body for authenticated user refreshes and derive `user_id` from JWT. Invalid JSON should return `400 invalid_json_body`.
+- Phase 3 adds `user_library` and `library_sync_status` tables + `user_library_active` view. Client writes to neither — all writes go through service role (Edge Function `sync-spotify-library`). Client reads via RLS `select_own`. `sync-spotify-library` also has `verify_jwt = false` and validates JWT itself.
+- **CRITICAL — upsert vs update on tables with NOT NULL columns:** PostgreSQL evaluates NOT NULL constraints *before* resolving ON CONFLICT. A `.upsert()` with a partial payload (missing `status`, `provider`, etc.) will fail at the INSERT phase even when the row already exists. Pattern: use a dedicated *create* upsert (all NOT NULL fields included) for initial row creation, then use plain `.update().eq('user_id', userId)` for incremental progress patches. Never use `.upsert()` for progress patches on `library_sync_status`.
+- `user_library_active` view follows the same security pattern as `streaming_connections_safe`: `security_invoker = false` (security definer) with an explicit `where auth.uid() = user_id` filter. Do not set `security_invoker = true` unless redesigning base-table grants/RLS.
 
 ## Conventions
 
@@ -44,6 +47,21 @@ The Claude Code sandbox blocks a few things relevant to this repo:
 - Supabase Auth in React Native uses SecureStore, `detectSessionInUrl: false`, `flowType: 'pkce'`, and AppState-driven `startAutoRefresh` / `stopAutoRefresh` in `lib/supabase.ts`.
 - OAuth callback handling lives in `lib/auth.ts` and `app/auth/callback.tsx`: PKCE callbacks use `exchangeCodeForSession(code)`, with `setSession` only as an implicit-flow fallback. Keep the explicit `auth/callback` path so Expo Router can finish deep links that arrive outside the `openAuthSessionAsync` promise. Callback parsing must accept OAuth params from both query strings and hash fragments, and dev logs should print only param keys, never callback codes or tokens.
 - `components/ui/Button` takes `title`, not `label`. The Spotify sign-in button is a dedicated `components/auth/SpotifyButton.tsx`.
+
+## Current product state
+
+- Bottom tabs are **Home / Discoveries / Friends / Profile**. The old `Library` tab was intentionally removed in the Discoveries pivot; do not recreate `app/(tabs)/library.tsx` or route users there.
+- Phase 3 library import pipeline is fully implemented: `user_library` + `library_sync_status` tables, `sync-spotify-library` Edge Function, `lib/library.ts` (`triggerLibrarySync`), `lib/hooks/useLibrarySyncStatus.ts`, `lib/hooks/useTriggerLibrarySync.ts`, `lib/hooks/useLibraryStats.ts`, `components/library/SyncBanner.tsx`, `components/ui/ProgressBar.tsx`.
+- `Discoveries` is currently a placeholder at `app/(tabs)/discoveries.tsx`. The real recommendation history list belongs to phase 5, after `albums_of_the_day` / ratings data exists.
+- Spotify library import remains backend data for the recommendation algorithm. Keep `user_library`, `library_sync_status`, `sync-spotify-library`, `lib/library.ts`, `useLibrarySyncStatus`, and `useTriggerLibrarySync`; do not delete or rename that pipeline just because the Library UI is gone.
+- Deleted on purpose: `components/library/LibraryListItem.tsx`, `components/library/LibrarySearchBar.tsx`, and `lib/hooks/useLibrary.ts`. Avoid reintroducing these unless a future plan explicitly restores a user-facing library list.
+- `SyncBanner` should render only in Profile. Home and Discoveries should not show sync progress or sync errors.
+- Profile owns manual library sync and library status. It uses `useLibraryStats()` for `aggregated_albums_count` and `last_synced_at`, and `relativeTime()` from `lib/format.ts` for compact timestamps.
+- Initial library sync after OAuth is fire-and-forget from both `app/(auth)/sign-in.tsx` and `app/auth/callback.tsx`. `RouterGuard` in `app/_layout.tsx` blocks tabs with `InitialSyncingScreen` only while `aggregated_albums_count` is null and sync status is missing, queued, syncing, or failed. It waits for `useLibrarySyncStatus` to finish loading first to avoid flashing the splash for existing users.
+- `components/auth/AuthProvider.tsx` handles stale auto-sync after session restore, but it should skip auto-sync until a Spotify connection row exists. Initial OAuth sync is handled by sign-in/callback, not by racing AuthProvider against connection creation. `maybeAutoSync` has three guards: (1) skip if `library_sync_status.status` is `queued` or `syncing`; (2) 15-min cooldown after `failed`; (3) `autoSyncedRef` (`useRef<Set<string>>`) ensures it fires at most once per userId per app session even if the `session` object identity changes.
+- **Spotify rate limit risk in Development Mode:** Spotify Development Mode apps have strict per-client_id rate limits. A cascade of auto-syncs (e.g. caused by a bug that prevents sync completion) can trigger 429 errors that block *all* Spotify API calls including OAuth `/me` — breaking login for hours. Always check `library_sync_status.status` before triggering a new sync, and always verify that syncs actually reach `completed` in logs before shipping auto-sync code.
+- **Realtime channel naming in hooks:** `supabase-js` reuses channels by name. If the same hook (e.g. `useLibrarySyncStatus`) mounts in multiple components simultaneously (SyncBanner on Home + Profile + etc.), the second `.on()` call throws "cannot add postgres_changes callbacks after subscribe()". Fix: append `useId()` to the channel name so each component instance gets its own channel. Example: `` `sync-status-${userId}-${instanceId}` ``.
+- The authoritative pivot plan is `plans/discoveries-pivot.md`; `plans/phase-3-library-import.md` contains older Library UI details with a post-pivot note. When they conflict, the Discoveries pivot wins for client UI.
 
 ## Phase plans
 

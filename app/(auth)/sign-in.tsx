@@ -31,8 +31,8 @@ export default function SignInScreen() {
       setLoading(true);
       const session = await signInWithSpotify();
       await syncSpotifyConnection(session);
-      // Initial library sync — fire-and-forget, user lands on Home and sees the banner.
-      void triggerLibrarySync().catch((error) => {
+      // Initial sync is fire-and-forget. The splash picks up status via Realtime.
+      triggerLibrarySync().catch((error) => {
         if (__DEV__) {
           console.warn('[initial-sync] failed:', error);
         }

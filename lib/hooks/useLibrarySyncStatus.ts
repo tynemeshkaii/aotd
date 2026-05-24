@@ -54,7 +54,10 @@ export function useLibrarySyncStatus(): { status: SyncStatus | null; loading: bo
         },
         (payload) => {
           const next = payload.new as SyncStatus | null;
-          if (next) qc.setQueryData(queryKey, next);
+          if (next) {
+            qc.setQueryData(queryKey, next);
+            qc.invalidateQueries({ queryKey: ['library-stats', userId] });
+          }
         },
       )
       .subscribe();

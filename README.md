@@ -100,9 +100,9 @@ npm run db:new      # create a new migration file
 │   ├── _layout.tsx              # QueryClientProvider + Stack + Sentry init
 │   ├── +not-found.tsx
 │   └── (tabs)/
-│       ├── _layout.tsx          # Tab bar (Home / Library / Friends / Profile)
+│       ├── _layout.tsx          # Tab bar (Home / Discoveries / Friends / Profile)
 │       ├── index.tsx
-│       ├── library.tsx
+│       ├── discoveries.tsx
 │       ├── friends.tsx
 │       └── profile.tsx
 ├── components/
