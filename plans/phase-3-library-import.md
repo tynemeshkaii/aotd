@@ -932,6 +932,60 @@ void triggerLibrarySync().catch((e) => {
 
 ---
 
+## 6a. Тестирование на большом аккаунте (10 000+ saved tracks)
+
+> Контекст: единственный доступный Spotify-аккаунт автора содержит >10 000 лайкнутых треков. Тестового аккаунта поменьше нет. Это вносит специфические риски, которые в обычном плане не учтены.
+
+### Риски
+
+| Риск | Почему критично именно для большого аккаунта |
+|---|---|
+| **Spotify rate limit (429) и многочасовой бан в Development Mode** | `/me/tracks` отдаёт по 50 треков за запрос → 10k треков = минимум 200 последовательных HTTP-вызовов. Каждый прогон жжёт rate-limit бюджет. Уже однажды получили многочасовой бан после каскада auto-sync. |
+| **Edge Function wall time** | `EdgeRuntime.waitUntil()` имеет лимит wall time (~150–400с в зависимости от плана Supabase). 200+ запросов с 401/429 retry и backoff могут упереться в потолок и оборваться на середине — статус залипнет в `syncing`, `aggregated_albums_count` останется null, initial splash повиснет. |
+| **Batch insert size** | После агрегации с `TRACK_THRESHOLD = 4` ожидается ~1–3 тысячи альбомов. План шага 5 уже делает chunks по 500 — это корректно, не трогать. |
+| **UX initial splash на минуты** | `InitialSyncingScreen` будет висеть несколько минут. Если Realtime / polling не обновляет прогресс — выглядит как фриз, юзер жмёт `Try again` → каскад. Прогресс должен реально тикать. |
+
+### Митигации (реализовать ДО первого e2e на большом аккаунте)
+
+1. **Флаг `SYNC_TRACK_LIMIT` в Edge Function.** Env-переменная, опциональная. Если задана — `fetchAllSpotifyPaged` для `/me/tracks` останавливается после `Math.ceil(N/50)` страниц. Меняется без redeploy через `supabase secrets set SYNC_TRACK_LIMIT=500`. Для итеративной отладки выставляем 300–500, для финального стресс-теста убираем переменную.
+
+   ```ts
+   // в sync-spotify-library/index.ts перед вызовом fetchAllSpotifyPaged для /me/tracks:
+   const trackLimit = Deno.env.get('SYNC_TRACK_LIMIT');
+   const maxTrackPages = trackLimit ? Math.ceil(Number(trackLimit) / 50) : Infinity;
+   ```
+   `fetchAllSpotifyPaged` должен принять опциональный `maxPages` параметр и остановиться по нему.
+
+2. **Экспоненциальный backoff с jitter в `fetchAllSpotifyPaged`** на 429 — не просто `Retry-After` секунд, а `min(Retry-After, 2^attempt + random()) * 1000`. Уменьшает шанс синхронных volleys на следующих прогонах.
+
+3. **Логирование прогресса в Edge Function logs каждые N страниц** (`console.log("[sync] fetched 500 tracks, page 10/?")`). Без этого при wall-time оборванном syncе непонятно где упал.
+
+4. **Гарантированное закрытие сессии в catch.** Если sync упал — `library_sync_status.status` обязан стать `failed`, а не остаться в `syncing`. В текущем плане шага 5 это сделано через try/catch вокруг `runSync` — проверить что catch реально достижим из всех ветвей (включая wall-time timeout: тут — нет, поэтому см. пункт 5).
+
+5. **Защита от залипания в `syncing`.** Если `library_sync_status.status = 'syncing'` старше N минут (предлагаю 10 мин) — клиентский `RouterGuard` / `InitialSyncingScreen` обязан показать кнопку `Try again`, которая удаляет строку и триггерит новый sync. Без этого после wall-time таймаута юзер навсегда заперт в splash.
+
+### Регламент прогонов
+
+Каждый прогон на большом аккаунте — дорогой (жжёт rate-limit бюджет Spotify Development Mode на весь client_id). Дисциплина:
+
+- **Перед каждым запуском sync вручную сбросить `library_sync_status`:**
+  `delete from public.library_sync_status where user_id = '<uuid>';`
+- **Проверить логи предыдущего запуска в Supabase Functions logs**, не повторять одну и ту же ошибку.
+- **Между прогонами выжидать минимум 10–15 минут**, даже если предыдущий завершился успешно. Rate-limit окно у Spotify не мгновенное.
+- **Не запускать sync параллельно с другими операциями над Spotify API** (например, ручное переподключение через OAuth) — `/me` в OAuth callback тоже учитывается в общем лимите client_id.
+
+### Стратегия e2e в 3 этапа
+
+1. **Малый объём с лимитом.** `supabase secrets set SYNC_TRACK_LIMIT=300`, прогнать полный цикл (sign-in → splash → discoveries → profile → manual sync из Profile). Покрывает 90% багов UX/логики. **Несколько итераций — здесь.**
+2. **Средний объём.** `SYNC_TRACK_LIMIT=2000` — один прогон, чтобы поймать batch-insert и Realtime-нагрузочные баги.
+3. **Полный объём (стресс-тест).** `supabase secrets unset SYNC_TRACK_LIMIT`, один финальный прогон. Цель — убедиться что wall time выдерживается и `synced_at < started_at` soft-delete отрабатывает на полной агрегации. Если упрётся в wall time — это сигнал к фазе 4 (нужен chunked sync с возобновлением, а не один long-running invoke).
+
+### Альтернатива: второй тестовый аккаунт
+
+В перспективе настоятельно рекомендую завести второй Spotify free-аккаунт на ProtonMail alias (у автора уже Proton — `+test` алиасы работают), добавить в Spotify Dashboard → Users and Access (whitelist Development Mode, лимит 25 юзеров). Это разово, но снимает все эти ограничения для будущих фаз. На фазе 3 — опционально, минимально жизнеспособная стратегия выше работает и без него.
+
+---
+
 ## 7. Точки обращения к Claude Code
 
 Рекомендую разбить на **4 задачи**:

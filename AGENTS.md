@@ -1,5 +1,77 @@
-# Expo HAS CHANGED
+@AGENTS.md
 
-Read the exact versioned docs at https://docs.expo.dev/versions/v54.0.0/ before writing any code.
+# Working on this codebase
 
-Note: project intentionally sits on SDK 54 — that's the SDK supported by the current App Store build of Expo Go. Do not bump to a newer SDK before verifying the latest App Store Expo Go supports it (open Expo Go → Profile → Supported SDK).
+## Dependency rules (don't skip)
+
+- **`npm install` must be run with `--legacy-peer-deps`.** Several deps (NativeWind, Supabase, etc.) have peer-dep conflicts with the Expo SDK's pinned RN/React. Plain `npm install` fails ERESOLVE.
+- **Pin `react` and `react-native` to exact versions** (no `^`, no `~`). RN bundles its renderer locked to a specific React patch, so a caret range will let npm pick a newer 19.x and crash at runtime with "Incompatible React versions". When bumping either, use `npm install --save-exact`.
+- **Before bumping Expo SDK**, open Expo Go on the device → Profile → "Supported SDK". App Store ships Expo Go behind npm by weeks. If npm has SDK 56 but App Store Expo Go reports SDK 54, the project must stay on 54 — otherwise the bundle loads to a "requires newer Expo Go" wall. Pin all `expo-*` packages to that SDK's matrix and use `npx expo install --check` to verify.
+- **For SDK 54, `expo-auth-session` is bundled as `~7.0.11`.** Older notes that say "expo-auth-session v6" apply to SDK 53. Use the exact SDK 54 docs before touching OAuth, and verify with `npx expo install --check`.
+- **Reanimated 4 needs `react-native-worklets` installed explicitly.** The babel worklet plugin moved out of `react-native-reanimated` in v4. Missing it surfaces as `Cannot find module 'react-native-worklets/plugin'` from `babel-preset-expo`.
+- **Stray `node_modules` in any parent directory (e.g. `/Users/pesnya/node_modules`) will poison resolution** — Node walks up the tree. If you see version mismatch errors that `npm ls` can't explain, check parent dirs.
+- In the Codex desktop shell, `node` may come from the app bundle while `npm`/`npx` live under `/opt/homebrew/bin`. If `npx` or nested `npm install` is missing, run commands with `PATH=/opt/homebrew/bin:$PATH`.
+
+## Sandbox behavior
+
+The Claude Code sandbox blocks a few things relevant to this repo:
+
+- When a change requires the user to run commands outside the assistant session (for example `supabase db push`, `supabase functions deploy ...`, `npm install`, app store / Expo Go checks, or any manual CLI step), explicitly remind the user in the final response. Include the exact commands, the required order, and why the order matters.
+- `rm -rf node_modules` — denied even with sandbox off. Ask the user to run it manually.
+- `supabase` CLI — writes to `~/.supabase/telemetry.json`, blocked by default. Run with `dangerouslyDisableSandbox: true`.
+- `npm install` writes to `~/.npm/_cacache` — same, needs sandbox off.
+- Anything under `~/.ssh`, `~/.aws`, or `./.env*` is read-blocked.
+
+## Supabase
+
+- Schema lives in `supabase/migrations/`. Phase 1 ships only the `profiles` table + `handle_new_user` trigger.
+- To regenerate types from the live DB: `supabase login` (interactive — user must do this), then `npm run db:types`.
+- `types/database.ts` should normally be generated from the linked Supabase project. If CLI/login is unavailable, hand-written updates are only a temporary fallback; regenerate after migrations are applied.
+- Service role keys never go in the app or repo. Only the `anon` key belongs in `.env.local`.
+- Phase 2 adds `streaming_connections` for Spotify tokens. Do **not** grant client `SELECT` on the base table and do **not** add a `select_own` RLS policy there; that would expose `access_token` and `refresh_token`. Client code reads only `public.streaming_connections_safe`.
+- Keep `public.streaming_connections_safe` as default/security definer (`security_invoker = false`) with the explicit `where auth.uid() = user_id` filter. Do not set `security_invoker = true` unless you also redesign base-table grants/RLS, because authenticated users intentionally cannot `SELECT` from `streaming_connections`.
+- Edge Functions under `supabase/functions/` use Deno and per-function `deno.json` import maps. They are excluded from the app `tsconfig.json`; validate them with Supabase/Deno tooling, not the Expo app `tsc`.
+- `upsert-streaming-connection` and `refresh-spotify-token` have `verify_jwt = false` in `supabase/config.toml` because they handle CORS preflight and validate `Authorization` themselves. Keep that validation in the function code if changing them.
+- Spotify refresh tokens may not be returned on every OAuth login. Preserve the existing DB refresh token when `provider_refresh_token` is absent.
+- `refresh-spotify-token` must tolerate an empty request body for authenticated user refreshes and derive `user_id` from JWT. Invalid JSON should return `400 invalid_json_body`.
+- Phase 3 adds `user_library` and `library_sync_status` tables + `user_library_active` view. Client writes to neither — all writes go through service role (Edge Function `sync-spotify-library`). Client reads via RLS `select_own`. `sync-spotify-library` also has `verify_jwt = false` and validates JWT itself.
+- **CRITICAL — upsert vs update on tables with NOT NULL columns:** PostgreSQL evaluates NOT NULL constraints *before* resolving ON CONFLICT. A `.upsert()` with a partial payload (missing `status`, `provider`, etc.) will fail at the INSERT phase even when the row already exists. Pattern: use a dedicated *create* upsert (all NOT NULL fields included) for initial row creation, then use plain `.update().eq('user_id', userId)` for incremental progress patches. Never use `.upsert()` for progress patches on `library_sync_status`.
+- `user_library_active` view follows the same security pattern as `streaming_connections_safe`: `security_invoker = false` (security definer) with an explicit `where auth.uid() = user_id` filter. Do not set `security_invoker = true` unless redesigning base-table grants/RLS.
+
+## Conventions
+
+- Path alias `@/*` resolves to repo root (see `tsconfig.json`).
+- Styling via NativeWind v4 — Tailwind class names on RN components. Color tokens (`bg`, `surface`, `text`, `muted`, `accent`) live in `tailwind.config.js`; reach for them before introducing hex literals.
+- `global.css` is intentionally excluded from Biome (`@tailwind` directives are unknown to its CSS linter).
+- UI primitives in `components/ui/` (`Screen`, `Text`, `Button`) — extend these rather than touching `react-native` components directly in screens.
+- Env reads go through `lib/env.ts` (zod-validated). Don't `process.env.*` in app code.
+- Supabase Auth in React Native uses SecureStore, `detectSessionInUrl: false`, `flowType: 'pkce'`, and AppState-driven `startAutoRefresh` / `stopAutoRefresh` in `lib/supabase.ts`.
+- OAuth callback handling lives in `lib/auth.ts` and `app/auth/callback.tsx`: PKCE callbacks use `exchangeCodeForSession(code)`, with `setSession` only as an implicit-flow fallback. Keep the explicit `auth/callback` path so Expo Router can finish deep links that arrive outside the `openAuthSessionAsync` promise. Callback parsing must accept OAuth params from both query strings and hash fragments, and dev logs should print only param keys, never callback codes or tokens.
+- `components/ui/Button` takes `title`, not `label`. The Spotify sign-in button is a dedicated `components/auth/SpotifyButton.tsx`.
+
+## Current product state
+
+- Bottom tabs are **Home / Discoveries / Profile** (3 tabs). The old `Library` tab was removed in the Discoveries pivot (2026-05-24). The `Friends` tab was removed in the v1-scope cut (2026-05-25) — all social features deferred to v2, tracked in `plans/v2-social.md`. The `Stats` tab was removed in the concept-refinement pass (2026-05-25) — its content (taste DNA, top genres, decade distribution, streaks) is merged into a rich `Profile` screen rather than living in its own tab. Do not recreate `library.tsx`, `friends.tsx`, or `stats.tsx`.
+- A general OS-level Share Sheet on the album card (no social graph, just `expo-sharing` + `react-native-view-shot` for a generated share card with cover) is in scope for v1 and lives in phase 5.
+- **V1 target audience: English-speaking only.** All UI copy is in English. Localization (RU, etc.) is deferred until after v1 launch. Do not add i18n infrastructure or Russian strings in v1.
+- **No skip mechanic.** Users do not skip albums. If they don't open or rate today's pick, it simply remains in their Discoveries list with `status='pending'`. The `albums_of_the_day.status` enum is `pending | opened | rated` only — there is no `skipped` value.
+- **Rating system: 5 emotional levels** (`Loved it / Liked it / It was alright / Not for me / Bad`), internally mapped to integers 5/4/3/2/1 for storage. No numeric sliders, no star pickers, no emojis as the primary visual. Plain word labels.
+- **Ratings are a personal journal, NOT an algorithm input.** The recommendation algorithm reads only `user_library` + `recommendation_history` (for dedup). It does not read `ratings`. This is a deliberate design choice — see `plans/master-plan.md` §4. Do not silently feed ratings back into scoring without an explicit plan change. When a user first rates an album, show microcopy clarifying: ratings are for their journal/stats/sharing, not for tuning future recommendations.
+- **Algorithm does NOT rank by genre taxonomy.** Genres in music are too fragmented and noisy (especially in underground). The algorithm uses artist similarity (Last.fm `artist.getSimilar` + Spotify `/artists/{id}/related-artists`) and audio features (Spotify `/audio-features`) as primary signals, not genre tags. `selection_reason` UI copy similarly references artists from the user's library, not genres.
+- **Spotify Free vs Premium detection.** On every OAuth and connection refresh, parse `product` from Spotify `/me` response and store in `streaming_connections.spotify_product`. For `free` accounts, show a one-time dismissible explainer that Free Spotify may shuffle tracks instead of playing the album in order. Not a blocker, just a soft heads-up.
+- **"Why this album" block on the album card is mandatory.** Parse `albums_of_the_day.selection_reason` jsonb and render a short, plain-language line — e.g. "Picked because you've been saving stuff by similar artists" or "Based on your library. We hope you like it. If not — tomorrow's pick is on us." Tone is humorous + low-pressure across the whole app.
+- Phase 3 library import pipeline is fully implemented: `user_library` + `library_sync_status` tables, `sync-spotify-library` Edge Function, `lib/library.ts` (`triggerLibrarySync`), `lib/hooks/useLibrarySyncStatus.ts`, `lib/hooks/useTriggerLibrarySync.ts`, `lib/hooks/useLibraryStats.ts`, `components/library/SyncBanner.tsx`, `components/ui/ProgressBar.tsx`.
+- `Discoveries` is currently a placeholder at `app/(tabs)/discoveries.tsx`. The real recommendation history list belongs to phase 5, after `albums_of_the_day` / ratings data exists.
+- Spotify library import remains backend data for the recommendation algorithm. Keep `user_library`, `library_sync_status`, `sync-spotify-library`, `lib/library.ts`, `useLibrarySyncStatus`, and `useTriggerLibrarySync`; do not delete or rename that pipeline just because the Library UI is gone.
+- Deleted on purpose: `components/library/LibraryListItem.tsx`, `components/library/LibrarySearchBar.tsx`, and `lib/hooks/useLibrary.ts`. Avoid reintroducing these unless a future plan explicitly restores a user-facing library list.
+- `SyncBanner` should render only in Profile. Home and Discoveries should not show sync progress or sync errors.
+- Profile owns manual library sync and library status. It uses `useLibraryStats()` for `aggregated_albums_count` and `last_synced_at`, and `relativeTime()` from `lib/format.ts` for compact timestamps.
+- Initial library sync after OAuth is fire-and-forget from both `app/(auth)/sign-in.tsx` and `app/auth/callback.tsx`. `RouterGuard` in `app/_layout.tsx` blocks tabs with `InitialSyncingScreen` only while `aggregated_albums_count` is null and sync status is missing, queued, syncing, or failed. It waits for `useLibrarySyncStatus` to finish loading first to avoid flashing the splash for existing users.
+- `components/auth/AuthProvider.tsx` handles stale auto-sync after session restore, but it should skip auto-sync until a Spotify connection row exists. Initial OAuth sync is handled by sign-in/callback, not by racing AuthProvider against connection creation. `maybeAutoSync` has three guards: (1) skip if `library_sync_status.status` is `queued` or `syncing`; (2) 15-min cooldown after `failed`; (3) `autoSyncedRef` (`useRef<Set<string>>`) ensures it fires at most once per userId per app session even if the `session` object identity changes.
+- **Spotify rate limit risk in Development Mode:** Spotify Development Mode apps have strict per-client_id rate limits. A cascade of auto-syncs (e.g. caused by a bug that prevents sync completion) can trigger 429 errors that block *all* Spotify API calls including OAuth `/me` — breaking login for hours. Always check `library_sync_status.status` before triggering a new sync, and always verify that syncs actually reach `completed` in logs before shipping auto-sync code.
+- **Realtime channel naming in hooks:** `supabase-js` reuses channels by name. If the same hook (e.g. `useLibrarySyncStatus`) mounts in multiple components simultaneously (SyncBanner on Home + Profile + etc.), the second `.on()` call throws "cannot add postgres_changes callbacks after subscribe()". Fix: append `useId()` to the channel name so each component instance gets its own channel. Example: `` `sync-status-${userId}-${instanceId}` ``.
+- The authoritative pivot plan is `plans/discoveries-pivot.md`; `plans/phase-3-library-import.md` contains older Library UI details with a post-pivot note. When they conflict, the Discoveries pivot wins for client UI.
+
+## Phase plans
+
+`plans/phase-*.md` are the source of truth for scope, but treat the *tooling* sections as advisory — they were written against a specific SDK snapshot and drift quickly (e.g. `sentry-expo` is deprecated in SDK 50+, NativeWind v2 babel syntax differs from v4). Verify package names and versions against current SDK docs before installing.

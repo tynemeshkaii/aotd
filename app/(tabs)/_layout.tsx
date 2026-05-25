@@ -37,13 +37,6 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
-        name="friends"
-        options={{
-          title: 'Friends',
-          tabBarIcon: ({ color, size }) => <Ionicons name="people" color={color} size={size} />,
-        }}
-      />
-      <Tabs.Screen
         name="profile"
         options={{
           title: 'Profile',

@@ -6,6 +6,7 @@ export type AggregatedAlbum = {
   provider_album_id: string;
   album_name: string;
   artist_name: string;
+  artist_ids: { id: string; name: string }[];
   cover_url: string | null;
   total_tracks: number | null;
   release_year: number | null;
@@ -25,6 +26,7 @@ export function aggregateLibrary(
       provider_album_id: a.id,
       album_name: a.name,
       artist_name: a.artists[0]?.name ?? 'Unknown',
+      artist_ids: a.artists.map((ar) => ({ id: ar.id, name: ar.name })),
       cover_url: a.images[0]?.url ?? null,
       total_tracks: a.total_tracks ?? null,
       release_year: parseReleaseYear(a.release_date),
@@ -43,6 +45,7 @@ export function aggregateLibrary(
         provider_album_id: a.id,
         album_name: a.name,
         artist_name: a.artists[0]?.name ?? 'Unknown',
+        artist_ids: a.artists.map((ar) => ({ id: ar.id, name: ar.name })),
         cover_url: a.images[0]?.url ?? null,
         total_tracks: a.total_tracks ?? null,
         release_year: parseReleaseYear(a.release_date),

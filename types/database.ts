@@ -39,6 +39,164 @@ export type Database = {
   }
   public: {
     Tables: {
+      albums: {
+        Row: {
+          album_type: string | null
+          audio_features: Json | null
+          cover_url: string | null
+          duration_ms: number | null
+          id: string
+          is_prewarm_seed: boolean
+          lastfm_listeners: number | null
+          lastfm_playcount: number | null
+          lastfm_url: string | null
+          mb_release_group_id: string | null
+          metadata_updated_at: string
+          primary_artist_name: string
+          primary_artist_spotify_id: string | null
+          release_year: number | null
+          spotify_id: string
+          title: string
+          total_tracks: number | null
+        }
+        Insert: {
+          album_type?: string | null
+          audio_features?: Json | null
+          cover_url?: string | null
+          duration_ms?: number | null
+          id?: string
+          is_prewarm_seed?: boolean
+          lastfm_listeners?: number | null
+          lastfm_playcount?: number | null
+          lastfm_url?: string | null
+          mb_release_group_id?: string | null
+          metadata_updated_at?: string
+          primary_artist_name: string
+          primary_artist_spotify_id?: string | null
+          release_year?: number | null
+          spotify_id: string
+          title: string
+          total_tracks?: number | null
+        }
+        Update: {
+          album_type?: string | null
+          audio_features?: Json | null
+          cover_url?: string | null
+          duration_ms?: number | null
+          id?: string
+          is_prewarm_seed?: boolean
+          lastfm_listeners?: number | null
+          lastfm_playcount?: number | null
+          lastfm_url?: string | null
+          mb_release_group_id?: string | null
+          metadata_updated_at?: string
+          primary_artist_name?: string
+          primary_artist_spotify_id?: string | null
+          release_year?: number | null
+          spotify_id?: string
+          title?: string
+          total_tracks?: number | null
+        }
+        Relationships: []
+      }
+      albums_of_the_day: {
+        Row: {
+          album_id: string
+          algorithm_version: number
+          created_at: string
+          date: string
+          fallback_reason: string | null
+          id: string
+          is_fallback: boolean
+          opened_at: string | null
+          selection_reason: Json
+          status: string
+          user_id: string
+          user_timezone_at_compute: string | null
+        }
+        Insert: {
+          album_id: string
+          algorithm_version?: number
+          created_at?: string
+          date: string
+          fallback_reason?: string | null
+          id?: string
+          is_fallback?: boolean
+          opened_at?: string | null
+          selection_reason: Json
+          status?: string
+          user_id: string
+          user_timezone_at_compute?: string | null
+        }
+        Update: {
+          album_id?: string
+          algorithm_version?: number
+          created_at?: string
+          date?: string
+          fallback_reason?: string | null
+          id?: string
+          is_fallback?: boolean
+          opened_at?: string | null
+          selection_reason?: Json
+          status?: string
+          user_id?: string
+          user_timezone_at_compute?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "albums_of_the_day_album_id_fkey"
+            columns: ["album_id"]
+            isOneToOne: false
+            referencedRelation: "albums"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      artist_similarity_cache: {
+        Row: {
+          fetched_at: string
+          id: string
+          similar_artists: Json
+          source: string
+          source_artist_key: string
+          source_artist_name: string
+        }
+        Insert: {
+          fetched_at?: string
+          id?: string
+          similar_artists: Json
+          source: string
+          source_artist_key: string
+          source_artist_name: string
+        }
+        Update: {
+          fetched_at?: string
+          id?: string
+          similar_artists?: Json
+          source?: string
+          source_artist_key?: string
+          source_artist_name?: string
+        }
+        Relationships: []
+      }
+      audio_features_cache: {
+        Row: {
+          features: Json
+          fetched_at: string
+          spotify_track_id: string
+        }
+        Insert: {
+          features: Json
+          fetched_at?: string
+          spotify_track_id: string
+        }
+        Update: {
+          features?: Json
+          fetched_at?: string
+          spotify_track_id?: string
+        }
+        Relationships: []
+      }
       library_sync_status: {
         Row: {
           aggregated_albums_count: number | null
@@ -87,6 +245,39 @@ export type Database = {
         }
         Relationships: []
       }
+      musicbrainz_release_group_cache: {
+        Row: {
+          fetched_at: string
+          first_release_date: string | null
+          id: string
+          normalized_album: string
+          normalized_artist: string
+          primary_type: string | null
+          release_group_id: string | null
+          secondary_types: string[]
+        }
+        Insert: {
+          fetched_at?: string
+          first_release_date?: string | null
+          id?: string
+          normalized_album: string
+          normalized_artist: string
+          primary_type?: string | null
+          release_group_id?: string | null
+          secondary_types?: string[]
+        }
+        Update: {
+          fetched_at?: string
+          first_release_date?: string | null
+          id?: string
+          normalized_album?: string
+          normalized_artist?: string
+          primary_type?: string | null
+          release_group_id?: string | null
+          secondary_types?: string[]
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -117,6 +308,35 @@ export type Database = {
         }
         Relationships: []
       }
+      recommendation_history: {
+        Row: {
+          album_id: string
+          id: string
+          recommended_at: string
+          user_id: string
+        }
+        Insert: {
+          album_id: string
+          id?: string
+          recommended_at?: string
+          user_id: string
+        }
+        Update: {
+          album_id?: string
+          id?: string
+          recommended_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recommendation_history_album_id_fkey"
+            columns: ["album_id"]
+            isOneToOne: false
+            referencedRelation: "albums"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       streaming_connections: {
         Row: {
           access_token: string
@@ -127,6 +347,7 @@ export type Database = {
           provider_user_id: string
           refresh_token: string
           scopes: string[]
+          spotify_product: string | null
           token_expires_at: string
           user_id: string
         }
@@ -139,6 +360,7 @@ export type Database = {
           provider_user_id: string
           refresh_token: string
           scopes?: string[]
+          spotify_product?: string | null
           token_expires_at: string
           user_id: string
         }
@@ -151,6 +373,7 @@ export type Database = {
           provider_user_id?: string
           refresh_token?: string
           scopes?: string[]
+          spotify_product?: string | null
           token_expires_at?: string
           user_id?: string
         }
@@ -160,10 +383,12 @@ export type Database = {
         Row: {
           added_at_provider: string | null
           album_name: string
+          artist_ids: Json | null
           artist_name: string
           cover_url: string | null
           id: string
           mb_release_group_id: string | null
+          primary_artist_spotify_id: string | null
           provider: string
           provider_album_id: string
           release_year: number | null
@@ -176,10 +401,12 @@ export type Database = {
         Insert: {
           added_at_provider?: string | null
           album_name: string
+          artist_ids?: Json | null
           artist_name: string
           cover_url?: string | null
           id?: string
           mb_release_group_id?: string | null
+          primary_artist_spotify_id?: string | null
           provider: string
           provider_album_id: string
           release_year?: number | null
@@ -192,10 +419,12 @@ export type Database = {
         Update: {
           added_at_provider?: string | null
           album_name?: string
+          artist_ids?: Json | null
           artist_name?: string
           cover_url?: string | null
           id?: string
           mb_release_group_id?: string | null
+          primary_artist_spotify_id?: string | null
           provider?: string
           provider_album_id?: string
           release_year?: number | null
@@ -217,6 +446,7 @@ export type Database = {
           provider: string | null
           provider_user_id: string | null
           scopes: string[] | null
+          spotify_product: string | null
           user_id: string | null
         }
         Insert: {
@@ -226,6 +456,7 @@ export type Database = {
           provider?: string | null
           provider_user_id?: string | null
           scopes?: string[] | null
+          spotify_product?: string | null
           user_id?: string | null
         }
         Update: {
@@ -235,6 +466,7 @@ export type Database = {
           provider?: string | null
           provider_user_id?: string | null
           scopes?: string[] | null
+          spotify_product?: string | null
           user_id?: string | null
         }
         Relationships: []
@@ -289,7 +521,73 @@ export type Database = {
       }
     }
     Functions: {
-      [_ in never]: never
+      ensure_recommendation_atomic: {
+        Args: {
+          p_album_id: string
+          p_algorithm_version: number
+          p_date: string
+          p_fallback_reason: string
+          p_is_fallback: boolean
+          p_selection_reason: Json
+          p_user_id: string
+          p_user_timezone: string
+        }
+        Returns: {
+          aotd_id: string
+          created: boolean
+        }[]
+      }
+      find_users_due_for_compute: {
+        Args: { p_lead_minutes?: number }
+        Returns: {
+          push_time: string
+          target_date: string
+          user_id: string
+          user_tz: string
+        }[]
+      }
+      get_current_pick: {
+        Args: { p_user_id: string }
+        Returns: {
+          album_cover_url: string
+          album_duration_ms: number
+          album_id: string
+          album_primary_artist_name: string
+          album_release_year: number
+          album_spotify_id: string
+          album_title: string
+          album_total_tracks: number
+          aotd_id: string
+          fallback_reason: string
+          is_fallback: boolean
+          opened_at: string
+          pick_date: string
+          selection_reason: Json
+          status: string
+        }[]
+      }
+      resolve_user_compute_context: {
+        Args: { p_user_id: string }
+        Returns: {
+          push_time: string
+          target_date: string
+          user_tz: string
+        }[]
+      }
+      try_start_library_sync: {
+        Args: {
+          p_stale_after?: string
+          p_started_at: string
+          p_user_id: string
+        }
+        Returns: {
+          aggregated_albums_count: number
+          should_start: boolean
+          started_at: string
+          status: string
+          updated_at: string
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never

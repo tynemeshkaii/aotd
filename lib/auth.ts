@@ -7,7 +7,7 @@ import { supabase } from './supabase';
 
 WebBrowser.maybeCompleteAuthSession();
 
-export const SPOTIFY_SCOPES = ['user-library-read', 'user-top-read'] as const;
+export const SPOTIFY_SCOPES = ['user-library-read', 'user-top-read', 'user-read-private'] as const;
 
 let activeCallbackUrl: string | null = null;
 let activeCallbackPromise: Promise<Session | null> | null = null;

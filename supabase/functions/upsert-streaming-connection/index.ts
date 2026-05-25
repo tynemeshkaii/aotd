@@ -81,6 +81,7 @@ Deno.serve(async (req) => {
         refresh_token: refreshToken,
         token_expires_at: tokenExpiresAt,
         scopes: body.scopes ?? [],
+        spotify_product: spotifyProfile.product ?? null,
         connected_at: new Date().toISOString(),
       },
       { onConflict: 'user_id,provider' },

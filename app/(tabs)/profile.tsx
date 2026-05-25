@@ -12,6 +12,7 @@ import { relativeTime } from '@/lib/format';
 import { useLibraryStats } from '@/lib/hooks/useLibraryStats';
 import { useLibrarySyncStatus } from '@/lib/hooks/useLibrarySyncStatus';
 import { useTriggerLibrarySync } from '@/lib/hooks/useTriggerLibrarySync';
+import { isActiveLibrarySync, isStaleLibrarySync } from '@/lib/library';
 import { supabase } from '@/lib/supabase';
 
 export default function ProfileScreen() {
@@ -67,7 +68,7 @@ export default function ProfileScreen() {
   const triggerSync = useTriggerLibrarySync();
   const { status: syncStatus } = useLibrarySyncStatus();
   const isSyncing =
-    triggerSync.isPending || syncStatus?.status === 'queued' || syncStatus?.status === 'syncing';
+    triggerSync.isPending || (isActiveLibrarySync(syncStatus) && !isStaleLibrarySync(syncStatus));
 
   const handleSyncNow = () => {
     triggerSync.mutate(undefined, {

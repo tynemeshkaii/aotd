@@ -7,6 +7,7 @@ import { ProgressBar } from '@/components/ui/ProgressBar';
 import { Text } from '@/components/ui/Text';
 import { useLibrarySyncStatus } from '@/lib/hooks/useLibrarySyncStatus';
 import { useTriggerLibrarySync } from '@/lib/hooks/useTriggerLibrarySync';
+import { isStaleLibrarySync } from '@/lib/library';
 
 export function InitialSyncingScreen() {
   const { status } = useLibrarySyncStatus();
@@ -28,6 +29,7 @@ export function InitialSyncingScreen() {
   const ratio = total > 0 ? Math.min(processed / total, 1) : 0;
 
   const isFailed = status?.status === 'failed';
+  const isStale = isStaleLibrarySync(status);
   const isStarting = !status || status.status === 'queued';
 
   return (
@@ -36,13 +38,15 @@ export function InitialSyncingScreen() {
         <Ionicons name="musical-notes" size={56} color="#1db954" />
       </View>
 
-      {isFailed ? (
+      {isFailed || isStale ? (
         <>
           <Text variant="h2" className="text-center">
-            We couldn't read your library
+            {isStale ? 'Sync is taking longer than expected' : "We couldn't read your library"}
           </Text>
           <Text variant="caption" className="mt-3 mb-8 text-center leading-5">
-            {status.error_message ?? 'Unknown error'}
+            {isStale
+              ? 'You can safely restart the library import.'
+              : (status?.error_message ?? 'Unknown error')}
           </Text>
           <Button
             title={retry.isPending ? 'Retrying...' : 'Try again'}

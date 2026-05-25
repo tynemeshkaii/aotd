@@ -31,3 +31,12 @@ verify_jwt = false
 
 [functions.sync-spotify-library]
 verify_jwt = false
+
+[functions.compute-album-of-the-day]
+verify_jwt = false
+
+[functions.dispatch-daily-picks]
+verify_jwt = false
+
+[functions.prewarm-album-cache]
+verify_jwt = false

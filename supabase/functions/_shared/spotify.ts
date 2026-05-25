@@ -10,6 +10,7 @@ export type SpotifyProfile = {
   id: string;
   display_name?: string | null;
   images?: SpotifyImage[];
+  product?: 'premium' | 'free' | 'open';
 };
 
 export type SpotifyRefreshResult = {
@@ -46,11 +47,26 @@ export type SpotifyPaged<T> = {
 };
 
 const SPOTIFY_API = 'https://api.spotify.com/v1';
+const SPOTIFY_PAGE_LIMIT = 50;
+const SPOTIFY_FETCH_TIMEOUT_MS = 8_000;
+const DEFAULT_MAX_429_RETRIES = 5;
+const MAX_429_BACKOFF_MS = 60_000;
+
+type FetchAllSpotifyPagedOptions = {
+  maxPages?: number;
+  max429Retries?: number;
+  logEveryPages?: number;
+  label?: string;
+};
 
 export async function fetchSpotifyProfile(accessToken: string) {
-  const response = await fetch('https://api.spotify.com/v1/me', {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
+  const response = await fetchWithTimeout(
+    'https://api.spotify.com/v1/me',
+    {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    },
+    SPOTIFY_FETCH_TIMEOUT_MS,
+  );
 
   if (!response.ok) {
     throw new Error(`spotify_me_failed:${response.status}`);
@@ -67,17 +83,21 @@ export async function refreshSpotifyAccessToken(refreshToken: string) {
     throw new Error('missing_spotify_credentials');
   }
 
-  const response = await fetch('https://accounts.spotify.com/api/token', {
-    method: 'POST',
-    headers: {
-      Authorization: `Basic ${btoa(`${clientId}:${clientSecret}`)}`,
-      'Content-Type': 'application/x-www-form-urlencoded',
+  const response = await fetchWithTimeout(
+    'https://accounts.spotify.com/api/token',
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Basic ${btoa(`${clientId}:${clientSecret}`)}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({
+        grant_type: 'refresh_token',
+        refresh_token: refreshToken,
+      }),
     },
-    body: new URLSearchParams({
-      grant_type: 'refresh_token',
-      refresh_token: refreshToken,
-    }),
-  });
+    SPOTIFY_FETCH_TIMEOUT_MS,
+  );
 
   if (!response.ok) {
     throw new Error(`spotify_refresh_failed:${response.status}`);
@@ -130,16 +150,33 @@ export async function fetchAllSpotifyPaged<T>(
   initialToken: string,
   onPage: (page: SpotifyPaged<T>) => Promise<void> | void,
   refreshToken: () => Promise<string>,
+  options: FetchAllSpotifyPagedOptions = {},
 ): Promise<{ totalFetched: number }> {
   let token = initialToken;
-  let url: string | null = `${SPOTIFY_API}${endpoint}?limit=50`;
+  let url: string | null = `${SPOTIFY_API}${endpoint}?limit=${SPOTIFY_PAGE_LIMIT}`;
   let totalFetched = 0;
   let retriedAuth = false;
+  let rateLimitRetries = 0;
+  let pagesFetched = 0;
+
+  const maxPages = options.maxPages ?? Number.POSITIVE_INFINITY;
+  const max429Retries = options.max429Retries ?? DEFAULT_MAX_429_RETRIES;
 
   while (url) {
-    const res = await fetch(url, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    if (pagesFetched >= maxPages) {
+      console.log(
+        `[spotify] stopped ${options.label ?? endpoint} after ${pagesFetched} pages (${totalFetched} items)`,
+      );
+      break;
+    }
+
+    const res = await fetchWithTimeout(
+      url,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      },
+      SPOTIFY_FETCH_TIMEOUT_MS,
+    );
 
     if (res.status === 401 && !retriedAuth) {
       retriedAuth = true;
@@ -147,8 +184,25 @@ export async function fetchAllSpotifyPaged<T>(
       continue;
     }
     if (res.status === 429) {
-      const retryAfter = Number(res.headers.get('Retry-After') ?? '2');
-      await new Promise((r) => setTimeout(r, Math.max(1, retryAfter) * 1000));
+      rateLimitRetries += 1;
+      if (rateLimitRetries > max429Retries) {
+        throw new Error(`spotify_rate_limited:${endpoint}`);
+      }
+
+      const retryAfterSeconds = Number(res.headers.get('Retry-After') ?? '0');
+      const retryAfterMs =
+        Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0 ? retryAfterSeconds * 1000 : 0;
+      const exponentialMs = Math.min(2 ** rateLimitRetries * 1000, MAX_429_BACKOFF_MS);
+      const jitterMs = Math.floor(Math.random() * 750);
+      const delayMs = Math.min(
+        Math.max(retryAfterMs, exponentialMs) + jitterMs,
+        MAX_429_BACKOFF_MS,
+      );
+
+      console.warn(
+        `[spotify] 429 for ${options.label ?? endpoint}; retry ${rateLimitRetries}/${max429Retries} in ${delayMs}ms`,
+      );
+      await new Promise((r) => setTimeout(r, delayMs));
       continue;
     }
     if (!res.ok) {
@@ -158,9 +212,31 @@ export async function fetchAllSpotifyPaged<T>(
     const page = (await res.json()) as SpotifyPaged<T>;
     await onPage(page);
     totalFetched += page.items.length;
+    pagesFetched += 1;
+    rateLimitRetries = 0;
     url = page.next;
     retriedAuth = false;
+
+    if (options.logEveryPages && pagesFetched % options.logEveryPages === 0) {
+      console.log(
+        `[spotify] fetched ${totalFetched}/${page.total} ${options.label ?? endpoint} items (${pagesFetched} pages)`,
+      );
+    }
   }
 
   return { totalFetched };
+}
+
+async function fetchWithTimeout(
+  url: string,
+  init: RequestInit,
+  timeoutMs: number,
+): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }

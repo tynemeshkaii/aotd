@@ -1,0 +1,431 @@
+import { createClient } from '@supabase/supabase-js';
+import { normalizeAlbumKey } from '../_shared/album-dedupe.ts';
+import {
+  type CandidateExclusions,
+  type DiagEvent,
+  generateCandidates,
+  validateCandidateWithMb,
+} from '../_shared/candidate-generation.ts';
+import { corsHeaders, jsonError, jsonResponse } from '../_shared/cors.ts';
+import { getCuratedFallback } from '../_shared/curated-fallback.ts';
+import {
+  ALGORITHM_VERSION,
+  buildSelectionReason,
+  type ScoredCandidate,
+  scoreCandidates,
+  selectFromTop,
+} from '../_shared/recommendation-algorithm.ts';
+import { getValidSpotifyToken } from '../_shared/spotify.ts';
+import { extractTasteSignal } from '../_shared/taste-extraction.ts';
+
+const PRIMARY_COMPUTE_BUDGET_MS = 25_000;
+const SPOTIFY_TOKEN_STAGE_TIMEOUT_MS = 10_000;
+const TASTE_STAGE_TIMEOUT_MS = 12_000;
+const CANDIDATE_STAGE_TIMEOUT_MS = 20_000;
+const DB_STAGE_TIMEOUT_MS = 8_000;
+const FALLBACK_STAGE_TIMEOUT_MS = 12_000;
+
+type FallbackReason =
+  | 'no_candidates'
+  | 'spotify_search_failed'
+  | 'spotify_audio_unavailable'
+  | 'lastfm_unavailable'
+  | 'mb_timeout'
+  | 'library_too_small'
+  | 'compute_timeout'
+  | 'unknown_error';
+
+type UserLibraryExclusionRow = {
+  provider_album_id: string | null;
+  mb_release_group_id: string | null;
+  album_name: string | null;
+  artist_name: string | null;
+};
+
+type AlbumJoin = {
+  spotify_id: string | null;
+  mb_release_group_id: string | null;
+  primary_artist_name: string | null;
+  title: string | null;
+};
+
+type HistoryRow = {
+  album: AlbumJoin | null;
+};
+
+type RecentPickRow = {
+  album: Pick<AlbumJoin, 'primary_artist_name'> | null;
+};
+
+Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+  if (req.method !== 'POST') return jsonError(405, 'method_not_allowed');
+
+  const cronSecret = Deno.env.get('CRON_SECRET');
+  if (!cronSecret || req.headers.get('Authorization') !== `Bearer ${cronSecret}`) {
+    return jsonError(401, 'unauthorized');
+  }
+
+  let payload: {
+    user_id?: string;
+    target_date?: string;
+    user_timezone?: string;
+    force_fallback?: boolean;
+    diag?: boolean;
+  };
+  try {
+    payload = await req.json();
+  } catch {
+    return jsonError(400, 'invalid_json_body');
+  }
+
+  const userId = payload.user_id;
+  if (!userId) return jsonError(400, 'missing_user_id');
+
+  const supabaseUrl = Deno.env.get('SUPABASE_URL');
+  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  if (!supabaseUrl || !serviceRoleKey) return jsonError(500, 'missing_supabase_env');
+  const admin = createClient(supabaseUrl, serviceRoleKey);
+
+  let targetDate = payload.target_date;
+  let userTz = payload.user_timezone ?? 'UTC';
+  if (!targetDate) {
+    const { data: ctx, error: ctxErr } = await admin.rpc('resolve_user_compute_context', {
+      p_user_id: userId,
+    });
+    if (ctxErr) return jsonError(500, 'context_resolve_failed', ctxErr.message);
+    const row = Array.isArray(ctx) ? ctx[0] : ctx;
+    targetDate = row?.target_date;
+    userTz = row?.user_tz ?? 'UTC';
+    if (!targetDate) return jsonError(400, 'profile_not_found');
+  }
+
+  const { data: existing } = await admin
+    .from('albums_of_the_day')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('date', targetDate)
+    .maybeSingle();
+  if (existing) {
+    return jsonResponse({ ok: true, status: 'already_exists', aotd_id: existing.id });
+  }
+
+  let albumId: string | null = null;
+  let selectionReason: Record<string, unknown> = {};
+  let isFallback = false;
+  let fallbackReason: FallbackReason | null = null;
+  const requestStartMs = Date.now();
+  const diag: DiagEvent[] = [];
+  const recordDiag = (stage: string, detail?: Record<string, unknown>) => {
+    diag.push({ at_ms: Date.now() - requestStartMs, stage, detail });
+  };
+
+  try {
+    const primaryDeadlineAtMs = Date.now() + PRIMARY_COMPUTE_BUDGET_MS;
+    console.log(`[compute] primary_start user=${userId} date=${targetDate}`);
+    recordDiag('primary_start');
+    if (payload.force_fallback) {
+      fallbackReason = 'compute_timeout';
+      throw new Error('forced_fallback');
+    }
+    const spotifyToken = await withTimeout(
+      getValidSpotifyToken(admin, userId),
+      SPOTIFY_TOKEN_STAGE_TIMEOUT_MS,
+      'spotify_token_timeout',
+    );
+    console.log(`[compute] spotify_token_ok user=${userId}`);
+    recordDiag('spotify_token_ok');
+    const taste = await withTimeout(
+      extractTasteSignal(admin, userId, spotifyToken, { includeTasteVector: false }),
+      TASTE_STAGE_TIMEOUT_MS,
+      'taste_signal_timeout',
+    );
+    console.log(
+      `[compute] taste_ready user=${userId} library_size=${taste.librarySize} top_artists=${taste.topArtists.length}`,
+    );
+    recordDiag('taste_ready', {
+      library_size: taste.librarySize,
+      top_artists: taste.topArtists.length,
+    });
+    if (taste.topArtists.length < 5) {
+      fallbackReason = 'library_too_small';
+      throw new Error('library_too_small');
+    }
+
+    const { data: lib } = await admin
+      .from('user_library')
+      .select('provider_album_id, mb_release_group_id, album_name, artist_name')
+      .eq('user_id', userId)
+      .is('removed_at', null);
+    const libRows = (lib ?? []) as UserLibraryExclusionRow[];
+
+    const { data: hist } = await admin
+      .from('recommendation_history')
+      .select('album:albums(spotify_id, mb_release_group_id, primary_artist_name, title)')
+      .eq('user_id', userId);
+    const historyRows = (hist ?? []) as HistoryRow[];
+
+    const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const { data: recentPicks } = await admin
+      .from('albums_of_the_day')
+      .select('album:albums(primary_artist_name)')
+      .eq('user_id', userId)
+      .gte('date', since);
+    const recentArtists = new Set(
+      ((recentPicks ?? []) as RecentPickRow[])
+        .map((r) => r.album?.primary_artist_name)
+        .filter(isNonEmptyString),
+    );
+
+    const exclusions = buildCandidateExclusions(libRows, historyRows);
+    recordDiag('exclusions_built', {
+      lib_rows: libRows.length,
+      history_rows: historyRows.length,
+      excluded_spotify: exclusions.spotifyAlbumIds.size,
+      excluded_rg: exclusions.releaseGroupIds.size,
+    });
+
+    const { candidates, spotifyRelatedAvailable } = await withTimeout(
+      generateCandidates(admin, spotifyToken, taste, exclusions, recentArtists, {
+        maxSourceArtists: 5,
+        maxSimilarPerSource: 4,
+        maxAlbumsPerSimilar: 1,
+        maxCandidates: 18,
+        maxConsecutiveLastfmFailures: 2,
+        maxConsecutiveSpotifySearchFailures: 2,
+        deadlineAtMs: primaryDeadlineAtMs,
+        useSpotifyRelated: false,
+        skipAlbumInfoLookup: true,
+        skipAlbumDetailsLookup: true,
+        skipMusicBrainz: true,
+        diag,
+      }),
+      Math.max(1_000, Math.min(CANDIDATE_STAGE_TIMEOUT_MS, primaryDeadlineAtMs - Date.now())),
+      'compute_timeout',
+    );
+    console.log(`[compute] candidates_ready user=${userId} count=${candidates.length}`);
+    recordDiag('candidates_ready', { count: candidates.length });
+
+    if (candidates.length === 0) {
+      fallbackReason = 'no_candidates';
+      throw new Error('no_candidates');
+    }
+
+    const scored = scoreCandidates(candidates, taste);
+    let chosen = selectFromTop(scored);
+    if (!chosen) {
+      fallbackReason = 'no_candidates';
+      throw new Error('selection_empty');
+    }
+
+    // Validate the chosen candidate against MusicBrainz post-scoring. Up to 3 attempts
+    // — each MB lookup costs ~1.1 s due to the upstream rate limit. If all attempts fail,
+    // ship the best non-validated candidate rather than falling back unnecessarily.
+    const MAX_MB_RETRIES = 3;
+    let mbAttempts = 0;
+    const tried = new Set<string>();
+    while (mbAttempts < MAX_MB_RETRIES && Date.now() < primaryDeadlineAtMs) {
+      tried.add(chosen.candidate.spotify_id);
+      const validation = await validateCandidateWithMb(
+        admin,
+        chosen.candidate,
+        exclusions.releaseGroupIds,
+      );
+      if (validation.ok) {
+        if (validation.rg?.id) {
+          chosen.candidate.mb_release_group_id = validation.rg.id;
+        }
+        break;
+      }
+      mbAttempts += 1;
+      console.log(
+        `[compute] mb_rejected user=${userId} album=${chosen.candidate.spotify_id} reason=${validation.rg ? 'not_album_like_or_dup' : 'unknown'} attempt=${mbAttempts}`,
+      );
+      const next = scored.find((s) => !tried.has(s.candidate.spotify_id));
+      if (!next) break;
+      chosen = next;
+    }
+
+    const { data: albumRow, error: albumErr } = await withTimeout(
+      admin
+        .from('albums')
+        .upsert(
+          {
+            spotify_id: chosen.candidate.spotify_id,
+            mb_release_group_id: chosen.candidate.mb_release_group_id ?? null,
+            title: chosen.candidate.title,
+            primary_artist_name: chosen.candidate.primary_artist_name,
+            primary_artist_spotify_id: chosen.candidate.primary_artist_spotify_id ?? null,
+            release_year: chosen.candidate.release_year ?? null,
+            cover_url: chosen.candidate.cover_url ?? null,
+            total_tracks: chosen.candidate.total_tracks,
+            duration_ms: chosen.candidate.duration_ms ?? null,
+            album_type: chosen.candidate.album_type ?? null,
+            lastfm_listeners: chosen.candidate.lastfm_listeners ?? null,
+            lastfm_playcount: chosen.candidate.lastfm_playcount ?? null,
+            metadata_updated_at: new Date().toISOString(),
+          },
+          { onConflict: 'spotify_id' },
+        )
+        .select('id')
+        .single(),
+      DB_STAGE_TIMEOUT_MS,
+      'album_upsert_timeout',
+    );
+
+    if (albumErr || !albumRow) {
+      fallbackReason = 'unknown_error';
+      throw new Error(`album_upsert_failed:${albumErr?.message}`);
+    }
+
+    albumId = albumRow.id;
+    selectionReason = buildSelectionReason(chosen, taste, spotifyRelatedAvailable);
+    console.log(`[compute] primary_selected user=${userId} album=${chosen.candidate.spotify_id}`);
+  } catch (e) {
+    const errMsg = e instanceof Error ? e.message : String(e);
+    console.warn(`[compute] primary failed for ${userId}: ${errMsg}`);
+    recordDiag('primary_failed', { error: errMsg });
+    isFallback = true;
+    if (!fallbackReason) {
+      fallbackReason = classifyFallbackReason(errMsg);
+    }
+    let fb: { album_id: string } | null;
+    try {
+      fb = await withTimeout(
+        getCuratedFallback(admin, userId),
+        FALLBACK_STAGE_TIMEOUT_MS,
+        'fallback_timeout',
+      );
+    } catch (fallbackError) {
+      return jsonError(
+        500,
+        'fallback_failed',
+        fallbackError instanceof Error ? fallbackError.message : String(fallbackError),
+      );
+    }
+    if (!fb) {
+      return jsonError(500, 'no_album_available', String(e));
+    }
+    console.log(`[compute] fallback_selected user=${userId} reason=${fallbackReason}`);
+    albumId = fb.album_id;
+    const fallbackScored: ScoredCandidate = {
+      candidate: {
+        spotify_id: 'fallback',
+        title: 'Fallback',
+        primary_artist_name: 'Fallback',
+        total_tracks: 0,
+        best_similarity_match: 0,
+        source_paths: [],
+      },
+      score: 0,
+      breakdown: { similarity: 0, source_freq: 0, popularity: 0, balance: 0, temperature: 0 },
+    };
+    selectionReason = buildSelectionReason(
+      fallbackScored,
+      { topArtists: [], tasteVector: null, librarySize: 0, libraryDecadeFractions: {} },
+      false,
+      true,
+      fallbackReason,
+    );
+  }
+
+  if (!albumId) return jsonError(500, 'no_album_id');
+
+  const { data: ensured, error: ensureErr } = await withTimeout(
+    admin.rpc('ensure_recommendation_atomic', {
+      p_user_id: userId,
+      p_album_id: albumId,
+      p_date: targetDate,
+      p_algorithm_version: ALGORITHM_VERSION,
+      p_selection_reason: selectionReason,
+      p_is_fallback: isFallback,
+      p_fallback_reason: fallbackReason,
+      p_user_timezone: userTz,
+    }),
+    DB_STAGE_TIMEOUT_MS,
+    'aotd_insert_timeout',
+  );
+
+  if (ensureErr) return jsonError(500, 'aotd_insert_failed', ensureErr.message);
+  const ensuredRow = Array.isArray(ensured) ? ensured[0] : ensured;
+
+  recordDiag('done', { is_fallback: isFallback, fallback_reason: fallbackReason });
+  return jsonResponse({
+    ok: true,
+    status: ensuredRow?.created ? 'created' : 'already_exists',
+    aotd_id: ensuredRow?.aotd_id,
+    is_fallback: isFallback,
+    fallback_reason: fallbackReason,
+    ...(payload.diag ? { diag } : {}),
+  });
+});
+
+function classifyFallbackReason(message: string): FallbackReason {
+  if (message.includes('spotify_search')) return 'spotify_search_failed';
+  if (message.includes('lastfm') || message.includes('missing_lastfm')) return 'lastfm_unavailable';
+  if (message.includes('no_candidates') || message.includes('selection_empty')) {
+    return 'no_candidates';
+  }
+  if (message.includes('library_too_small')) return 'library_too_small';
+  if (message.includes('mb_timeout')) return 'mb_timeout';
+  if (
+    message.includes('compute_timeout') ||
+    message.includes('spotify_token') ||
+    message.includes('taste_signal')
+  ) {
+    return 'compute_timeout';
+  }
+  return 'unknown_error';
+}
+
+async function withTimeout<T>(promise: PromiseLike<T>, timeoutMs: number, message: string) {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      Promise.resolve(promise),
+      new Promise<never>((_, reject) => {
+        timeoutId = setTimeout(() => reject(new Error(message)), timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
+}
+
+function buildCandidateExclusions(
+  libRows: UserLibraryExclusionRow[],
+  historyRows: HistoryRow[],
+): CandidateExclusions {
+  const spotifyAlbumIds = new Set<string>();
+  const releaseGroupIds = new Set<string>();
+  const normalizedAlbumKeys = new Set<string>();
+
+  for (const row of libRows) {
+    if (isNonEmptyString(row.provider_album_id)) spotifyAlbumIds.add(row.provider_album_id);
+    if (isNonEmptyString(row.mb_release_group_id)) releaseGroupIds.add(row.mb_release_group_id);
+    addNormalizedKey(normalizedAlbumKeys, row.artist_name, row.album_name);
+  }
+
+  for (const row of historyRows) {
+    const album = row.album;
+    if (!album) continue;
+    if (isNonEmptyString(album.spotify_id)) spotifyAlbumIds.add(album.spotify_id);
+    if (isNonEmptyString(album.mb_release_group_id)) releaseGroupIds.add(album.mb_release_group_id);
+    addNormalizedKey(normalizedAlbumKeys, album.primary_artist_name, album.title);
+  }
+
+  return { spotifyAlbumIds, releaseGroupIds, normalizedAlbumKeys };
+}
+
+function addNormalizedKey(
+  keys: Set<string>,
+  artist: string | null | undefined,
+  album: string | null | undefined,
+) {
+  if (!isNonEmptyString(artist) || !isNonEmptyString(album)) return;
+  keys.add(normalizeAlbumKey(artist, album));
+}
+
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === 'string' && value.trim().length > 0;
+}

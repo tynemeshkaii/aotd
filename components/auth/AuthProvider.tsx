@@ -9,7 +9,7 @@ import {
   useState,
 } from 'react';
 
-import { triggerLibrarySync } from '@/lib/library';
+import { isActiveLibrarySync, isStaleLibrarySync, triggerLibrarySync } from '@/lib/library';
 import { supabase } from '@/lib/supabase';
 
 const AUTO_SYNC_STALE_MS = 24 * 60 * 60 * 1000;
@@ -27,7 +27,7 @@ async function maybeAutoSync(userId: string) {
       .maybeSingle();
 
     if (syncRow) {
-      if (syncRow.status === 'queued' || syncRow.status === 'syncing') {
+      if (isActiveLibrarySync(syncRow) && !isStaleLibrarySync(syncRow)) {
         return;
       }
       if (syncRow.status === 'failed') {

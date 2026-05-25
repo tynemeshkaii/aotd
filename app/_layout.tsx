@@ -11,6 +11,7 @@ import { AuthProvider, useSession } from '@/components/auth/AuthProvider';
 import { InitialSyncingScreen } from '@/components/onboarding/InitialSyncingScreen';
 import { Text } from '@/components/ui/Text';
 import { useLibrarySyncStatus } from '@/lib/hooks/useLibrarySyncStatus';
+import { hasCompletedLibrarySync } from '@/lib/library';
 import { queryClient } from '@/lib/queryClient';
 import { initSentry } from '@/lib/sentry';
 
@@ -70,7 +71,7 @@ function RouterGuard() {
 
   const isFirstTimeSync =
     !!session &&
-    syncStatus?.aggregated_albums_count == null &&
+    !hasCompletedLibrarySync(syncStatus) &&
     (syncStatus == null ||
       syncStatus.status === 'queued' ||
       syncStatus.status === 'syncing' ||

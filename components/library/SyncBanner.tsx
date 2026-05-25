@@ -3,16 +3,20 @@ import { View } from 'react-native';
 import { ProgressBar } from '@/components/ui/ProgressBar';
 import { Text } from '@/components/ui/Text';
 import { useLibrarySyncStatus } from '@/lib/hooks/useLibrarySyncStatus';
+import { isStaleLibrarySync } from '@/lib/library';
 
 export function SyncBanner() {
   const { status } = useLibrarySyncStatus();
   if (!status || status.status === 'idle' || status.status === 'completed') return null;
+  const isStale = isStaleLibrarySync(status);
 
-  if (status.status === 'failed') {
+  if (status.status === 'failed' || isStale) {
     return (
       <View className="mb-3 rounded-xl bg-surface px-4 py-3">
         <Text variant="caption" className="text-text">
-          Sync failed: {status.error_message ?? 'unknown error'}. Try again from Profile.
+          {isStale
+            ? 'Sync is taking longer than expected. You can try again now.'
+            : `Sync failed: ${status.error_message ?? 'unknown error'}. Try again from Profile.`}
         </Text>
       </View>
     );
