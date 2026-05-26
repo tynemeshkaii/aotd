@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { jsonError, jsonResponse } from '../_shared/cors.ts';
+import { corsHeaders, jsonError, jsonResponse } from '../_shared/cors.ts';
 
 const CONCURRENCY = 5;
 
@@ -10,8 +10,11 @@ type DueUser = {
 };
 
 Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+  if (req.method !== 'POST') return jsonError(405, 'method_not_allowed');
+
   const cronSecret = Deno.env.get('CRON_SECRET');
-  if (req.headers.get('Authorization') !== `Bearer ${cronSecret}`) {
+  if (!cronSecret || req.headers.get('Authorization') !== `Bearer ${cronSecret}`) {
     return jsonError(401, 'unauthorized');
   }
 

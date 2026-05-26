@@ -59,7 +59,7 @@ export async function searchAlbum(
   const q = `album:"${album}" artist:"${artist}"`;
   const url = `${SPOTIFY_API}/search?type=album&limit=5&market=${market}&q=${encodeURIComponent(q)}`;
   const res = await spotifyFetch(url, token);
-  if (!res.ok) return null;
+  if (!res.ok) throw new Error(`spotify_search_failed:${res.status}`);
   const data = (await res.json()) as { albums?: { items?: SpotifyAlbumSearchItem[] } };
   const items = data.albums?.items ?? [];
   const normalizedAlbum = normalizeSearch(album);

@@ -16,7 +16,8 @@ import {
   selectFromTop,
 } from '../_shared/recommendation-algorithm.ts';
 import { getValidSpotifyToken } from '../_shared/spotify.ts';
-import { extractTasteSignal } from '../_shared/taste-extraction.ts';
+import { fetchAlbumDetails } from '../_shared/spotify-extended.ts';
+import { extractTasteSignal, type TasteSignal } from '../_shared/taste-extraction.ts';
 
 const PRIMARY_COMPUTE_BUDGET_MS = 25_000;
 const SPOTIFY_TOKEN_STAGE_TIMEOUT_MS = 10_000;
@@ -24,6 +25,7 @@ const TASTE_STAGE_TIMEOUT_MS = 12_000;
 const CANDIDATE_STAGE_TIMEOUT_MS = 20_000;
 const DB_STAGE_TIMEOUT_MS = 8_000;
 const FALLBACK_STAGE_TIMEOUT_MS = 12_000;
+const POST_SELECTION_DETAILS_TIMEOUT_MS = 4_000;
 
 type FallbackReason =
   | 'no_candidates'
@@ -114,6 +116,7 @@ Deno.serve(async (req) => {
   let selectionReason: Record<string, unknown> = {};
   let isFallback = false;
   let fallbackReason: FallbackReason | null = null;
+  let taste: TasteSignal | null = null;
   const requestStartMs = Date.now();
   const diag: DiagEvent[] = [];
   const recordDiag = (stage: string, detail?: Record<string, unknown>) => {
@@ -135,7 +138,7 @@ Deno.serve(async (req) => {
     );
     console.log(`[compute] spotify_token_ok user=${userId}`);
     recordDiag('spotify_token_ok');
-    const taste = await withTimeout(
+    taste = await withTimeout(
       extractTasteSignal(admin, userId, spotifyToken, { includeTasteVector: false }),
       TASTE_STAGE_TIMEOUT_MS,
       'taste_signal_timeout',
@@ -146,6 +149,7 @@ Deno.serve(async (req) => {
     recordDiag('taste_ready', {
       library_size: taste.librarySize,
       top_artists: taste.topArtists.length,
+      source_artists: taste.topArtists.slice(0, 8).map((artist) => artist.name),
     });
     if (taste.topArtists.length < 5) {
       fallbackReason = 'library_too_small';
@@ -187,12 +191,12 @@ Deno.serve(async (req) => {
 
     const { candidates, spotifyRelatedAvailable } = await withTimeout(
       generateCandidates(admin, spotifyToken, taste, exclusions, recentArtists, {
-        maxSourceArtists: 5,
-        maxSimilarPerSource: 4,
-        maxAlbumsPerSimilar: 1,
-        maxCandidates: 18,
+        maxSourceArtists: 8,
+        maxSimilarPerSource: 6,
+        maxAlbumsPerSimilar: 2,
+        maxCandidates: 28,
         maxConsecutiveLastfmFailures: 2,
-        maxConsecutiveSpotifySearchFailures: 2,
+        maxConsecutiveSpotifySearchFailures: 4,
         deadlineAtMs: primaryDeadlineAtMs,
         useSpotifyRelated: false,
         skipAlbumInfoLookup: true,
@@ -246,6 +250,30 @@ Deno.serve(async (req) => {
       chosen = next;
     }
 
+    if (!chosen.candidate.duration_ms && Date.now() < primaryDeadlineAtMs - 1_000) {
+      try {
+        const timeoutMs = Math.max(
+          1_000,
+          Math.min(POST_SELECTION_DETAILS_TIMEOUT_MS, primaryDeadlineAtMs - Date.now()),
+        );
+        const details = await withTimeout(
+          fetchAlbumDetails(spotifyToken, chosen.candidate.spotify_id),
+          timeoutMs,
+          'post_selection_album_details_timeout',
+        );
+        if (details?.duration_ms) {
+          chosen.candidate.duration_ms = details.duration_ms;
+          recordDiag('post_selection_details_ok', { duration_ms: details.duration_ms });
+        }
+      } catch (detailsError) {
+        const msg = detailsError instanceof Error ? detailsError.message : String(detailsError);
+        console.warn(
+          `[compute] post_selection_album_details_failed user=${userId} album=${chosen.candidate.spotify_id} error=${msg}`,
+        );
+        recordDiag('post_selection_details_failed', { error: msg });
+      }
+    }
+
     const { data: albumRow, error: albumErr } = await withTimeout(
       admin
         .from('albums')
@@ -292,7 +320,7 @@ Deno.serve(async (req) => {
     let fb: { album_id: string } | null;
     try {
       fb = await withTimeout(
-        getCuratedFallback(admin, userId),
+        getCuratedFallback(admin, userId, taste ?? undefined),
         FALLBACK_STAGE_TIMEOUT_MS,
         'fallback_timeout',
       );

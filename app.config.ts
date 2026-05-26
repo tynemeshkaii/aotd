@@ -11,6 +11,9 @@ const config: ExpoConfig = {
   ios: {
     bundleIdentifier: 'com.pesnya.albumoftheday',
     supportsTablet: false,
+    infoPlist: {
+      LSApplicationQueriesSchemes: ['spotify'],
+    },
   },
   android: {
     package: 'com.pesnya.albumoftheday',

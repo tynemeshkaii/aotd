@@ -3,6 +3,7 @@ import { normalizeAlbumKey } from './album-dedupe.ts';
 import { getLastfmSimilarCached, getSpotifyRelatedCached } from './external-cache.ts';
 import { fetchAlbumInfo, fetchTopAlbumsForArtist } from './lastfm.ts';
 import { getReleaseGroupCached, isAlbumLike, type MbReleaseGroup } from './musicbrainz.ts';
+import { isRecommendationReleaseLike } from './release-eligibility.ts';
 import { fetchAlbumDetails, searchAlbum } from './spotify-extended.ts';
 import type { TasteSignal, UserArtist } from './taste-extraction.ts';
 
@@ -190,35 +191,49 @@ export async function generateCandidates(
       assertWithinDeadline(o.deadlineAtMs);
       if (candidates.length >= o.maxCandidates) break;
       if (exclusions.normalizedAlbumKeys.has(normalizeAlbumKey(sim.name, ta.name))) continue;
-      const sp = await searchAlbum(spotifyToken, sim.name, ta.name, o.market).catch((e) => {
+      let sp: Awaited<ReturnType<typeof searchAlbum>>;
+      try {
+        sp = await searchAlbum(spotifyToken, sim.name, ta.name, o.market);
+      } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         console.warn(
           `[candidates] spotify_search_failed artist="${sim.name}" album="${ta.name}" error=${msg}`,
         );
-        return null;
-      });
-      if (!sp) {
         consecutiveSpotifySearchFailures += 1;
         if (consecutiveSpotifySearchFailures >= o.maxConsecutiveSpotifySearchFailures) {
           throw new Error('spotify_search_failed');
         }
         continue;
       }
+      if (!sp) {
+        consecutiveSpotifySearchFailures = 0;
+        console.log(
+          `[candidates] spotify_search_no_match artist="${sim.name}" album="${ta.name}" ${elapsedTag(startMs)}`,
+        );
+        pushDiag(diag, startMs, 'spotify_search_no_match', {
+          artist: sim.name,
+          album: ta.name,
+        });
+        continue;
+      }
       consecutiveSpotifySearchFailures = 0;
       if (seenSpotifyIds.has(sp.id)) continue;
-      if (sp.album_type !== 'album') continue;
       const primaryArtistName = sp.artists[0]?.name ?? sim.name;
       if (exclusions.normalizedAlbumKeys.has(normalizeAlbumKey(primaryArtistName, sp.name)))
         continue;
 
       let durationMs: number | undefined;
-      if (sp.total_tracks < 6) {
-        if (o.skipAlbumDetailsLookup) continue;
-        if (sp.total_tracks < 3) continue;
+      let releaseLike = isRecommendationReleaseLike(sp);
+      if (!releaseLike && !o.skipAlbumDetailsLookup && sp.total_tracks >= 2) {
         const details = await fetchAlbumDetails(spotifyToken, sp.id, o.market);
         durationMs = details?.duration_ms;
-        if (!durationMs || durationMs < 20 * 60 * 1000) continue;
+        releaseLike = isRecommendationReleaseLike({
+          album_type: sp.album_type,
+          total_tracks: sp.total_tracks,
+          duration_ms: durationMs,
+        });
       }
+      if (!releaseLike) continue;
       seenSpotifyIds.add(sp.id);
 
       let infoListeners: number | undefined;

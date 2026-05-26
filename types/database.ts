@@ -308,6 +308,57 @@ export type Database = {
         }
         Relationships: []
       }
+      ratings: {
+        Row: {
+          album_id: string
+          album_of_the_day_id: string | null
+          comment: string | null
+          created_at: string
+          id: string
+          is_public: boolean
+          score: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          album_id: string
+          album_of_the_day_id?: string | null
+          comment?: string | null
+          created_at?: string
+          id?: string
+          is_public?: boolean
+          score: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          album_id?: string
+          album_of_the_day_id?: string | null
+          comment?: string | null
+          created_at?: string
+          id?: string
+          is_public?: boolean
+          score?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ratings_album_id_fkey"
+            columns: ["album_id"]
+            isOneToOne: false
+            referencedRelation: "albums"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ratings_album_of_the_day_id_fkey"
+            columns: ["album_of_the_day_id"]
+            isOneToOne: false
+            referencedRelation: "albums_of_the_day"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       recommendation_history: {
         Row: {
           album_id: string
@@ -521,6 +572,31 @@ export type Database = {
       }
     }
     Functions: {
+      discovery_album_rows: {
+        Args: { p_user_id: string }
+        Returns: {
+          album_cover_url: string
+          album_duration_ms: number
+          album_id: string
+          album_primary_artist_name: string
+          album_release_year: number
+          album_spotify_id: string
+          album_title: string
+          album_total_tracks: number
+          aotd_id: string
+          fallback_reason: string
+          is_fallback: boolean
+          opened_at: string
+          pick_date: string
+          rating_comment: string
+          rating_created_at: string
+          rating_id: string
+          rating_score: number
+          rating_updated_at: string
+          selection_reason: Json
+          status: string
+        }[]
+      }
       ensure_recommendation_atomic: {
         Args: {
           p_album_id: string
@@ -562,6 +638,61 @@ export type Database = {
           is_fallback: boolean
           opened_at: string
           pick_date: string
+          rating_comment: string
+          rating_created_at: string
+          rating_id: string
+          rating_score: number
+          rating_updated_at: string
+          selection_reason: Json
+          status: string
+        }[]
+      }
+      get_discoveries: {
+        Args: { p_user_id: string }
+        Returns: {
+          album_cover_url: string
+          album_duration_ms: number
+          album_id: string
+          album_primary_artist_name: string
+          album_release_year: number
+          album_spotify_id: string
+          album_title: string
+          album_total_tracks: number
+          aotd_id: string
+          fallback_reason: string
+          is_fallback: boolean
+          opened_at: string
+          pick_date: string
+          rating_comment: string
+          rating_created_at: string
+          rating_id: string
+          rating_score: number
+          rating_updated_at: string
+          selection_reason: Json
+          status: string
+        }[]
+      }
+      get_discovery_detail: {
+        Args: { p_aotd_id: string; p_user_id: string }
+        Returns: {
+          album_cover_url: string
+          album_duration_ms: number
+          album_id: string
+          album_primary_artist_name: string
+          album_release_year: number
+          album_spotify_id: string
+          album_title: string
+          album_total_tracks: number
+          aotd_id: string
+          fallback_reason: string
+          is_fallback: boolean
+          opened_at: string
+          pick_date: string
+          rating_comment: string
+          rating_created_at: string
+          rating_id: string
+          rating_score: number
+          rating_updated_at: string
           selection_reason: Json
           status: string
         }[]
@@ -572,6 +703,25 @@ export type Database = {
           push_time: string
           target_date: string
           user_tz: string
+        }[]
+      }
+      save_album_rating: {
+        Args: {
+          p_aotd_id: string
+          p_comment?: string
+          p_score: number
+          p_user_id: string
+        }
+        Returns: {
+          album_id: string
+          album_of_the_day_id: string
+          comment: string
+          created_at: string
+          id: string
+          is_public: boolean
+          score: number
+          updated_at: string
+          user_id: string
         }[]
       }
       try_start_library_sync: {

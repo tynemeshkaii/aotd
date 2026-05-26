@@ -93,18 +93,13 @@ async function fetchReleaseGroup(artist: string, album: string): Promise<MbRelea
   }
 }
 
-const EXCLUDED_SECONDARY_TYPES = new Set([
-  'Compilation',
-  'Live',
-  'Soundtrack',
-  'Remix',
-  'DJ-mix',
-  'Mixtape/Street',
-]);
+const EXCLUDED_SECONDARY_TYPES = new Set(['Compilation', 'Live', 'Soundtrack', 'Remix', 'DJ-mix']);
+
+const ALLOWED_PRIMARY_TYPES = new Set(['Album', 'EP']);
 
 export function isAlbumLike(rg: MbReleaseGroup | null): boolean {
   if (!rg) return true;
-  if (rg.primary_type && rg.primary_type !== 'Album') return false;
+  if (rg.primary_type && !ALLOWED_PRIMARY_TYPES.has(rg.primary_type)) return false;
   return !(rg.secondary_types ?? []).some((t) => EXCLUDED_SECONDARY_TYPES.has(t));
 }
 

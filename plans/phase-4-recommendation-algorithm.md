@@ -35,18 +35,18 @@
 
 ## Current implementation status
 
-Phase 4 is implemented, hardened, and acceptance-tested end-to-end (2026-05-25). Treat the checked-in files as authoritative when they differ from design-era snippets in this document:
+Phase 4 is implemented, hardened, and acceptance-tested end-to-end (final review fixes applied 2026-05-26). Treat the checked-in files as authoritative when they differ from design-era snippets in this document:
 
 - SQL migrations are now five files, ending with `20260526040000_phase4_recommendation_fixes.sql`.
 - `ensure_recommendation_atomic` is race-safe: it inserts into `albums_of_the_day` with `ON CONFLICT (user_id, date) DO NOTHING`, then returns the existing pick if another worker already won the race. Confirmed under parallel curl invocations on the same `(user_id, date)`.
 - Repeat/library exclusion uses three keys together: exact Spotify album ID, MusicBrainz release group ID, and normalized `artist + album` from `album-dedupe.ts`.
 - Both primary candidate generation and `curated-fallback.ts` use the same repeat guard shape.
 - Client updates to `albums_of_the_day` can only move forward through `pending -> opened -> rated`; immutable recommendation fields and `opened_at` are protected by trigger.
-- `compute-album-of-the-day` is **production-hardened against Spotify 429 cascades.** `spotifyFetch` caps 429 retries to 1 and Retry-After to ≤ 1s (`_shared/spotify-extended.ts`). Primary candidate generation skips `album.getInfo`, the Spotify album-detail lookup, and the in-loop MusicBrainz pass via the `skipAlbumInfoLookup` / `skipAlbumDetailsLookup` / `skipMusicBrainz` flags on `generateCandidates`; MusicBrainz validation runs once post-scoring on the chosen candidate (`validateCandidateWithMb`, up to 3 retries before shipping the best non-validated candidate).
+- `compute-album-of-the-day` is **production-hardened against Spotify 429 cascades.** `spotifyFetch` caps 429 retries to 1 and Retry-After to ≤ 1s (`_shared/spotify-extended.ts`). `searchAlbum()` throws on non-2xx Spotify API failures/timeouts but returns `null` for normal 2xx "no match" results; candidate generation skips those misses without incrementing the Spotify failure breaker. Primary candidate generation skips `album.getInfo`, the Spotify album-detail lookup, and the in-loop MusicBrainz pass via the `skipAlbumInfoLookup` / `skipAlbumDetailsLookup` / `skipMusicBrainz` flags on `generateCandidates`; MusicBrainz validation runs once post-scoring on the chosen candidate (`validateCandidateWithMb`, up to 3 retries before shipping the best non-validated candidate).
 - **Diagnostic mode**: `compute-album-of-the-day` accepts `"diag": true` in the request body and returns a `diag` array of per-stage timings. Compute-stage `at_ms` is request-relative; candidate-generation `at_ms` is candidate-internal-relative.
-- `prewarm-album-cache` has an OPTIONS handler, method guard, and `!cronSecret` undefined check, matching the auth surface of `compute-album-of-the-day`.
-- `npm run typecheck`, `npm run lint`, and `deno test _shared/recommendation-algorithm.test.ts` (4/4 passing) all green.
-- See `plans/phase-4-implementation.md` § "Session 2 — Production hardening" for the post-mortem and acceptance test log.
+- `compute-album-of-the-day`, `dispatch-daily-picks`, and `prewarm-album-cache` all have an OPTIONS handler, POST-only method guard, and `!cronSecret` undefined check because `verify_jwt=false` is set for these functions.
+- `npm run typecheck`, `npm run lint`, and Deno tests for recommendation scoring + Spotify Search semantics (6/6 passing) are green.
+- See `plans/phase-4-implementation.md` §§ "Session 2 — Production hardening" and "Session 3 — Final review fixes" for the post-mortem and acceptance test log.
 
 ## 1. Архитектура (high-level)
 
@@ -1095,10 +1095,18 @@ export type SpotifyAudioFeatures = {
 export type SpotifyRelatedArtist = { id: string; name: string };
 
 async function spotifyFetch(url: string, token: string, retryCount = 0): Promise<Response> {
-  const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
-  if (res.status === 429 && retryCount < 3) {
-    const retry = Number(res.headers.get('Retry-After') ?? '2');
-    await new Promise(r => setTimeout(r, retry * 1000));
+  const res = await fetchWithTimeout(
+    url,
+    { headers: { Authorization: `Bearer ${token}` } },
+    SPOTIFY_FETCH_TIMEOUT_MS,
+  );
+  if (res.status === 429 && retryCount < SPOTIFY_429_MAX_RETRIES) {
+    const requested = Number(res.headers.get('Retry-After') ?? '1') * 1000;
+    const waitMs = Math.min(
+      Number.isFinite(requested) && requested > 0 ? requested : 1_000,
+      SPOTIFY_429_MAX_RETRY_AFTER_MS,
+    );
+    await new Promise(r => setTimeout(r, waitMs));
     return spotifyFetch(url, token, retryCount + 1);
   }
   return res;
@@ -1112,7 +1120,7 @@ export async function searchAlbum(token: string, artist: string, album: string, 
   const q = `album:"${album}" artist:"${artist}"`;
   const url = `${SPOTIFY_API}/search?type=album&limit=5&market=${market}&q=${encodeURIComponent(q)}`;
   const res = await spotifyFetch(url, token);
-  if (!res.ok) return null;
+  if (!res.ok) throw new Error(`spotify_search_failed:${res.status}`);
   const data = (await res.json()) as { albums?: { items?: SpotifyAlbumSearchItem[] } };
   const items = data.albums?.items ?? [];
   // Prefer title/artist matches and album_type='album'. Spotify search can
@@ -1603,6 +1611,7 @@ export async function generateCandidates(
   // then resolve metadata via Spotify search.
   const candidates: AlbumCandidate[] = [];
   const seenSpotifyIds = new Set<string>(exclusions.spotifyAlbumIds);
+  let consecutiveSpotifySearchFailures = 0;
 
   for (const sim of similarMap.values()) {
     if (candidates.length >= o.maxCandidates) break;
@@ -1619,8 +1628,18 @@ export async function generateCandidates(
     for (const ta of topAlbums) {
       if (candidates.length >= o.maxCandidates) break;
       if (exclusions.normalizedAlbumKeys.has(normalizeAlbumKey(sim.name, ta.name))) continue;
-      const sp = await searchAlbum(spotifyToken, sim.name, ta.name, o.market);
+      let sp: Awaited<ReturnType<typeof searchAlbum>>;
+      try {
+        sp = await searchAlbum(spotifyToken, sim.name, ta.name, o.market);
+      } catch {
+        consecutiveSpotifySearchFailures += 1;
+        if (consecutiveSpotifySearchFailures >= o.maxConsecutiveSpotifySearchFailures) {
+          throw new Error('spotify_search_failed');
+        }
+        continue;
+      }
       if (!sp) continue;
+      consecutiveSpotifySearchFailures = 0;
       if (seenSpotifyIds.has(sp.id)) continue;
       if (sp.album_type !== 'album') continue;
       const primaryArtistName = sp.artists[0]?.name ?? sim.name;
@@ -2118,13 +2137,16 @@ Deno.serve(async (req) => {
 
 ```ts
 import { createClient } from '@supabase/supabase-js';
-import { jsonError, jsonResponse } from '../_shared/cors.ts';
+import { corsHeaders, jsonError, jsonResponse } from '../_shared/cors.ts';
 
 const CONCURRENCY = 5;
 
 Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+  if (req.method !== 'POST') return jsonError(405, 'method_not_allowed');
+
   const cronSecret = Deno.env.get('CRON_SECRET');
-  if (req.headers.get('Authorization') !== `Bearer ${cronSecret}`) {
+  if (!cronSecret || req.headers.get('Authorization') !== `Bearer ${cronSecret}`) {
     return jsonError(401, 'unauthorized');
   }
 
@@ -2172,13 +2194,16 @@ Deno.serve(async (req) => {
 
 ```ts
 import { createClient } from '@supabase/supabase-js';
-import { jsonError, jsonResponse } from '../_shared/cors.ts';
+import { corsHeaders, jsonError, jsonResponse } from '../_shared/cors.ts';
 import { fetchGloballyTopAlbums } from '../_shared/lastfm.ts';
 import { getServiceSpotifyToken, searchAlbum } from '../_shared/spotify-extended.ts';
 
 Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+  if (req.method !== 'POST') return jsonError(405, 'method_not_allowed');
+
   const cronSecret = Deno.env.get('CRON_SECRET');
-  if (req.headers.get('Authorization') !== `Bearer ${cronSecret}`) {
+  if (!cronSecret || req.headers.get('Authorization') !== `Bearer ${cronSecret}`) {
     return jsonError(401, 'unauthorized');
   }
 

@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { getAudioFeaturesCached } from './external-cache.ts';
 import { fetchUserTopTracksOptional } from './spotify-extended.ts';
+import { isUsableTasteArtist } from './taste-filters.ts';
 
 export interface UserArtist {
   spotify_id: string | null;
@@ -44,6 +45,7 @@ export async function extractTasteSignal(
   type ArtistAgg = { spotify_id: string | null; name: string; frequency: number };
   const byKey = new Map<string, ArtistAgg>();
   for (const row of lib ?? []) {
+    if (!isUsableTasteArtist(row.artist_name)) continue;
     const id: string | null = row.primary_artist_spotify_id ?? null;
     const key = id ?? row.artist_name.toLowerCase().trim();
     const existing = byKey.get(key);

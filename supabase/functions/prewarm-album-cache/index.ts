@@ -1,12 +1,18 @@
 import { corsHeaders, jsonError, jsonResponse } from '../_shared/cors.ts';
 import { fetchGloballyTopAlbums } from '../_shared/lastfm.ts';
-import { getServiceSpotifyToken, searchAlbum } from '../_shared/spotify-extended.ts';
+import { isRecommendationReleaseLike } from '../_shared/release-eligibility.ts';
+import {
+  fetchAlbumDetails,
+  getServiceSpotifyToken,
+  searchAlbum,
+} from '../_shared/spotify-extended.ts';
 
 const DEFAULT_PREWARM_LIMIT = 30;
 const MAX_PREWARM_LIMIT = 40;
 const MAX_RUNTIME_MS = 95_000;
 const SPOTIFY_TOKEN_TIMEOUT_MS = 10_000;
 const SPOTIFY_SEARCH_TIMEOUT_MS = 3_500;
+const SPOTIFY_DETAILS_TIMEOUT_MS = 3_500;
 const DB_STEP_TIMEOUT_MS = 8_000;
 const MAX_CONSECUTIVE_SPOTIFY_SEARCH_FAILURES = 2;
 
@@ -70,17 +76,17 @@ Deno.serve(async (req) => {
       attempted += 1;
       await new Promise((r) => setTimeout(r, 100));
       console.log(`[prewarm] attempt=${attempted} artist="${item.artist}" album="${item.name}"`);
-      const sp = await withTimeout(
-        searchAlbum(spotifyToken, item.artist, item.name),
-        SPOTIFY_SEARCH_TIMEOUT_MS,
-        'spotify_search_timeout',
-      ).catch((e) => {
+      let sp: Awaited<ReturnType<typeof searchAlbum>>;
+      try {
+        sp = await withTimeout(
+          searchAlbum(spotifyToken, item.artist, item.name),
+          SPOTIFY_SEARCH_TIMEOUT_MS,
+          'spotify_search_timeout',
+        );
+      } catch (e) {
         console.warn(
           `[prewarm] spotify_search_failed artist="${item.artist}" album="${item.name}" error=${formatError(e)}`,
         );
-        return null;
-      });
-      if (!sp) {
         consecutiveSpotifySearchFailures += 1;
         if (consecutiveSpotifySearchFailures >= MAX_CONSECUTIVE_SPOTIFY_SEARCH_FAILURES) {
           stoppedReason = 'spotify_search_unavailable';
@@ -91,7 +97,41 @@ Deno.serve(async (req) => {
         }
         continue;
       }
+      if (!sp) {
+        consecutiveSpotifySearchFailures = 0;
+        console.log(
+          `[prewarm] spotify_search_no_match artist="${item.artist}" album="${item.name}"`,
+        );
+        continue;
+      }
       consecutiveSpotifySearchFailures = 0;
+
+      let durationMs: number | null = null;
+      let releaseLike = isRecommendationReleaseLike(sp);
+      if (!releaseLike && sp.total_tracks >= 2) {
+        const details = await withTimeout(
+          fetchAlbumDetails(spotifyToken, sp.id),
+          SPOTIFY_DETAILS_TIMEOUT_MS,
+          'spotify_album_details_timeout',
+        ).catch((e) => {
+          console.warn(
+            `[prewarm] spotify_details_failed spotify_id=${sp.id} artist="${item.artist}" album="${item.name}" error=${formatError(e)}`,
+          );
+          return null;
+        });
+        durationMs = details?.duration_ms ?? null;
+        releaseLike = isRecommendationReleaseLike({
+          album_type: sp.album_type,
+          total_tracks: sp.total_tracks,
+          duration_ms: durationMs,
+        });
+      }
+      if (!releaseLike) {
+        console.log(
+          `[prewarm] release_not_eligible spotify_id=${sp.id} type=${sp.album_type} tracks=${sp.total_tracks}`,
+        );
+        continue;
+      }
 
       const upserted = await upsertAlbumSeed(supabaseUrl, serviceRoleKey, {
         spotify_id: sp.id,
@@ -101,6 +141,7 @@ Deno.serve(async (req) => {
         release_year: parseYear(sp.release_date),
         cover_url: sp.images[0]?.url ?? null,
         total_tracks: sp.total_tracks,
+        duration_ms: durationMs,
         album_type: sp.album_type,
         lastfm_playcount: item.playcount ?? null,
         is_prewarm_seed: true,
@@ -179,6 +220,7 @@ type AlbumSeedRow = {
   release_year: number | null;
   cover_url: string | null;
   total_tracks: number;
+  duration_ms: number | null;
   album_type: string;
   lastfm_playcount: number | null;
   is_prewarm_seed: boolean;
