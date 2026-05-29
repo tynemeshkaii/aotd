@@ -4,12 +4,14 @@ import { supabase } from './supabase';
 
 export const ACTIVE_LIBRARY_SYNC_STALE_MS = 10 * 60 * 1000;
 
+export type LibrarySyncMode = 'initial' | 'bounded' | 'full_reconcile';
+
 type LibrarySyncStatus = Database['public']['Tables']['library_sync_status']['Row'];
 type LibrarySyncStatusLike = Pick<LibrarySyncStatus, 'started_at' | 'status' | 'updated_at'> &
   Partial<Pick<LibrarySyncStatus, 'aggregated_albums_count' | 'completed_at'>>;
 
-export async function triggerLibrarySync(): Promise<void> {
-  const { error } = await supabase.functions.invoke('sync-spotify-library', { body: {} });
+export async function triggerLibrarySync(mode: LibrarySyncMode = 'full_reconcile'): Promise<void> {
+  const { error } = await supabase.functions.invoke('sync-spotify-library', { body: { mode } });
   if (error) throw error;
 }
 

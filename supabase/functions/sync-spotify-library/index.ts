@@ -21,6 +21,9 @@ type SyncStartResult = {
 
 const SPOTIFY_PAGE_SIZE = 50;
 const SYNC_LOG_EVERY_PAGES = 10;
+const DEFAULT_BOUNDED_SYNC_PAGES = 3;
+
+type SyncMode = 'initial' | 'bounded' | 'full_reconcile';
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
@@ -48,6 +51,16 @@ Deno.serve(async (req) => {
 
     const admin = createClient(supabaseUrl, serviceRoleKey);
 
+    const payload = await parsePayload(req).catch((error) => {
+      if (error instanceof Error && error.message === 'invalid_sync_mode') {
+        throw new Response(JSON.stringify({ error: 'invalid_sync_mode' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      throw error;
+    });
+    const mode = payload.mode ?? 'initial';
     const startedAt = new Date().toISOString();
     const start = await tryStartLibrarySync(admin, user.id, startedAt);
 
@@ -64,21 +77,25 @@ Deno.serve(async (req) => {
     }
 
     // Background — client gets 202 immediately and listens via Realtime.
-    EdgeRuntime.waitUntil(runSync(admin, user.id, start.started_at ?? startedAt));
+    EdgeRuntime.waitUntil(runSync(admin, user.id, start.started_at ?? startedAt, mode));
 
-    return jsonResponse({ ok: true, status: 'queued' }, { status: 202 });
+    return jsonResponse({ ok: true, status: 'queued', mode }, { status: 202 });
   } catch (e) {
+    if (e instanceof Response) return e;
     return jsonError(500, 'unexpected', String(e));
   }
 });
 
-async function runSync(admin: SupabaseClient, userId: string, startedAt: string) {
+async function runSync(admin: SupabaseClient, userId: string, startedAt: string, mode: SyncMode) {
   try {
     await patchSyncStatus(admin, userId, { status: 'syncing', processed_count: 0 }, startedAt);
 
     const token = await getValidSpotifyToken(admin, userId);
     const trackLimit = getSyncTrackLimit();
-    const maxTrackPages = trackLimit ? Math.ceil(trackLimit / SPOTIFY_PAGE_SIZE) : undefined;
+    const boundedMaxPages = mode === 'bounded' ? getBoundedSyncPages() : undefined;
+    const maxAlbumPages = boundedMaxPages;
+    const maxTrackPages =
+      boundedMaxPages ?? (trackLimit ? Math.ceil(trackLimit / SPOTIFY_PAGE_SIZE) : undefined);
 
     const savedAlbums: SpotifySavedAlbum[] = [];
     const savedTracks: SpotifySavedTrack[] = [];
@@ -100,7 +117,15 @@ async function runSync(admin: SupabaseClient, userId: string, startedAt: string)
         );
       },
       () => getValidSpotifyToken(admin, userId),
-      { label: 'saved albums', logEveryPages: SYNC_LOG_EVERY_PAGES },
+      {
+        admin,
+        userId,
+        endpointName: 'paged_library_albums',
+        label: 'saved albums',
+        logEveryPages: SYNC_LOG_EVERY_PAGES,
+        maxPages: maxAlbumPages,
+        rateLimitIntervalMs: mode === 'bounded' ? 500 : undefined,
+      },
     );
 
     await fetchAllSpotifyPaged<SpotifySavedTrack>(
@@ -124,7 +149,15 @@ async function runSync(admin: SupabaseClient, userId: string, startedAt: string)
         );
       },
       () => getValidSpotifyToken(admin, userId),
-      { label: 'saved tracks', logEveryPages: SYNC_LOG_EVERY_PAGES, maxPages: maxTrackPages },
+      {
+        admin,
+        userId,
+        endpointName: 'paged_library_tracks',
+        label: 'saved tracks',
+        logEveryPages: SYNC_LOG_EVERY_PAGES,
+        maxPages: maxTrackPages,
+        rateLimitIntervalMs: mode === 'bounded' ? 500 : undefined,
+      },
     );
 
     const aggregated = aggregateLibrary(savedAlbums, savedTracks);
@@ -165,7 +198,10 @@ async function runSync(admin: SupabaseClient, userId: string, startedAt: string)
     }
 
     const reconcileAt = new Date().toISOString();
-    if (trackLimit) {
+    if (mode === 'bounded') {
+      console.warn('[sync-spotify-library] bounded sync; skipping reconciliation');
+      await stampConnectionSyncedAt(admin, userId, reconcileAt);
+    } else if (trackLimit) {
       console.warn(
         '[sync-spotify-library] SYNC_TRACK_LIMIT is set; skipping reconciliation and last_synced_at update',
       );
@@ -181,13 +217,11 @@ async function runSync(admin: SupabaseClient, userId: string, startedAt: string)
         .lt('synced_at', startedAt);
       if (reconcileErr) throw new Error(`db_reconcile_failed:${reconcileErr.message}`);
 
-      const { error: connectionErr } = await admin
-        .from('streaming_connections')
-        .update({ last_synced_at: reconcileAt })
-        .eq('user_id', userId)
-        .eq('provider', 'spotify');
-      if (connectionErr) throw new Error(`connection_sync_stamp_failed:${connectionErr.message}`);
+      await stampConnectionSyncedAt(admin, userId, reconcileAt);
     }
+
+    const aggregatedAlbumsCount =
+      mode === 'bounded' ? await countActiveLibraryAlbums(admin, userId) : aggregated.length;
 
     await patchSyncStatus(
       admin,
@@ -195,19 +229,27 @@ async function runSync(admin: SupabaseClient, userId: string, startedAt: string)
       {
         status: 'completed',
         completed_at: reconcileAt,
-        aggregated_albums_count: aggregated.length,
+        aggregated_albums_count: aggregatedAlbumsCount,
       },
       startedAt,
     );
 
-    // Day-1 compute trigger — fire-and-forget.
+    // Day-1 prewarm + compute trigger — fire-and-forget.
     try {
       const cronSecret = Deno.env.get('CRON_SECRET');
       const supabaseUrl = Deno.env.get('SUPABASE_URL');
-      if (cronSecret && supabaseUrl) {
+      if (mode !== 'bounded' && cronSecret && supabaseUrl) {
         EdgeRuntime.waitUntil(
           (async () => {
             try {
+              await fetch(`${supabaseUrl}/functions/v1/prewarm-user-candidates`, {
+                method: 'POST',
+                headers: {
+                  Authorization: `Bearer ${cronSecret}`,
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ user_id: userId }),
+              });
               await fetch(`${supabaseUrl}/functions/v1/compute-album-of-the-day`, {
                 method: 'POST',
                 headers: {
@@ -217,7 +259,10 @@ async function runSync(admin: SupabaseClient, userId: string, startedAt: string)
                 body: JSON.stringify({ user_id: userId }),
               });
             } catch (e) {
-              console.warn('[day-1-compute] trigger failed', e instanceof Error ? e.message : e);
+              console.warn(
+                '[day-1-prewarm-compute] trigger failed',
+                e instanceof Error ? e.message : e,
+              );
             }
           })(),
         );
@@ -244,6 +289,24 @@ async function runSync(admin: SupabaseClient, userId: string, startedAt: string)
         statusError instanceof Error ? statusError.message : String(statusError),
       );
     }
+  }
+}
+
+async function parsePayload(req: Request): Promise<{ mode?: SyncMode }> {
+  try {
+    const payload = (await req.json()) as { mode?: unknown };
+    if (
+      payload.mode === undefined ||
+      payload.mode === 'initial' ||
+      payload.mode === 'bounded' ||
+      payload.mode === 'full_reconcile'
+    ) {
+      return payload as { mode?: SyncMode };
+    }
+    throw new Error('invalid_sync_mode');
+  } catch (e) {
+    if (e instanceof SyntaxError) return {};
+    throw e;
   }
 }
 
@@ -294,6 +357,15 @@ async function patchSyncStatus(
   }
 }
 
+async function stampConnectionSyncedAt(admin: SupabaseClient, userId: string, syncedAt: string) {
+  const { error } = await admin
+    .from('streaming_connections')
+    .update({ last_synced_at: syncedAt })
+    .eq('user_id', userId)
+    .eq('provider', 'spotify');
+  if (error) throw new Error(`connection_sync_stamp_failed:${error.message}`);
+}
+
 function getSyncTrackLimit() {
   const raw = Deno.env.get('SYNC_TRACK_LIMIT');
   if (!raw) return null;
@@ -305,4 +377,23 @@ function getSyncTrackLimit() {
   }
 
   return Math.floor(value);
+}
+
+function getBoundedSyncPages() {
+  const raw = Deno.env.get('BOUNDED_SYNC_PAGES');
+  if (!raw) return DEFAULT_BOUNDED_SYNC_PAGES;
+  const value = Number(raw);
+  if (!Number.isFinite(value) || value <= 0) return DEFAULT_BOUNDED_SYNC_PAGES;
+  return Math.max(1, Math.min(10, Math.floor(value)));
+}
+
+async function countActiveLibraryAlbums(admin: SupabaseClient, userId: string) {
+  const { count, error } = await admin
+    .from('user_library')
+    .select('provider_album_id', { count: 'exact', head: true })
+    .eq('user_id', userId)
+    .eq('provider', 'spotify')
+    .is('removed_at', null);
+  if (error) throw new Error(`library_count_failed:${error.message}`);
+  return count ?? 0;
 }

@@ -40,3 +40,6 @@ verify_jwt = false
 
 [functions.prewarm-album-cache]
 verify_jwt = false
+
+[functions.prewarm-user-candidates]
+verify_jwt = false

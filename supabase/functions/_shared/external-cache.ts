@@ -10,7 +10,7 @@ import {
 const SIMILARITY_TTL_DAYS = 30;
 const AUDIO_FEATURES_TTL_DAYS = 180;
 
-function normalizeArtistName(name: string): string {
+export function normalizeArtistName(name: string): string {
   return name.toLowerCase().trim().replace(/\s+/g, ' ');
 }
 

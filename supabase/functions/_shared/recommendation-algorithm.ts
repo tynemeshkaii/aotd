@@ -1,7 +1,10 @@
 import type { AlbumCandidate } from './candidate-generation.ts';
+import { normalizeArtistName } from './external-cache.ts';
+import { type PopularityBucket, popularityBucket } from './popularity-bucket.ts';
 import type { TasteSignal } from './taste-extraction.ts';
+import { type CandidateTier, classifyCandidate } from './tier-classifier.ts';
 
-export const ALGORITHM_VERSION = 1;
+export const ALGORITHM_VERSION = 2;
 
 export interface ScoringWeights {
   artist_similarity: number;
@@ -29,6 +32,13 @@ export interface ScoredCandidate {
     balance: number;
     temperature: number;
   };
+  candidate_tier?: CandidateTier;
+  popularity_bucket?: PopularityBucket;
+  track_b_multipliers?: {
+    mainstream_penalty: number;
+    known_artist_bonus: number;
+    deep_discovery_bonus: number;
+  };
 }
 
 export function scoreCandidates(
@@ -38,6 +48,7 @@ export function scoreCandidates(
   weights = DEFAULT_WEIGHTS,
 ): ScoredCandidate[] {
   if (candidates.length === 0) return [];
+  const userArtistFrequencies = buildUserArtistFrequencies(taste);
 
   const popularityMetrics = candidates.map((c) => c.lastfm_listeners ?? c.lastfm_playcount ?? 0);
   const logPopularity = popularityMetrics.map((v) => Math.log(v + 1));
@@ -62,20 +73,50 @@ export function scoreCandidates(
       const balance = releaseBalanceScore(c, taste);
       const temperature = rng();
 
-      const score =
+      const baseScore =
         weights.artist_similarity * similarity +
         weights.source_artist_frequency * source_freq +
         weights.popularity_log_percentile * popularity +
         weights.release_balance * balance +
         weights.sampling_temperature * temperature;
+      const bucket = popularityBucket(c.lastfm_listeners);
+      const tier = classifyCandidate(c, userArtistFrequencies, bucket);
+      const adjusted = applyTrackBScore(baseScore, tier, bucket);
 
       return {
         candidate: c,
-        score,
+        score: adjusted.score,
         breakdown: { similarity, source_freq, popularity, balance, temperature },
+        candidate_tier: tier,
+        popularity_bucket: bucket,
+        track_b_multipliers: adjusted.multipliers,
       };
     })
     .sort((a, b) => b.score - a.score);
+}
+
+export function applyTrackBScore(baseScore: number, tier: CandidateTier, bucket: PopularityBucket) {
+  const multipliers = {
+    mainstream_penalty: 1,
+    known_artist_bonus: 1,
+    deep_discovery_bonus: 1,
+  };
+  let score = baseScore;
+
+  if (bucket === 'mainstream' && tier !== 'safe_anchor') {
+    multipliers.mainstream_penalty = 0.4;
+    score *= multipliers.mainstream_penalty;
+  }
+  if (tier === 'known_artist_new_album') {
+    multipliers.known_artist_bonus = 1.25;
+    score *= multipliers.known_artist_bonus;
+  }
+  if (tier === 'deep_discovery') {
+    multipliers.deep_discovery_bonus = 1.1;
+    score *= multipliers.deep_discovery_bonus;
+  }
+
+  return { score, multipliers };
 }
 
 function clamp01(x: number) {
@@ -87,6 +128,15 @@ function releaseBalanceScore(c: AlbumCandidate, taste: TasteSignal): number {
   const decade = String(Math.floor(c.release_year / 10) * 10);
   const libFraction = taste.libraryDecadeFractions[decade] ?? 0;
   return clamp01(1 - libFraction);
+}
+
+function buildUserArtistFrequencies(taste: TasteSignal) {
+  const out = new Map<string, number>();
+  for (const artist of taste.topArtists) {
+    const key = normalizeArtistName(artist.name);
+    out.set(key, (out.get(key) ?? 0) + artist.frequency);
+  }
+  return out;
 }
 
 export function selectFromTop(
@@ -137,5 +187,9 @@ export function buildSelectionReason(
     spotify_related_used: spotifyRelatedAvailable,
     audio_match_used: false,
     score_breakdown: chosen.breakdown,
+    candidate_tier: chosen.candidate_tier ?? null,
+    popularity_bucket: chosen.popularity_bucket ?? null,
+    source_artist_count: chosen.candidate.source_paths.length,
+    track_b_multipliers: chosen.track_b_multipliers ?? null,
   };
 }

@@ -9,6 +9,13 @@ type DueUser = {
   user_tz: string;
 };
 
+type DispatchFailure = {
+  user_id: string;
+  target_date: string;
+  status?: number;
+  error: string;
+};
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   if (req.method !== 'POST') return jsonError(405, 'method_not_allowed');
@@ -25,6 +32,7 @@ Deno.serve(async (req) => {
 
   const { data: due, error } = await admin.rpc('find_users_due_for_compute', {
     p_lead_minutes: 60,
+    p_catchup_minutes: 720,
   });
   if (error) return jsonError(500, 'rpc_failed', error.message);
   if (!due || due.length === 0) {
@@ -32,6 +40,7 @@ Deno.serve(async (req) => {
   }
 
   let dispatched = 0;
+  const failed: DispatchFailure[] = [];
   const dueUsers = due as DueUser[];
   for (let i = 0; i < dueUsers.length; i += CONCURRENCY) {
     const batch = dueUsers.slice(i, i + CONCURRENCY);
@@ -50,14 +59,40 @@ Deno.serve(async (req) => {
               user_timezone: u.user_tz,
             }),
           });
-          if (res.ok) dispatched += 1;
-          else console.warn(`[dispatch] compute failed for ${u.user_id}: ${res.status}`);
+          if (res.ok) {
+            dispatched += 1;
+          } else {
+            const body = await res.text().catch(() => '');
+            const errorBody = body.slice(0, 500);
+            failed.push({
+              user_id: u.user_id,
+              target_date: u.target_date,
+              status: res.status,
+              error: errorBody || res.statusText,
+            });
+            console.warn(`[dispatch] compute failed for ${u.user_id}: ${res.status} ${errorBody}`);
+          }
         } catch (e) {
-          console.warn(`[dispatch] error for ${u.user_id}: ${e instanceof Error ? e.message : e}`);
+          const message = e instanceof Error ? e.message : String(e);
+          failed.push({
+            user_id: u.user_id,
+            target_date: u.target_date,
+            error: message,
+          });
+          console.warn(`[dispatch] error for ${u.user_id}: ${message}`);
         }
       }),
     );
   }
 
-  return jsonResponse({ ok: true, dispatched, total_due: due.length });
+  return jsonResponse(
+    {
+      ok: failed.length === 0,
+      dispatched,
+      failed_count: failed.length,
+      failed,
+      total_due: due.length,
+    },
+    { status: failed.length === 0 ? 200 : dispatched > 0 ? 207 : 500 },
+  );
 });

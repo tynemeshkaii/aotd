@@ -10,12 +10,14 @@ import {
 } from 'react';
 
 import { isActiveLibrarySync, isStaleLibrarySync, triggerLibrarySync } from '@/lib/library';
+import { syncDeviceTimeZone } from '@/lib/profile';
+import { queryClient } from '@/lib/queryClient';
 import { supabase } from '@/lib/supabase';
 
 const AUTO_SYNC_STALE_MS = 24 * 60 * 60 * 1000;
 // Don't retry a failed sync within this window — Spotify rate limits punish
 // rapid retries, and the user can always tap "Sync now" in Profile.
-const FAILED_RETRY_COOLDOWN_MS = 15 * 60 * 1000;
+const FAILED_RETRY_COOLDOWN_MS = 60 * 60 * 1000;
 
 async function maybeAutoSync(userId: string) {
   try {
@@ -51,7 +53,7 @@ async function maybeAutoSync(userId: string) {
       !lastSyncedAt || Date.now() - new Date(lastSyncedAt).getTime() > AUTO_SYNC_STALE_MS;
     if (!stale) return;
 
-    await triggerLibrarySync();
+    await triggerLibrarySync('bounded');
   } catch (error) {
     if (__DEV__) {
       console.warn('[auto-sync] skipped:', error);
@@ -73,6 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const autoSyncedRef = useRef<Set<string>>(new Set());
+  const timeZoneSyncedRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     let mounted = true;
@@ -121,6 +124,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!userId || autoSyncedRef.current.has(userId)) return;
     autoSyncedRef.current.add(userId);
     void maybeAutoSync(userId);
+  }, [session?.user.id]);
+
+  // Keep server-side "today" and cron dispatch aligned with the device's
+  // current timezone. This is intentionally per app session to avoid noisy
+  // profile writes while still correcting stale UTC defaults quickly.
+  useEffect(() => {
+    const userId = session?.user.id;
+    if (!userId || timeZoneSyncedRef.current.has(userId)) return;
+
+    timeZoneSyncedRef.current.add(userId);
+    syncDeviceTimeZone(userId)
+      .then((didSync) => {
+        if (didSync) {
+          void queryClient.invalidateQueries({ queryKey: ['today-pick', userId] });
+        }
+      })
+      .catch((error) => {
+        if (__DEV__) {
+          console.warn('[profile] timezone sync skipped:', error);
+        }
+      });
   }, [session?.user.id]);
 
   const value = useMemo(() => ({ session, loading }), [session, loading]);

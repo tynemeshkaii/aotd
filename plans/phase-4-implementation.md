@@ -6,7 +6,7 @@ Date: 2026-05-25
 
 Recommendation algorithm pipeline: from user library analysis to daily album pick delivery.
 
-### SQL migrations (5 files)
+### Core SQL migrations
 
 | Migration | Purpose |
 |---|---|
@@ -15,6 +15,7 @@ Recommendation algorithm pipeline: from user library analysis to daily album pic
 | `20260526020000_phase4_recommendation_schema.sql` | Creates `albums`, `artist_similarity_cache`, `audio_features_cache`, `musicbrainz_release_group_cache`, `albums_of_the_day`, `recommendation_history` |
 | `20260526030000_phase4_recommendation_rpcs.sql` | `find_users_due_for_compute`, `ensure_recommendation_atomic`, `get_current_pick`, `resolve_user_compute_context` |
 | `20260526040000_phase4_recommendation_fixes.sql` | Makes `ensure_recommendation_atomic` race-safe via `ON CONFLICT DO NOTHING`; hardens client status transitions |
+| `20260528010000_daily_pick_timezone_and_catchup.sql` | Adds safe profile timezone handling, grants profile read/update to authenticated clients, updates `get_current_pick` / `resolve_user_compute_context`, and adds a 12-hour catch-up window to `find_users_due_for_compute` |
 
 ### Shared helpers (10 files in `supabase/functions/_shared/`)
 
@@ -37,7 +38,7 @@ Recommendation algorithm pipeline: from user library analysis to daily album pic
 | Function | Trigger | Purpose |
 |---|---|---|
 | `compute-album-of-the-day` | Called by dispatch or day-1 trigger | Bounded pipeline: taste extraction -> limited candidate generation -> scoring -> album upsert -> atomic pick insert. Primary path has a short 25s budget and falls back to curated on failures, Last.fm/Spotify Search degradation, or compute budget exhaustion. Supports authenticated `force_fallback` smoke tests |
-| `dispatch-daily-picks` | pg_cron hourly | Calls `find_users_due_for_compute` RPC, dispatches compute with concurrency=5. Has the same OPTIONS/method/auth guard surface as the other cron functions |
+| `dispatch-daily-picks` | pg_cron hourly | Calls `find_users_due_for_compute(60, 720)`, dispatches compute with concurrency=5, and reports per-user failures instead of hiding partial dispatch errors. Has the same OPTIONS/method/auth guard surface as the other cron functions |
 | `prewarm-album-cache` | pg_cron nightly | Fetches a bounded Last.fm globally-top batch, resolves via Spotify, upserts as prewarm seeds. Includes 10 bootstrap fallback seeds, supports `?limit=N`, and stops early with diagnostics when Spotify Search API is unavailable |
 
 ### Modified existing files
@@ -50,7 +51,9 @@ Recommendation algorithm pipeline: from user library analysis to daily album pic
 | `supabase/functions/_shared/library-aggregation.ts` | Added `artist_ids` to `AggregatedAlbum` and both aggregation branches |
 | `supabase/functions/upsert-streaming-connection/index.ts` | Writes `spotify_product` on upsert |
 | `supabase/functions/sync-spotify-library/index.ts` | Maps `primary_artist_spotify_id` + `artist_ids` to rows; fires day-1 compute after sync completion |
-| `app/(tabs)/index.tsx` | Shows `TodayCard` or `WaitingForPick` via `useTodayPick` hook |
+| `app/(tabs)/index.tsx` | Shows today's album, `WaitingForPick`, or an explicit retryable pick-read error via `useTodayPick` |
+| `components/auth/AuthProvider.tsx` | Syncs device timezone to `profiles.timezone` once per app session so server-side "today" and cron windows match the phone |
+| `app/(auth)/sign-in.tsx`, `app/auth/callback.tsx` | Sync device timezone immediately after Spotify OAuth connection and before initial library sync / day-1 compute |
 
 ### Client layer (new files)
 
@@ -60,6 +63,8 @@ Recommendation algorithm pipeline: from user library analysis to daily album pic
 | `lib/hooks/useTodayPick.ts` | React Query + Realtime subscription for today's pick |
 | `components/home/TodayCard.tsx` | Album card with cover, title, artist, year, selection reason |
 | `components/home/WaitingForPick.tsx` | Placeholder while pick is computing |
+| `components/home/PickError.tsx` | Retryable Home state for RPC/network failures so true errors are not masked as "pick is brewing" |
+| `lib/profile.ts` | `Intl.DateTimeFormat().resolvedOptions().timeZone` helper and `profiles.timezone` sync |
 
 ### Tests
 
@@ -179,18 +184,55 @@ Verification after this patch:
 - `npm run lint`
 - Deno tests were not run in the local Codex environment because `deno` is not installed there.
 
+## Session 6 — Timezone and cron catch-up hardening (2026-05-28)
+
+Manual QA found a user in `Europe/Samara` seeing `WaitingForPick` after their expected morning pick time, while Discoveries only showed a manually computed previous-day pick. The recommendation algorithm was healthy; the issue was scheduling/context:
+
+- `profiles.timezone` defaulted to `UTC`, and the app did not write the phone timezone back to the profile. A user at 10:40 Samara time could still be treated as 06:40 UTC, so the default `08:00` push window had not arrived yet server-side.
+- `find_users_due_for_compute` only looked forward (`now` to `now + 60 minutes`). If the hourly cron missed the exact pre-push window, the user would not be selected later that same local day.
+- Home rendered every `get_current_pick` failure/empty result as `WaitingForPick`, making real RPC/network errors indistinguishable from "no row yet".
+- One pg_cron job was failing with `url = null` because the cron command expected a Vault secret named `project_url`, but only `cron_secret` was configured.
+
+Fixes:
+
+| File | Change |
+|---|---|
+| `lib/profile.ts` | Added device timezone detection and best-effort `profiles.timezone` sync |
+| `components/auth/AuthProvider.tsx` | Syncs timezone once per authenticated app session and invalidates today's pick query after sync |
+| `app/(auth)/sign-in.tsx`, `app/auth/callback.tsx` | Sync timezone immediately after OAuth connection, before initial sync/day-1 compute |
+| `components/home/PickError.tsx`, `app/(tabs)/index.tsx` | Added explicit retry UI for today-pick RPC/network errors |
+| `supabase/migrations/20260528010000_daily_pick_timezone_and_catchup.sql` | Adds `safe_profile_timezone`, grants profile read/update to authenticated users, updates `get_current_pick` / `resolve_user_compute_context`, and replaces `find_users_due_for_compute` with `(p_lead_minutes, p_catchup_minutes)` |
+| `supabase/functions/dispatch-daily-picks/index.ts` | Calls `find_users_due_for_compute(60, 720)`, returns `failed_count` / `failed`, and uses HTTP `207` for partial success or `500` when all due dispatches fail |
+
+Operational notes:
+
+- `project_url` and `cron_secret` must both exist in Supabase Vault. `project_url` should be `https://<project-ref>.supabase.co` with no trailing slash.
+- `net.http_post(...)` returns a queue id, not the Edge Function response. Inspect `net._http_response` by that id; healthy manual dispatch with no due users returns `status_code = 200`, `timed_out = false`, `error_msg = null`, and `content = {"ok":true,"dispatched":0}`.
+- Once a user's pick already exists for their local date, `find_users_due_for_compute(60, 720)` should no longer return that user. This is the expected idempotency check.
+
+Verification after this patch:
+
+- `npm run typecheck`
+- `npm run lint`
+- `git diff --check`
+- Manual SQL verified: profile timezone no longer UTC by accident, today's pick created on the correct local date, user no longer appears in due list after creation, cron jobs are alive, and manual dispatch returns `{"ok":true,"dispatched":0}` through `net._http_response`.
+- Deno checks were not run in the local Codex environment because `deno` is not installed there.
+
 ## Deployment checklist
 
 Run in this order:
 
-1. `supabase db push` — apply all 5 migrations
+1. `supabase db push` — apply migrations before deploying functions that call new RPC signatures
 2. Set env vars on Supabase dashboard:
    - `CRON_SECRET` — shared secret for cron-triggered functions
    - `LASTFM_API_KEY` — Last.fm API key
    - `LASTFM_USER_AGENT` — e.g. `AlbumOfTheDay/1.0 (contact@example.com)`
    - `MUSICBRAINZ_USER_AGENT` — e.g. `AlbumOfTheDay/1.0 (contact@example.com)`
    - `SPOTIFY_CLIENT_ID` + `SPOTIFY_CLIENT_SECRET` — for client credentials flow (prewarm)
-3. Deploy functions:
+3. Set Vault secrets in Supabase Dashboard -> Settings -> Vault:
+   - `cron_secret` — same value as the Edge Function `CRON_SECRET`
+   - `project_url` — `https://<project-ref>.supabase.co` with no trailing slash
+4. Deploy functions:
    ```
    supabase functions deploy compute-album-of-the-day
    supabase functions deploy dispatch-daily-picks
@@ -198,23 +240,60 @@ Run in this order:
    supabase functions deploy sync-spotify-library
    supabase functions deploy upsert-streaming-connection
    ```
-4. Set up pg_cron jobs (via SQL editor or migration):
+5. Set up pg_cron jobs (via SQL editor or migration). Keep URLs/secrets in Vault; do not hardcode bearer tokens in `cron.job.command`:
    ```sql
-   select cron.schedule('dispatch-daily-picks', '0 * * * *',
-     $$select net.http_post(
-       url := '<SUPABASE_URL>/functions/v1/dispatch-daily-picks',
-       headers := '{"Authorization": "Bearer <CRON_SECRET>"}'::jsonb
-     )$$);
+   create extension if not exists pg_cron;
+   create extension if not exists pg_net;
+   create extension if not exists supabase_vault;
 
-   select cron.schedule('prewarm-album-cache', '0 3 * * *',
-     $$select net.http_post(
-       url := '<SUPABASE_URL>/functions/v1/prewarm-album-cache',
-       headers := '{"Authorization": "Bearer <CRON_SECRET>"}'::jsonb
-     )$$);
+   select cron.schedule(
+     'dispatch-daily-picks',
+     '5 * * * *',
+     $$
+     select net.http_post(
+       url := (select decrypted_secret from vault.decrypted_secrets where name = 'project_url') || '/functions/v1/dispatch-daily-picks',
+       headers := jsonb_build_object(
+         'Authorization', 'Bearer ' || (select decrypted_secret from vault.decrypted_secrets where name = 'cron_secret'),
+         'Content-Type', 'application/json'
+       ),
+       body := '{}'::jsonb
+     );
+     $$
+   );
+
+   select cron.schedule(
+     'prewarm-album-cache',
+     '0 3 * * *',
+     $$
+     select net.http_post(
+       url := (select decrypted_secret from vault.decrypted_secrets where name = 'project_url') || '/functions/v1/prewarm-album-cache',
+       headers := jsonb_build_object(
+         'Authorization', 'Bearer ' || (select decrypted_secret from vault.decrypted_secrets where name = 'cron_secret'),
+         'Content-Type', 'application/json'
+       ),
+       body := '{}'::jsonb
+     );
+     $$
+   );
    ```
-5. `npm run db:types` — regenerate `types/database.ts` from the linked DB so `get_current_pick` is represented by generated Supabase types instead of the local typed RPC shim in `useTodayPick.ts`
-6. Run API smoketest: `./tests/smoketest-apis.sh <SPOTIFY_TOKEN> <LASTFM_KEY>`, fill results into `plans/phase-4-api-smoketest.md`
-7. Run prewarm manually once to seed the fallback pool:
+6. Verify Vault and cron health:
+   ```sql
+   select name, decrypted_secret is not null as present, length(decrypted_secret) as secret_length
+   from vault.decrypted_secrets
+   where name in ('project_url', 'cron_secret');
+
+   select jobid, jobname, schedule, active, command
+   from cron.job
+   order by jobid;
+
+   select jobid, status, start_time, end_time, return_message
+   from cron.job_run_details
+   order by start_time desc
+   limit 20;
+   ```
+7. `npm run db:types` — regenerate `types/database.ts` from the linked DB so RPC signatures match the live schema, especially `find_users_due_for_compute(p_lead_minutes, p_catchup_minutes)`
+8. Run API smoketest: `./tests/smoketest-apis.sh <SPOTIFY_TOKEN> <LASTFM_KEY>`, fill results into `plans/phase-4-api-smoketest.md`
+9. Run prewarm manually once to seed the fallback pool:
    ```
    curl -X POST <SUPABASE_URL>/functions/v1/prewarm-album-cache?limit=30 \
      -H "Authorization: Bearer <CRON_SECRET>"

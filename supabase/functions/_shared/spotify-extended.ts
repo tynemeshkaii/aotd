@@ -3,6 +3,18 @@ const SPOTIFY_FETCH_TIMEOUT_MS = 3_500;
 const SPOTIFY_429_MAX_RETRIES = 1;
 const SPOTIFY_429_MAX_RETRY_AFTER_MS = 1_000;
 
+export class SpotifyApiError extends Error {
+  status: number;
+  retryAfterSeconds: number | null;
+
+  constructor(message: string, status: number, retryAfterSeconds: number | null = null) {
+    super(message);
+    this.name = 'SpotifyApiError';
+    this.status = status;
+    this.retryAfterSeconds = retryAfterSeconds;
+  }
+}
+
 export type SpotifyAlbumSearchItem = {
   id: string;
   name: string;
@@ -59,20 +71,32 @@ export async function searchAlbum(
   const q = `album:"${album}" artist:"${artist}"`;
   const url = `${SPOTIFY_API}/search?type=album&limit=5&market=${market}&q=${encodeURIComponent(q)}`;
   const res = await spotifyFetch(url, token);
-  if (!res.ok) throw new Error(`spotify_search_failed:${res.status}`);
+  if (!res.ok) {
+    throw new SpotifyApiError(
+      `spotify_search_failed:${res.status}`,
+      res.status,
+      retryAfterSeconds(res),
+    );
+  }
   const data = (await res.json()) as { albums?: { items?: SpotifyAlbumSearchItem[] } };
   const items = data.albums?.items ?? [];
-  const normalizedAlbum = normalizeSearch(album);
-  const normalizedArtist = normalizeSearch(artist);
-  const strong = items
-    .filter(
-      (i) =>
-        normalizeSearch(i.name).includes(normalizedAlbum) ||
-        normalizedAlbum.includes(normalizeSearch(i.name)),
-    )
-    .filter((i) => i.artists.some((a) => normalizeSearch(a.name) === normalizedArtist));
+  const strong = items.filter((i) => isStrongAlbumSearchMatch(i, artist, album));
   const pool = strong.length > 0 ? strong : items;
   return pool.find((i) => i.album_type === 'album') ?? pool[0] ?? null;
+}
+
+export function isStrongAlbumSearchMatch(
+  item: SpotifyAlbumSearchItem,
+  artist: string,
+  album: string,
+) {
+  const normalizedAlbum = normalizeSearch(album);
+  const normalizedArtist = normalizeSearch(artist);
+  const itemAlbum = normalizeSearch(item.name);
+  if (!itemAlbum || !normalizedAlbum) return false;
+  const albumMatches = itemAlbum.includes(normalizedAlbum) || normalizedAlbum.includes(itemAlbum);
+  const artistMatches = item.artists.some((a) => normalizeSearch(a.name) === normalizedArtist);
+  return albumMatches && artistMatches;
 }
 
 export async function fetchAlbumDetails(
@@ -191,4 +215,12 @@ function normalizeSearch(value: string): string {
     .replace(/\b(remaster(?:ed)?|deluxe|expanded|anniversary|edition|version)\b/g, '')
     .replace(/[^\p{L}\p{N}]+/gu, ' ')
     .trim();
+}
+
+function retryAfterSeconds(res: Response): number | null {
+  const raw = res.headers.get('Retry-After');
+  if (!raw) return null;
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed) || parsed < 0) return null;
+  return Math.ceil(parsed);
 }

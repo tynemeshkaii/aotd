@@ -3,11 +3,23 @@ import * as AuthSession from 'expo-auth-session';
 import * as QueryParams from 'expo-auth-session/build/QueryParams';
 import * as WebBrowser from 'expo-web-browser';
 
+import { triggerLibrarySync } from './library';
+import { syncDeviceTimeZone } from './profile';
 import { supabase } from './supabase';
 
 WebBrowser.maybeCompleteAuthSession();
 
 export const SPOTIFY_SCOPES = ['user-library-read', 'user-top-read', 'user-read-private'] as const;
+
+// Spotify access tokens always expire after 3600s. The Edge Function derives
+// `token_expires_at` from this value; keep it in sync if Spotify ever changes.
+const SPOTIFY_TOKEN_TTL_SECONDS = 3600;
+
+// Both the sign-in screen and the explicit /auth/callback route can resolve the
+// same OAuth session. Dedupe the post-auth bootstrap (connection upsert +
+// timezone sync + initial library sync) so we don't double-hit Spotify /me —
+// extra calls in Development Mode risk a 429 cascade that breaks login.
+const bootstrapInFlight = new Map<string, Promise<void>>();
 
 let activeCallbackUrl: string | null = null;
 let activeCallbackPromise: Promise<Session | null> | null = null;
@@ -134,7 +146,7 @@ export async function syncSpotifyConnection(session?: Session | null) {
     body: {
       provider_token: currentSession.provider_token,
       provider_refresh_token: currentSession.provider_refresh_token,
-      expires_in: 3600,
+      expires_in: SPOTIFY_TOKEN_TTL_SECONDS,
       scopes: [...SPOTIFY_SCOPES],
     },
   });
@@ -144,9 +156,54 @@ export async function syncSpotifyConnection(session?: Session | null) {
   }
 }
 
+/**
+ * Runs the one-time post-OAuth setup for a freshly authenticated session:
+ * upsert the Spotify connection, sync the device timezone, and kick off the
+ * initial library import (fire-and-forget). Safe to call from both the sign-in
+ * screen and the /auth/callback route — it dedupes per user for the lifetime of
+ * the JS context, and a failed run clears so the next attempt can retry.
+ */
+export function bootstrapSpotifySession(session: Session | null): Promise<void> {
+  if (!session) {
+    return Promise.reject(new Error('missing_session'));
+  }
+
+  const userId = session.user.id;
+  const existing = bootstrapInFlight.get(userId);
+  if (existing) {
+    return existing;
+  }
+
+  const run = (async () => {
+    await syncSpotifyConnection(session);
+
+    await syncDeviceTimeZone(userId).catch((error) => {
+      if (__DEV__) {
+        console.warn('[profile] timezone sync skipped:', error);
+      }
+    });
+
+    // Initial sync is fire-and-forget. The splash picks up status via Realtime.
+    triggerLibrarySync('initial').catch((error) => {
+      if (__DEV__) {
+        console.warn('[initial-sync] failed:', error);
+      }
+    });
+  })();
+
+  bootstrapInFlight.set(userId, run);
+  // Only the connection upsert can reject here; clear on failure so a retry
+  // (e.g. user taps sign-in again) isn't permanently suppressed.
+  run.catch(() => bootstrapInFlight.delete(userId));
+  return run;
+}
+
 export async function signOut() {
   const { error } = await supabase.auth.signOut();
   if (error) {
     throw error;
   }
+  // Clear bootstrap dedupe so a fresh sign-in (even same user, same app
+  // session) re-runs the connection upsert and saves the new provider token.
+  bootstrapInFlight.clear();
 }

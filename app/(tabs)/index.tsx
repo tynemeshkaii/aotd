@@ -2,6 +2,7 @@ import { router } from 'expo-router';
 import { Pressable, View } from 'react-native';
 
 import { AlbumDetail } from '@/components/album/AlbumDetail';
+import { PickError } from '@/components/home/PickError';
 import { WaitingForPick } from '@/components/home/WaitingForPick';
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
@@ -9,7 +10,7 @@ import { useDiscoveries } from '@/lib/hooks/useDiscoveries';
 import { useTodayPick } from '@/lib/hooks/useTodayPick';
 
 export default function HomeScreen() {
-  const { data: pick, isLoading } = useTodayPick();
+  const { data: pick, isError, isLoading, isRefetching, refetch } = useTodayPick();
   const { data: discoveries } = useDiscoveries();
   const oldPendingCount =
     discoveries?.filter((row) => row.status !== 'rated' && row.aotd_id !== pick?.aotd_id).length ??
@@ -19,7 +20,13 @@ export default function HomeScreen() {
     <Screen>
       <Text variant="h1">Today</Text>
       <View className="mt-5">
-        {isLoading ? null : pick ? <AlbumDetail album={pick} isToday /> : <WaitingForPick />}
+        {isLoading ? null : isError ? (
+          <PickError onRetry={() => void refetch()} retrying={isRefetching} />
+        ) : pick ? (
+          <AlbumDetail album={pick} isToday />
+        ) : (
+          <WaitingForPick />
+        )}
       </View>
       {oldPendingCount > 0 && (
         <Pressable

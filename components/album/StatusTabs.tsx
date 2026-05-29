@@ -4,9 +4,12 @@ import { Text } from '@/components/ui/Text';
 
 export type DiscoveryFilter = 'all' | 'pending' | 'rated';
 
+// The `pending` filter shows everything not yet rated (pending + opened), so
+// "Unrated" matches the content — an opened-but-unrated album still belongs
+// here and keeps its own per-item "Opened" badge.
 const tabs: { value: DiscoveryFilter; label: string }[] = [
   { value: 'all', label: 'All' },
-  { value: 'pending', label: 'Pending' },
+  { value: 'pending', label: 'Unrated' },
   { value: 'rated', label: 'Rated' },
 ];
 

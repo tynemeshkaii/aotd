@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/Button';
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
 import { useDiscoveryDetail } from '@/lib/hooks/useDiscoveryDetail';
+import colors from '@/theme/colors';
 
 export default function DiscoveryDetailScreen() {
   const { aotdId } = useLocalSearchParams<{ aotdId?: string }>();
@@ -24,7 +25,7 @@ export default function DiscoveryDetailScreen() {
         onPress={goBack}
         className="mb-5 h-10 w-10 items-center justify-center rounded-lg bg-surface active:opacity-80"
       >
-        <Ionicons name="chevron-back" size={22} color="#fafafa" />
+        <Ionicons name="chevron-back" size={22} color={colors.text} />
       </Pressable>
 
       {isLoading ? (

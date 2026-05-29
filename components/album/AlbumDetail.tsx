@@ -24,6 +24,8 @@ export function AlbumDetail({ album, isToday }: Props) {
   const [sharing, setSharing] = useState(false);
   const openAlbum = useOpenAlbum(album);
   const freeExplainer = useSpotifyFreeExplainer();
+  const isFreeSpotify =
+    freeExplainer.spotifyProduct === 'free' || freeExplainer.spotifyProduct === 'open';
 
   const open = async () => {
     await freeExplainer.maybeShow();
@@ -58,7 +60,7 @@ export function AlbumDetail({ album, isToday }: Props) {
         quality: 1,
       });
 
-      const message = `My album of the day: ${album.album_primary_artist_name} - ${album.album_title} ${spotifyAlbumUrl(album.album_spotify_id)}`;
+      const message = `My album of the day: ${album.album_primary_artist_name} — ${album.album_title} 🎧 ${spotifyAlbumUrl(album.album_spotify_id)}`;
 
       if (Platform.OS === 'ios') {
         await Share.share(
@@ -96,6 +98,11 @@ export function AlbumDetail({ album, isToday }: Props) {
       <AlbumHero album={album} />
       <WhyThisAlbum album={album} />
       <AlbumActions opening={openAlbum.isPending} sharing={sharing} onOpen={open} onShare={share} />
+      {isFreeSpotify && (
+        <Text variant="caption" className="text-muted">
+          Heads up: Free Spotify may shuffle this album. Premium plays it in order.
+        </Text>
+      )}
       <RatingEditor album={album} />
 
       <View pointerEvents="none" collapsable={false} className="absolute -left-[2000px] top-0">

@@ -2,6 +2,7 @@ import { FontAwesome } from '@expo/vector-icons';
 import { ActivityIndicator, Pressable, View } from 'react-native';
 
 import { Text } from '@/components/ui/Text';
+import colors from '@/theme/colors';
 
 type Props = {
   disabled?: boolean;
@@ -22,9 +23,9 @@ export function SpotifyButton({ disabled, loading, onPress }: Props) {
     >
       <View className="absolute left-6">
         {loading ? (
-          <ActivityIndicator color="#0a0a0a" />
+          <ActivityIndicator color={colors.bg} />
         ) : (
-          <FontAwesome name="spotify" color="#0a0a0a" size={24} />
+          <FontAwesome name="spotify" color={colors.bg} size={24} />
         )}
       </View>
       <Text className="text-bg font-bold">

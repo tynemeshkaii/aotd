@@ -1,17 +1,15 @@
+import { createClient } from '@supabase/supabase-js';
 import { corsHeaders, jsonError, jsonResponse } from '../_shared/cors.ts';
 import { fetchGloballyTopAlbums } from '../_shared/lastfm.ts';
+import { getLastfmTopAlbumsCached } from '../_shared/lastfm-top-albums-cache.ts';
 import { isRecommendationReleaseLike } from '../_shared/release-eligibility.ts';
-import {
-  fetchAlbumDetails,
-  getServiceSpotifyToken,
-  searchAlbum,
-} from '../_shared/spotify-extended.ts';
+import { resolveSpotifyAlbumCached } from '../_shared/spotify-album-resolution-cache.ts';
+import { fetchAlbumDetails, getServiceSpotifyToken } from '../_shared/spotify-extended.ts';
 
 const DEFAULT_PREWARM_LIMIT = 30;
 const MAX_PREWARM_LIMIT = 40;
 const MAX_RUNTIME_MS = 95_000;
 const SPOTIFY_TOKEN_TIMEOUT_MS = 10_000;
-const SPOTIFY_SEARCH_TIMEOUT_MS = 3_500;
 const SPOTIFY_DETAILS_TIMEOUT_MS = 3_500;
 const DB_STEP_TIMEOUT_MS = 8_000;
 const MAX_CONSECUTIVE_SPOTIFY_SEARCH_FAILURES = 2;
@@ -30,6 +28,7 @@ Deno.serve(async (req) => {
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
   const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
   if (!supabaseUrl || !serviceRoleKey) return jsonError(500, 'missing_supabase_env');
+  const admin = createClient(supabaseUrl, serviceRoleKey);
   const limit = parseLimit(req.url);
   const artistOffset = parseArtistOffset(req.url);
   const source = parseSource(req.url);
@@ -47,7 +46,11 @@ Deno.serve(async (req) => {
     const topAlbums =
       source !== 'bootstrap' && Date.now() - startedAt < MAX_RUNTIME_MS
         ? await withTimeout(
-            fetchGloballyTopAlbums(limit, { artistOffset }),
+            fetchGloballyTopAlbums(limit, {
+              artistOffset,
+              topAlbumsForArtist: (artistName, albumLimit) =>
+                getLastfmTopAlbumsCached(admin, artistName, albumLimit),
+            }),
             30_000,
             'lastfm_batch_timeout',
           ).catch((e) => {
@@ -76,13 +79,11 @@ Deno.serve(async (req) => {
       attempted += 1;
       await new Promise((r) => setTimeout(r, 100));
       console.log(`[prewarm] attempt=${attempted} artist="${item.artist}" album="${item.name}"`);
-      let sp: Awaited<ReturnType<typeof searchAlbum>>;
+      let sp: Awaited<ReturnType<typeof resolveSpotifyAlbumCached>>;
       try {
-        sp = await withTimeout(
-          searchAlbum(spotifyToken, item.artist, item.name),
-          SPOTIFY_SEARCH_TIMEOUT_MS,
-          'spotify_search_timeout',
-        );
+        sp = await resolveSpotifyAlbumCached(admin, spotifyToken, item.artist, item.name, {
+          requestContext: 'prewarm_album_cache',
+        });
       } catch (e) {
         console.warn(
           `[prewarm] spotify_search_failed artist="${item.artist}" album="${item.name}" error=${formatError(e)}`,

@@ -6,6 +6,7 @@ import { Text } from '@/components/ui/Text';
 import { useSaveRating } from '@/lib/hooks/useSaveRating';
 import type { AlbumDiscovery, RatingScore } from '@/lib/recommendation';
 import { RATING_OPTIONS } from '@/lib/recommendation';
+import colors from '@/theme/colors';
 
 type Props = {
   album: AlbumDiscovery;
@@ -74,7 +75,7 @@ export function RatingEditor({ album }: Props) {
         value={comment}
         onChangeText={setComment}
         placeholder="Add a private note"
-        placeholderTextColor="#737373"
+        placeholderTextColor={colors.muted}
         textAlignVertical="top"
         className="min-h-24 rounded-lg bg-bg px-4 py-3 text-base text-text"
       />

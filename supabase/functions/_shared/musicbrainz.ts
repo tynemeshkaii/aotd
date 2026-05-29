@@ -1,4 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { recordExternalApiCall } from './external-api-log.ts';
+import { reserveExternalApiSlot } from './external-api-rate-limit.ts';
 
 const MB_BASE = 'https://musicbrainz.org/ws/2';
 const MB_RATE_LIMIT_MS = 1100;
@@ -51,7 +53,7 @@ export async function getReleaseGroupCached(
     };
   }
 
-  const fresh = await fetchReleaseGroup(artist, album);
+  const fresh = await fetchReleaseGroup(admin, artist, album);
   await admin.from('musicbrainz_release_group_cache').upsert(
     {
       normalized_artist: normalizedArtist,
@@ -68,9 +70,15 @@ export async function getReleaseGroupCached(
   return fresh;
 }
 
-async function fetchReleaseGroup(artist: string, album: string): Promise<MbReleaseGroup | null> {
+async function fetchReleaseGroup(
+  admin: SupabaseClient,
+  artist: string,
+  album: string,
+): Promise<MbReleaseGroup | null> {
+  const startedAt = Date.now();
   try {
     await mbThrottle();
+    await reserveExternalApiSlot(admin, 'musicbrainz', 'release_group_search', MB_RATE_LIMIT_MS);
     const q = `release:"${album.replace(/"/g, '\\"')}" AND artist:"${artist.replace(/"/g, '\\"')}"`;
     const res = await fetch(
       `${MB_BASE}/release-group?query=${encodeURIComponent(q)}&fmt=json&limit=1`,
@@ -78,6 +86,14 @@ async function fetchReleaseGroup(artist: string, album: string): Promise<MbRelea
         headers: { 'User-Agent': Deno.env.get('MUSICBRAINZ_USER_AGENT') ?? 'AlbumOfTheDay/1.0' },
       },
     );
+    await recordExternalApiCall(admin, {
+      service: 'musicbrainz',
+      endpoint: 'release_group_search',
+      status: res.status,
+      ok: res.ok,
+      duration_ms: Date.now() - startedAt,
+      error_code: res.ok ? null : `musicbrainz_failed:${res.status}`,
+    });
     if (!res.ok) return null;
     const data = (await res.json()) as { 'release-groups'?: MusicBrainzReleaseGroup[] };
     const rg = data['release-groups']?.[0];
@@ -88,7 +104,14 @@ async function fetchReleaseGroup(artist: string, album: string): Promise<MbRelea
       secondary_types: rg['secondary-types'] ?? [],
       first_release_date: rg['first-release-date'],
     };
-  } catch {
+  } catch (e) {
+    await recordExternalApiCall(admin, {
+      service: 'musicbrainz',
+      endpoint: 'release_group_search',
+      ok: false,
+      duration_ms: Date.now() - startedAt,
+      error_code: e instanceof Error ? e.message : String(e),
+    });
     return null;
   }
 }

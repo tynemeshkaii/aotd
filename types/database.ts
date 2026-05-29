@@ -197,6 +197,126 @@ export type Database = {
         }
         Relationships: []
       }
+      external_api_circuit_breakers: {
+        Row: {
+          cooldown_until: string | null
+          endpoint: string
+          failure_count: number
+          last_error: string | null
+          last_status: number | null
+          opened_at: string | null
+          service: string
+          state: string
+          updated_at: string
+        }
+        Insert: {
+          cooldown_until?: string | null
+          endpoint: string
+          failure_count?: number
+          last_error?: string | null
+          last_status?: number | null
+          opened_at?: string | null
+          service: string
+          state: string
+          updated_at?: string
+        }
+        Update: {
+          cooldown_until?: string | null
+          endpoint?: string
+          failure_count?: number
+          last_error?: string | null
+          last_status?: number | null
+          opened_at?: string | null
+          service?: string
+          state?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      external_api_rate_limits: {
+        Row: {
+          endpoint: string
+          next_allowed_at: string
+          service: string
+          updated_at: string
+        }
+        Insert: {
+          endpoint: string
+          next_allowed_at?: string
+          service: string
+          updated_at?: string
+        }
+        Update: {
+          endpoint?: string
+          next_allowed_at?: string
+          service?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      external_api_request_log: {
+        Row: {
+          created_at: string
+          duration_ms: number | null
+          endpoint: string
+          error_code: string | null
+          id: string
+          ok: boolean
+          request_context: string | null
+          retry_after_seconds: number | null
+          service: string
+          status: number | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          duration_ms?: number | null
+          endpoint: string
+          error_code?: string | null
+          id?: string
+          ok: boolean
+          request_context?: string | null
+          retry_after_seconds?: number | null
+          service: string
+          status?: number | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          duration_ms?: number | null
+          endpoint?: string
+          error_code?: string | null
+          id?: string
+          ok?: boolean
+          request_context?: string | null
+          retry_after_seconds?: number | null
+          service?: string
+          status?: number | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      lastfm_artist_top_albums_cache: {
+        Row: {
+          artist_name: string
+          fetched_at: string
+          normalized_artist: string
+          top_albums: Json
+        }
+        Insert: {
+          artist_name: string
+          fetched_at?: string
+          normalized_artist: string
+          top_albums: Json
+        }
+        Update: {
+          artist_name?: string
+          fetched_at?: string
+          normalized_artist?: string
+          top_albums?: Json
+        }
+        Relationships: []
+      }
       library_sync_status: {
         Row: {
           aggregated_albums_count: number | null
@@ -359,6 +479,84 @@ export type Database = {
           },
         ]
       }
+      recommendation_candidates: {
+        Row: {
+          album_type: string | null
+          candidate_album_name: string
+          candidate_artist_name: string
+          candidate_artist_spotify_id: string | null
+          cover_url: string | null
+          duration_ms: number | null
+          eligibility_status: string
+          fetched_at: string
+          id: string
+          lastfm_listeners: number | null
+          lastfm_playcount: number | null
+          mb_release_group_id: string | null
+          next_retry_at: string | null
+          popularity_bucket: string | null
+          rejection_reason: string | null
+          release_year: number | null
+          resolved_at: string | null
+          similarity_match: number | null
+          source: string
+          source_artist_key: string
+          source_artist_name: string
+          spotify_album_id: string | null
+          total_tracks: number | null
+        }
+        Insert: {
+          album_type?: string | null
+          candidate_album_name: string
+          candidate_artist_name: string
+          candidate_artist_spotify_id?: string | null
+          cover_url?: string | null
+          duration_ms?: number | null
+          eligibility_status: string
+          fetched_at?: string
+          id?: string
+          lastfm_listeners?: number | null
+          lastfm_playcount?: number | null
+          mb_release_group_id?: string | null
+          next_retry_at?: string | null
+          popularity_bucket?: string | null
+          rejection_reason?: string | null
+          release_year?: number | null
+          resolved_at?: string | null
+          similarity_match?: number | null
+          source: string
+          source_artist_key: string
+          source_artist_name: string
+          spotify_album_id?: string | null
+          total_tracks?: number | null
+        }
+        Update: {
+          album_type?: string | null
+          candidate_album_name?: string
+          candidate_artist_name?: string
+          candidate_artist_spotify_id?: string | null
+          cover_url?: string | null
+          duration_ms?: number | null
+          eligibility_status?: string
+          fetched_at?: string
+          id?: string
+          lastfm_listeners?: number | null
+          lastfm_playcount?: number | null
+          mb_release_group_id?: string | null
+          next_retry_at?: string | null
+          popularity_bucket?: string | null
+          rejection_reason?: string | null
+          release_year?: number | null
+          resolved_at?: string | null
+          similarity_match?: number | null
+          source?: string
+          source_artist_key?: string
+          source_artist_name?: string
+          spotify_album_id?: string | null
+          total_tracks?: number | null
+        }
+        Relationships: []
+      }
       recommendation_history: {
         Row: {
           album_id: string
@@ -387,6 +585,51 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      spotify_album_resolution_cache: {
+        Row: {
+          failure_detail: string | null
+          failure_status: number | null
+          fetched_at: string
+          id: string
+          next_retry_at: string | null
+          normalized_album: string
+          normalized_artist: string
+          requested_album: string
+          requested_artist: string
+          result: Json | null
+          spotify_album_id: string | null
+          status: string
+        }
+        Insert: {
+          failure_detail?: string | null
+          failure_status?: number | null
+          fetched_at?: string
+          id?: string
+          next_retry_at?: string | null
+          normalized_album: string
+          normalized_artist: string
+          requested_album: string
+          requested_artist: string
+          result?: Json | null
+          spotify_album_id?: string | null
+          status: string
+        }
+        Update: {
+          failure_detail?: string | null
+          failure_status?: number | null
+          fetched_at?: string
+          id?: string
+          next_retry_at?: string | null
+          normalized_album?: string
+          normalized_artist?: string
+          requested_album?: string
+          requested_artist?: string
+          result?: Json | null
+          spotify_album_id?: string | null
+          status?: string
+        }
+        Relationships: []
       }
       streaming_connections: {
         Row: {
@@ -570,6 +813,28 @@ export type Database = {
         }
         Relationships: []
       }
+      v1_external_api_health: {
+        Row: {
+          avg_duration_ms: number | null
+          calls: number | null
+          endpoint: string | null
+          failures: number | null
+          hour: string | null
+          rate_limited: number | null
+          service: string | null
+        }
+        Relationships: []
+      }
+      v1_fallback_health: {
+        Row: {
+          day: string | null
+          fallback_count: number | null
+          fallback_pct: number | null
+          fallback_reasons: string[] | null
+          total_picks: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       discovery_album_rows: {
@@ -614,7 +879,7 @@ export type Database = {
         }[]
       }
       find_users_due_for_compute: {
-        Args: { p_lead_minutes?: number }
+        Args: { p_catchup_minutes?: number; p_lead_minutes?: number }
         Returns: {
           push_time: string
           target_date: string
@@ -648,7 +913,7 @@ export type Database = {
         }[]
       }
       get_discoveries: {
-        Args: { p_user_id: string }
+        Args: { p_limit?: number; p_offset?: number; p_user_id: string }
         Returns: {
           album_cover_url: string
           album_duration_ms: number
@@ -697,6 +962,37 @@ export type Database = {
           status: string
         }[]
       }
+      get_external_api_circuit_state: {
+        Args: { p_endpoint: string; p_service: string }
+        Returns: {
+          cooldown_until: string
+          failure_count: number
+          state: string
+        }[]
+      }
+      prune_external_api_request_log: { Args: never; Returns: undefined }
+      record_external_api_circuit_failure: {
+        Args: {
+          p_cooldown_seconds: number
+          p_endpoint: string
+          p_error: string
+          p_service: string
+          p_status: number
+        }
+        Returns: {
+          cooldown_until: string
+          failure_count: number
+          state: string
+        }[]
+      }
+      record_external_api_circuit_success: {
+        Args: { p_endpoint: string; p_service: string }
+        Returns: undefined
+      }
+      reserve_external_api_slot: {
+        Args: { p_endpoint: string; p_interval_ms: number; p_service: string }
+        Returns: string
+      }
       resolve_user_compute_context: {
         Args: { p_user_id: string }
         Returns: {
@@ -705,6 +1001,7 @@ export type Database = {
           user_tz: string
         }[]
       }
+      safe_profile_timezone: { Args: { p_timezone: string }; Returns: string }
       save_album_rating: {
         Args: {
           p_aotd_id: string

@@ -1,10 +1,13 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { normalizeAlbumKey } from './album-dedupe.ts';
+import { ExternalApiCircuitOpenError } from './external-api-breaker.ts';
 import { getLastfmSimilarCached, getSpotifyRelatedCached } from './external-cache.ts';
-import { fetchAlbumInfo, fetchTopAlbumsForArtist } from './lastfm.ts';
+import { fetchAlbumInfo } from './lastfm.ts';
+import { getLastfmTopAlbumsCached } from './lastfm-top-albums-cache.ts';
 import { getReleaseGroupCached, isAlbumLike, type MbReleaseGroup } from './musicbrainz.ts';
 import { isRecommendationReleaseLike } from './release-eligibility.ts';
-import { fetchAlbumDetails, searchAlbum } from './spotify-extended.ts';
+import { resolveSpotifyAlbumCached } from './spotify-album-resolution-cache.ts';
+import { fetchAlbumDetails } from './spotify-extended.ts';
 import type { TasteSignal, UserArtist } from './taste-extraction.ts';
 
 export interface AlbumCandidate {
@@ -31,6 +34,8 @@ interface GenerateOpts {
   maxSimilarPerSource?: number;
   maxAlbumsPerSimilar?: number;
   maxCandidates?: number;
+  maxTextArtistLookups?: number;
+  spotifyResolutionTopK?: number;
   maxMusicBrainzLookups?: number;
   maxConsecutiveLastfmFailures?: number;
   maxConsecutiveSpotifySearchFailures?: number;
@@ -45,6 +50,8 @@ interface GenerateOpts {
   skipMusicBrainz?: boolean;
   /** Optional diagnostic sink — when provided, generateCandidates appends per-stage timings. */
   diag?: DiagEvent[];
+  userId?: string;
+  requestContext?: string;
 }
 
 export interface CandidateExclusions {
@@ -53,11 +60,34 @@ export interface CandidateExclusions {
   normalizedAlbumKeys: Set<string>;
 }
 
-const DEFAULTS: Required<Omit<GenerateOpts, 'diag'>> = {
+type TextCandidate = {
+  candidate_artist_name: string;
+  candidate_album_name: string;
+  lastfm_playcount?: number;
+  similarity_match: number;
+  source_artist_frequency: number;
+  source_paths: { source_artist: UserArtist; similar_match: number }[];
+};
+
+export class CandidateGenerationError extends Error {
+  candidates: AlbumCandidate[];
+  spotifyRelatedAvailable: boolean;
+
+  constructor(message: string, candidates: AlbumCandidate[], spotifyRelatedAvailable: boolean) {
+    super(message);
+    this.name = 'CandidateGenerationError';
+    this.candidates = candidates;
+    this.spotifyRelatedAvailable = spotifyRelatedAvailable;
+  }
+}
+
+const DEFAULTS: Required<Omit<GenerateOpts, 'diag' | 'userId' | 'requestContext'>> = {
   maxSourceArtists: 15,
   maxSimilarPerSource: 8,
   maxAlbumsPerSimilar: 2,
   maxCandidates: 250,
+  maxTextArtistLookups: 40,
+  spotifyResolutionTopK: 20,
   maxMusicBrainzLookups: 40,
   maxConsecutiveLastfmFailures: 2,
   maxConsecutiveSpotifySearchFailures: 2,
@@ -164,19 +194,27 @@ export async function generateCandidates(
   const seenSpotifyIds = new Set<string>(exclusions.spotifyAlbumIds);
   let consecutiveSpotifySearchFailures = 0;
   let simIdx = 0;
+  const textCandidates = new Map<string, TextCandidate>();
 
-  for (const sim of similarMap.values()) {
+  const rankedSimilarHits = [...similarMap.values()]
+    .sort((a, b) => scoreSimilarForTextExpansion(b) - scoreSimilarForTextExpansion(a))
+    .slice(0, o.maxTextArtistLookups);
+  pushDiag(diag, startMs, 'text_artist_pool_ready', {
+    similar_pool: similarMap.size,
+    lookup_count: rankedSimilarHits.length,
+  });
+
+  for (const sim of rankedSimilarHits) {
     assertWithinDeadline(o.deadlineAtMs);
-    if (candidates.length >= o.maxCandidates) break;
     const simStageStart = Date.now();
     const currentSimIdx = simIdx++;
     pushDiag(diag, startMs, 'sim_start', { idx: currentSimIdx, artist: sim.name });
     const simNameLower = sim.name.toLowerCase().trim();
     if ([...recentArtistsToAvoid].some((a) => a.toLowerCase().trim() === simNameLower)) continue;
 
-    let topAlbums: Awaited<ReturnType<typeof fetchTopAlbumsForArtist>>;
+    let topAlbums: Awaited<ReturnType<typeof getLastfmTopAlbumsCached>>;
     try {
-      topAlbums = await fetchTopAlbumsForArtist(sim.name, o.maxAlbumsPerSimilar);
+      topAlbums = await getLastfmTopAlbumsCached(admin, sim.name, o.maxAlbumsPerSimilar);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       console.warn(`[candidates] lastfm_top_albums_failed artist="${sim.name}" error=${msg}`);
@@ -186,89 +224,125 @@ export async function generateCandidates(
       }
       continue;
     }
+    assertWithinDeadline(o.deadlineAtMs);
     consecutiveLastfmFailures = 0;
     for (const ta of topAlbums) {
       assertWithinDeadline(o.deadlineAtMs);
-      if (candidates.length >= o.maxCandidates) break;
       if (exclusions.normalizedAlbumKeys.has(normalizeAlbumKey(sim.name, ta.name))) continue;
-      let sp: Awaited<ReturnType<typeof searchAlbum>>;
-      try {
-        sp = await searchAlbum(spotifyToken, sim.name, ta.name, o.market);
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        console.warn(
-          `[candidates] spotify_search_failed artist="${sim.name}" album="${ta.name}" error=${msg}`,
-        );
-        consecutiveSpotifySearchFailures += 1;
-        if (consecutiveSpotifySearchFailures >= o.maxConsecutiveSpotifySearchFailures) {
-          throw new Error('spotify_search_failed');
-        }
-        continue;
-      }
-      if (!sp) {
-        consecutiveSpotifySearchFailures = 0;
-        console.log(
-          `[candidates] spotify_search_no_match artist="${sim.name}" album="${ta.name}" ${elapsedTag(startMs)}`,
-        );
-        pushDiag(diag, startMs, 'spotify_search_no_match', {
-          artist: sim.name,
-          album: ta.name,
-        });
-        continue;
-      }
-      consecutiveSpotifySearchFailures = 0;
-      if (seenSpotifyIds.has(sp.id)) continue;
-      const primaryArtistName = sp.artists[0]?.name ?? sim.name;
-      if (exclusions.normalizedAlbumKeys.has(normalizeAlbumKey(primaryArtistName, sp.name)))
-        continue;
-
-      let durationMs: number | undefined;
-      let releaseLike = isRecommendationReleaseLike(sp);
-      if (!releaseLike && !o.skipAlbumDetailsLookup && sp.total_tracks >= 2) {
-        const details = await fetchAlbumDetails(spotifyToken, sp.id, o.market);
-        durationMs = details?.duration_ms;
-        releaseLike = isRecommendationReleaseLike({
-          album_type: sp.album_type,
-          total_tracks: sp.total_tracks,
-          duration_ms: durationMs,
-        });
-      }
-      if (!releaseLike) continue;
-      seenSpotifyIds.add(sp.id);
-
-      let infoListeners: number | undefined;
-      let infoPlaycount: number | undefined;
-      if (!o.skipAlbumInfoLookup) {
-        const info = await fetchAlbumInfo(sp.artists[0]?.name ?? sim.name, sp.name);
-        infoListeners = info?.listeners;
-        infoPlaycount = info?.playcount;
-      }
-
-      candidates.push({
-        spotify_id: sp.id,
-        title: sp.name,
-        primary_artist_name: primaryArtistName,
-        primary_artist_spotify_id: sp.artists[0]?.id,
-        cover_url: sp.images[0]?.url,
-        total_tracks: sp.total_tracks,
-        duration_ms: durationMs,
-        release_year: parseYear(sp.release_date),
-        album_type: sp.album_type,
-        best_similarity_match: sim.best_match,
-        source_paths: sim.source_paths.slice(),
-        lastfm_listeners: infoListeners,
-        lastfm_playcount: infoPlaycount ?? ta.playcount,
-      });
+      mergeTextCandidate(textCandidates, sim, ta);
     }
     console.log(
-      `[candidates] sim[${currentSimIdx}] "${sim.name}" top=${topAlbums.length} candidates=${candidates.length} took=${Date.now() - simStageStart}ms ${elapsedTag(startMs)}`,
+      `[candidates] sim[${currentSimIdx}] "${sim.name}" top=${topAlbums.length} text_candidates=${textCandidates.size} took=${Date.now() - simStageStart}ms ${elapsedTag(startMs)}`,
     );
     pushDiag(diag, startMs, 'sim_done', {
       idx: currentSimIdx,
       artist: sim.name,
       top: topAlbums.length,
-      candidates: candidates.length,
+      text_candidates: textCandidates.size,
       took_ms: Date.now() - simStageStart,
+    });
+  }
+
+  const rankedTextCandidates = [...textCandidates.values()]
+    .map((candidate) => ({ ...candidate, text_score: scoreTextCandidate(candidate) }))
+    .sort((a, b) => b.text_score - a.text_score)
+    .slice(0, Math.min(o.spotifyResolutionTopK, o.maxCandidates));
+  console.log(
+    `[candidates] text_pool_ready count=${textCandidates.size} resolving=${rankedTextCandidates.length} ${elapsedTag(startMs)}`,
+  );
+  pushDiag(diag, startMs, 'text_pool_ready', {
+    count: textCandidates.size,
+    resolving: rankedTextCandidates.length,
+  });
+
+  for (const text of rankedTextCandidates) {
+    assertWithinDeadline(o.deadlineAtMs);
+    if (candidates.length >= o.maxCandidates) break;
+    let sp: Awaited<ReturnType<typeof resolveSpotifyAlbumCached>>;
+    try {
+      sp = await resolveSpotifyAlbumCached(
+        admin,
+        spotifyToken,
+        text.candidate_artist_name,
+        text.candidate_album_name,
+        {
+          market: o.market,
+          userId: o.userId,
+          requestContext: o.requestContext ?? 'candidate_generation',
+        },
+      );
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.warn(
+        `[candidates] spotify_search_failed artist="${text.candidate_artist_name}" album="${text.candidate_album_name}" error=${msg}`,
+      );
+      consecutiveSpotifySearchFailures += 1;
+      const isCircuitOpen =
+        e instanceof ExternalApiCircuitOpenError || msg.includes('circuit_open');
+      if (
+        isCircuitOpen ||
+        consecutiveSpotifySearchFailures >= o.maxConsecutiveSpotifySearchFailures
+      ) {
+        throw new CandidateGenerationError(
+          isCircuitOpen ? 'spotify_search_circuit_open' : 'spotify_search_failed',
+          candidates,
+          spotifyRelatedAvailable,
+        );
+      }
+      continue;
+    }
+    if (!sp) {
+      consecutiveSpotifySearchFailures = 0;
+      console.log(
+        `[candidates] spotify_search_no_match artist="${text.candidate_artist_name}" album="${text.candidate_album_name}" ${elapsedTag(startMs)}`,
+      );
+      pushDiag(diag, startMs, 'spotify_search_no_match', {
+        artist: text.candidate_artist_name,
+        album: text.candidate_album_name,
+      });
+      continue;
+    }
+    consecutiveSpotifySearchFailures = 0;
+    if (seenSpotifyIds.has(sp.id)) continue;
+    const primaryArtistName = sp.artists[0]?.name ?? text.candidate_artist_name;
+    if (exclusions.normalizedAlbumKeys.has(normalizeAlbumKey(primaryArtistName, sp.name))) continue;
+
+    let durationMs: number | undefined;
+    let releaseLike = isRecommendationReleaseLike(sp);
+    if (!releaseLike && !o.skipAlbumDetailsLookup && sp.total_tracks >= 2) {
+      const details = await fetchAlbumDetails(spotifyToken, sp.id, o.market);
+      durationMs = details?.duration_ms;
+      releaseLike = isRecommendationReleaseLike({
+        album_type: sp.album_type,
+        total_tracks: sp.total_tracks,
+        duration_ms: durationMs,
+      });
+    }
+    if (!releaseLike) continue;
+    seenSpotifyIds.add(sp.id);
+
+    let infoListeners: number | undefined;
+    let infoPlaycount: number | undefined;
+    if (!o.skipAlbumInfoLookup) {
+      const info = await fetchAlbumInfo(sp.artists[0]?.name ?? text.candidate_artist_name, sp.name);
+      infoListeners = info?.listeners;
+      infoPlaycount = info?.playcount;
+    }
+
+    candidates.push({
+      spotify_id: sp.id,
+      title: sp.name,
+      primary_artist_name: primaryArtistName,
+      primary_artist_spotify_id: sp.artists[0]?.id,
+      cover_url: sp.images[0]?.url,
+      total_tracks: sp.total_tracks,
+      duration_ms: durationMs,
+      release_year: parseYear(sp.release_date),
+      album_type: sp.album_type,
+      best_similarity_match: text.similarity_match,
+      source_paths: text.source_paths.slice(),
+      lastfm_listeners: infoListeners,
+      lastfm_playcount: infoPlaycount ?? text.lastfm_playcount,
     });
   }
 
@@ -360,6 +434,68 @@ function mergeSimilar(
       source_paths: [{ source_artist: source, similar_match: match }],
     });
   }
+}
+
+function scoreSimilarForTextExpansion(sim: {
+  best_match: number;
+  source_paths: { source_artist: UserArtist; similar_match: number }[];
+}) {
+  const sourceFrequency = sim.source_paths.reduce(
+    (sum, path) => sum + (path.source_artist.frequency ?? 1),
+    0,
+  );
+  return 0.7 * clamp01(sim.best_match) + 0.3 * clamp01(Math.log1p(sourceFrequency) / Math.log(20));
+}
+
+function mergeTextCandidate(
+  map: Map<string, TextCandidate>,
+  sim: {
+    name: string;
+    best_match: number;
+    source_paths: { source_artist: UserArtist; similar_match: number }[];
+  },
+  album: { name: string; playcount?: number },
+) {
+  const key = normalizeAlbumKey(sim.name, album.name);
+  const sourceArtistFrequency = sim.source_paths.reduce(
+    (sum, path) => sum + (path.source_artist.frequency ?? 1),
+    0,
+  );
+  const existing = map.get(key);
+  if (existing) {
+    existing.similarity_match = Math.max(existing.similarity_match, sim.best_match);
+    existing.source_artist_frequency = Math.max(
+      existing.source_artist_frequency,
+      sourceArtistFrequency,
+    );
+    existing.lastfm_playcount = Math.max(existing.lastfm_playcount ?? 0, album.playcount ?? 0);
+    for (const path of sim.source_paths) {
+      if (!existing.source_paths.some((p) => p.source_artist.name === path.source_artist.name)) {
+        existing.source_paths.push(path);
+      }
+    }
+    return;
+  }
+  map.set(key, {
+    candidate_artist_name: sim.name,
+    candidate_album_name: album.name,
+    lastfm_playcount: album.playcount,
+    similarity_match: sim.best_match,
+    source_artist_frequency: sourceArtistFrequency,
+    source_paths: sim.source_paths.slice(),
+  });
+}
+
+function scoreTextCandidate(candidate: TextCandidate): number {
+  const similarity = clamp01(candidate.similarity_match);
+  const sourceFrequency = Math.log1p(Math.max(candidate.source_artist_frequency, 0)) / Math.log(20);
+  const playcount = Math.log1p(Math.max(candidate.lastfm_playcount ?? 0, 0)) / Math.log(5_000_000);
+  return 0.55 * similarity + 0.3 * clamp01(sourceFrequency) + 0.15 * clamp01(playcount);
+}
+
+function clamp01(value: number) {
+  if (!Number.isFinite(value)) return 0;
+  return Math.max(0, Math.min(1, value));
 }
 
 function parseYear(d: string): number | undefined {

@@ -1,6 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 import { normalizeAlbumKey } from '../_shared/album-dedupe.ts';
+import { loadCachedCandidates, writeCandidatesToCache } from '../_shared/candidate-cache.ts';
 import {
+  type AlbumCandidate,
   type CandidateExclusions,
   type DiagEvent,
   generateCandidates,
@@ -8,6 +10,7 @@ import {
 } from '../_shared/candidate-generation.ts';
 import { corsHeaders, jsonError, jsonResponse } from '../_shared/cors.ts';
 import { getCuratedFallback } from '../_shared/curated-fallback.ts';
+import { getExternalApiCircuitState } from '../_shared/external-api-breaker.ts';
 import {
   ALGORITHM_VERSION,
   buildSelectionReason,
@@ -26,6 +29,8 @@ const CANDIDATE_STAGE_TIMEOUT_MS = 20_000;
 const DB_STAGE_TIMEOUT_MS = 8_000;
 const FALLBACK_STAGE_TIMEOUT_MS = 12_000;
 const POST_SELECTION_DETAILS_TIMEOUT_MS = 4_000;
+const MIN_CACHE_POOL_SIZE = 30;
+const MIN_TOTAL_POOL_SIZE = 5;
 
 type FallbackReason =
   | 'no_candidates'
@@ -167,7 +172,7 @@ Deno.serve(async (req) => {
       .from('recommendation_history')
       .select('album:albums(spotify_id, mb_release_group_id, primary_artist_name, title)')
       .eq('user_id', userId);
-    const historyRows = (hist ?? []) as HistoryRow[];
+    const historyRows = (hist ?? []) as unknown as HistoryRow[];
 
     const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
     const { data: recentPicks } = await admin
@@ -176,7 +181,7 @@ Deno.serve(async (req) => {
       .eq('user_id', userId)
       .gte('date', since);
     const recentArtists = new Set(
-      ((recentPicks ?? []) as RecentPickRow[])
+      ((recentPicks ?? []) as unknown as RecentPickRow[])
         .map((r) => r.album?.primary_artist_name)
         .filter(isNonEmptyString),
     );
@@ -189,28 +194,74 @@ Deno.serve(async (req) => {
       excluded_rg: exclusions.releaseGroupIds.size,
     });
 
-    const { candidates, spotifyRelatedAvailable } = await withTimeout(
-      generateCandidates(admin, spotifyToken, taste, exclusions, recentArtists, {
-        maxSourceArtists: 8,
-        maxSimilarPerSource: 6,
-        maxAlbumsPerSimilar: 2,
-        maxCandidates: 28,
-        maxConsecutiveLastfmFailures: 2,
-        maxConsecutiveSpotifySearchFailures: 4,
-        deadlineAtMs: primaryDeadlineAtMs,
-        useSpotifyRelated: false,
-        skipAlbumInfoLookup: true,
-        skipAlbumDetailsLookup: true,
-        skipMusicBrainz: true,
-        diag,
-      }),
-      Math.max(1_000, Math.min(CANDIDATE_STAGE_TIMEOUT_MS, primaryDeadlineAtMs - Date.now())),
-      'compute_timeout',
+    let candidates = await withTimeout(
+      loadCachedCandidates(admin, taste, 20, exclusions, recentArtists),
+      DB_STAGE_TIMEOUT_MS,
+      'candidate_cache_timeout',
     );
+    let spotifyRelatedAvailable = false;
+    console.log(`[compute] cache_candidates_ready user=${userId} count=${candidates.length}`);
+    recordDiag('cache_candidates_ready', { count: candidates.length });
+
+    if (candidates.length < MIN_CACHE_POOL_SIZE && Date.now() < primaryDeadlineAtMs - 1_000) {
+      const spotifySearchCircuit = await getExternalApiCircuitState(
+        admin,
+        'spotify',
+        'search_album',
+      );
+      if (spotifySearchCircuit.state === 'open') {
+        recordDiag('live_recovery_skipped', {
+          reason: 'spotify_search_circuit_open',
+          cooldown_until: spotifySearchCircuit.cooldown_until,
+        });
+      } else {
+        const liveRecovery = await withTimeout(
+          generateCandidates(admin, spotifyToken, taste, exclusions, recentArtists, {
+            maxSourceArtists: 5,
+            maxSimilarPerSource: 6,
+            maxAlbumsPerSimilar: 2,
+            maxCandidates: 28,
+            maxTextArtistLookups: 16,
+            spotifyResolutionTopK: 8,
+            maxConsecutiveLastfmFailures: 2,
+            maxConsecutiveSpotifySearchFailures: 2,
+            deadlineAtMs: primaryDeadlineAtMs,
+            useSpotifyRelated: false,
+            skipAlbumInfoLookup: true,
+            skipAlbumDetailsLookup: true,
+            skipMusicBrainz: true,
+            diag,
+            userId,
+            requestContext: 'compute_live_recovery',
+          }),
+          Math.max(1_000, Math.min(CANDIDATE_STAGE_TIMEOUT_MS, primaryDeadlineAtMs - Date.now())),
+          'compute_timeout',
+        );
+        spotifyRelatedAvailable = liveRecovery.spotifyRelatedAvailable;
+        try {
+          await writeCandidatesToCache(admin, liveRecovery.candidates);
+        } catch (cacheWriteError) {
+          console.warn(
+            `[compute] candidate_cache_write_failed user=${userId} error=${
+              cacheWriteError instanceof Error ? cacheWriteError.message : String(cacheWriteError)
+            }`,
+          );
+        }
+        candidates = mergeCandidates(candidates, liveRecovery.candidates);
+        console.log(
+          `[compute] live_recovery_done user=${userId} live=${liveRecovery.candidates.length} total=${candidates.length}`,
+        );
+        recordDiag('live_recovery_done', {
+          live_count: liveRecovery.candidates.length,
+          total_count: candidates.length,
+        });
+      }
+    }
+
     console.log(`[compute] candidates_ready user=${userId} count=${candidates.length}`);
     recordDiag('candidates_ready', { count: candidates.length });
 
-    if (candidates.length === 0) {
+    if (candidates.length < MIN_TOTAL_POOL_SIZE) {
       fallbackReason = 'no_candidates';
       throw new Error('no_candidates');
     }
@@ -456,4 +507,25 @@ function addNormalizedKey(
 
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === 'string' && value.trim().length > 0;
+}
+
+function mergeCandidates(a: AlbumCandidate[], b: AlbumCandidate[]) {
+  const out = new Map<string, AlbumCandidate>();
+  for (const candidate of [...a, ...b]) {
+    const existing = out.get(candidate.spotify_id);
+    if (!existing) {
+      out.set(candidate.spotify_id, candidate);
+      continue;
+    }
+    existing.best_similarity_match = Math.max(
+      existing.best_similarity_match,
+      candidate.best_similarity_match,
+    );
+    for (const path of candidate.source_paths) {
+      if (!existing.source_paths.some((p) => p.source_artist.name === path.source_artist.name)) {
+        existing.source_paths.push(path);
+      }
+    }
+  }
+  return [...out.values()];
 }

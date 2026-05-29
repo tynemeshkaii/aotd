@@ -4,8 +4,7 @@ import { Alert, View } from 'react-native';
 import { SpotifyButton } from '@/components/auth/SpotifyButton';
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
-import { signInWithSpotify, syncSpotifyConnection } from '@/lib/auth';
-import { triggerLibrarySync } from '@/lib/library';
+import { bootstrapSpotifySession, signInWithSpotify } from '@/lib/auth';
 
 function getErrorMessage(error: unknown) {
   if (error instanceof Error) {
@@ -30,13 +29,7 @@ export default function SignInScreen() {
     try {
       setLoading(true);
       const session = await signInWithSpotify();
-      await syncSpotifyConnection(session);
-      // Initial sync is fire-and-forget. The splash picks up status via Realtime.
-      triggerLibrarySync().catch((error) => {
-        if (__DEV__) {
-          console.warn('[initial-sync] failed:', error);
-        }
-      });
+      await bootstrapSpotifySession(session);
     } catch (error) {
       Alert.alert('Could not sign in', getErrorMessage(error));
     } finally {

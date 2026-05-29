@@ -1,0 +1,116 @@
+# Глубокий разбор AOTD-алгоритма для настоящего музыкального discovery
+
+## Главный вывод
+
+Сейчас у вас не “сломанный” алгоритм, а алгоритм с **не той целевой функцией**. По факту он лучше умеет находить **безопасные, социально подтвержденные, уже популярные** альбомы вокруг поверхности вкуса пользователя, чем делать два самых ценных для discovery-продукта действия: **открывать неожиданно релевантных новых артистов** и **находить неизвестные альбомы уже знакомых артистов**. Это видно из архитектуры фазы 4: основным сигналом выбран Last.fm `artist.getSimilar` + `artist.getTopAlbums`, scoring version 1 прямо включает положительный вес популярности, а production compute вообще не использует `tasteVector` и отключает Spotify related artists в основной ветке. fileciteturn16file0L3-L3 fileciteturn38file0L3-L3 fileciteturn8file0L3-L3
+
+Из-за этого твое ощущение “мне просто выдают топовые альбомы от топовых артистов” очень похоже на реальную системную проблему, а не на единичный баг. У тебя popularity bias входит в систему **дважды**: сначала на этапе генерации кандидатов, потому что Last.fm `artist.getTopAlbums` официально возвращает топ-альбомы артиста, “ordered by popularity”, а потом второй раз — уже в ранжировании, где популярность еще получает отдельный позитивный вес. Исследования по recommender systems давно показывают, что такая конструкция систематически переусиливает head-каталог и ухудшает опыт пользователей, которым популярное нравится меньше среднего; в мультимедийных датасетах вроде LastFM-подобных это особенно заметно. citeturn4view2turn13academia1turn13academia2turn13academia0
+
+Если уж формулировать результат жестко и честно: **текущий AOTD больше похож на personalized canon recommender, чем на discovery guide**. Чтобы продукт начал реально открывать “новое и крутое”, вам нужно перестроить не только веса, но и саму схему: **отдельные candidate buckets, отдельная novelty-логика, калибровка по вкусу пользователя и отдельный policy-слой, который управляет степенью “смелости” рекомендации**. Такой сдвиг хорошо согласуется и с современными исследованиями про calibration, beyond-accuracy метрики, popularity bias и exploration через contextual bandits. citeturn11academia0turn11academia1turn14academia0turn11academia3turn10academia1
+
+## Что реально происходит в текущем коде
+
+Пайплайн сейчас устроен так: после sync’а Spotify-библиотеки вы строите `user_library`, потом в `compute-album-of-the-day` вытаскиваете taste signal, строите exclusions по library/history, генерируете кандидатов, скроите их и выбираете один альбом; если primary path ломается или не дает результата, идете в curated fallback. В RPC-слое текущий pick и discoveries уже умеют возвращать `is_fallback`, `fallback_reason` и `selection_reason`, так что инфраструктура для диагностики у вас уже есть. fileciteturn19file0L3-L3 fileciteturn8file0L3-L3 fileciteturn33file0L3-L3
+
+Но taste representation сейчас реально поверхностный. `aggregateLibrary()` сохраняет альбом в пользовательскую библиотеку только если он был сохранен целиком или если у него набралось не меньше 4 saved tracks; далее `extractTasteSignal()` строит `topArtists` просто по частоте альбомных строк из `user_library`, а `compute-album-of-the-day` вызывает его с `includeTasteVector: false`, так что продовый AOTD в принципе не использует даже тот дополнительный слой персонализации, который уже частично был предусмотрен. Это означает, что пользователь, который слушает много артистов треками, но редко сохраняет альбомы целиком, у вас будет описан грубее, чем он есть на самом деле. fileciteturn35file0L3-L3 fileciteturn7file0L3-L3 fileciteturn8file0L3-L3
+
+Дальше генерация кандидатов в production очень ограничена бюджетом. `compute-album-of-the-day` передает в candidate generation `maxSourceArtists: 8`, `maxSimilarPerSource: 6`, `maxAlbumsPerSimilar: 2`, `maxCandidates: 28`, `useSpotifyRelated: false`, плюс отключает часть lookup’ов ради времени ответа. Даже по внутреннему phase-4 post-mortem это называется bounded pipeline с жестким compute budget, а качество уже приходилось “hardening”-ом подтягивать после ручного QA. Для resilience это разумно, но для discovery это означает, что вы работаете с очень узким пулом и практически вынуждены брать очевидных кандидатов. fileciteturn8file0L3-L3 fileciteturn38file0L3-L3
+
+Отдельно важный момент: fallback у вас тоже по определению тяготеет к “музыкальному канону”. `prewarm-album-cache` собирает глобально топовые альбомы через Last.fm charts и еще добавляет bootstrap seeds вроде *Abbey Road*, *Kind of Blue*, *OK Computer* и т.д.; `curated-fallback` затем выбирает только из `albums.is_prewarm_seed = true`, сортируя по listeners/playcount и слегка подмешивая taste-aware affinity. То есть если primary path часто срывается в fallback, пользователь закономерно будет видеть “великие и общепризнанные” альбомы чаще, чем хотелось бы discovery-продукту. fileciteturn18file0L3-L3 fileciteturn9file0L3-L3
+
+Есть и инфраструктурный риск: у Spotify related artists endpoint уже помечен как deprecated, аудио-фичи endpoint для нескольких треков тоже deprecated, а в феврале–марте 2026 Spotify изменил правила для Development Mode apps, при этом Extended Quota apps от этих изменений не пострадали. Плюс MusicBrainz официально режет по IP примерно до 1 request/sec. Это означает, что ваша текущая осторожность с optional endpoints и кэшами правильная, но одновременно подсказывает, что core discovery нельзя строить на “дорогих” или нестабильных онлайн-запросах в последний момент — его надо переносить в кэши, precomputation и bucketized policy. citeturn4view0turn16view0turn12view0turn4view3
+
+## Почему алгоритм дрейфует в популярных артистов
+
+Главная системная проблема в том, что текущий scoring поощряет не “интересную новизну”, а **релевантную популярность**. В design/post-mortem для `recommendation-algorithm.ts` зафиксированы веса `0.45 similarity + 0.20 source_freq + 0.20 popularity + 0.05 release_balance + 0.10 temperature`. То есть почти треть итогового балла может приходить не из сходства как такового, а из смеси popularity и случайной температуры, а еще пятая часть — из частоты source artists. Из этого следует простая вещь: **низкосходный, но очень популярный кандидат может обойти более точное, но нишевое совпадение**, особенно если candidate pool и так узкий. Это уже не баг одного кейса с Taylor Swift или Olivia Rodrigo — это прямое следствие целевой функции. fileciteturn16file0L3-L3 fileciteturn38file0L3-L3
+
+Вторая проблема — генератор кандидатов сам по себе тянет в сторону “самых очевидных альбомов”. Last.fm `artist.getSimilar` возвращает похожих артистов, а `artist.getTopAlbums` — топ-альбомы артиста, **ordered by popularity**. Иными словами, даже до scoring’а вы почти всегда приходите к head of catalog: не к “самому интересно подходящему неизвестному релизу”, а к “самому известному релизу похожего артиста”. Это очень нормальный выбор для холодного старта качества, но очень слабый выбор для продукта, который обещает discoveries. citeturn4view1turn4view2
+
+Третья проблема — отсутствие **разделения на типы открытия**. Пользовательский запрос у тебя по сути двусоставный:  
+он хочет и **“known artist, unknown album”**, и **“unknown artist, but genuinely relevant”**.  
+Текущий пайплайн смешивает оба сценария в одну кучу и скармливает их одному score, где нет отдельного novelty-терма, нет explicit familiar-vs-adventurous policy, нет “дистанции от known graph” как управляемой величины и нет понятия user-specific tolerance к популярности. Исследования по calibration показывают, что рекомендации должны отражать **распределение** пользовательских интересов, а не только самый доминирующий кластер; исследования по popularity bias подчеркивают, что users with low-pop tolerance часто получают худшие рекомендации именно при таком head-heavy ранжировании. citeturn11academia0turn11academia1turn13academia0turn13academia1turn13academia2
+
+Четвертая проблема — у вас почти нет сигнала о том, **насколько пользователь вообще любит рискованное discovery**. В phase 4 ratings сознательно исключены из algorithm input, что было хорошим решением против filter bubble, но у этого есть побочный эффект: система не учится, пользователю заходит больше “смелых находок” или “безопасных расширений каталога”. Я бы не ломал вашу философию полностью: ratings необязательно превращать в прямую label для ranker’а. Но их очень стоит использовать в **policy layer** — чтобы учиться не “что именно любит юзер”, а “насколько рядом или далеко от его текущего профиля можно ходить без деградации experience”. Такой ход очень хорошо ложится на bandit-подходы и на работы про calibrated recommendation. fileciteturn16file0L3-L3 fileciteturn38file0L3-L3 citeturn11academia3turn10academia1turn11academia0
+
+И еще одна важная вещь: в музыкальном домене snapshot-библиотеки недостаточно. Публичные датасеты и работы по music streaming показывают, что для music recommendation критичны session dynamics, repeat behavior и последовательность взаимодействий, а не только статичная библиотека. У вас сейчас в центре тяжести saved albums / saved tracks aggregation, а не listening sessions. Это окей для v1, но если цель — “discovery-проводник”, дальше без session-aware сигналов качество будет упираться в потолок. citeturn20academia1turn20academia0
+
+## Каким должен быть discovery-алгоритм для AOTD
+
+Я бы рекомендовал перестроить продуктовую цель так: **не “выбери лучший альбом из похожих”, а “выбери лучший тип открытия для этого пользователя сегодня, а потом — лучший альбом внутри этого типа”**. Это важнейший концептуальный сдвиг.
+
+Практически это значит, что candidate generation нужно разбить минимум на четыре buckets.
+
+Первый bucket — **familiar catalog discovery**: артист уже знаком пользователю, но конкретного альбома нет в его библиотеке. Это как раз тот кейс, который ты описал: “слышал артиста, но не копал его дискографию”. Для него не нужен Last.fm top albums как основной двигатель. Здесь лучше брать top user artists и обходить их каталоги через Spotify `GET /artists/{id}/albums` с `include_groups=album`, потом фильтровать уже известные альбомы, history, повторы и выбирать не обязательно номер 1 в каталоге, а лучший unexplored candidate. Spotify это официально поддерживает. citeturn15view0turn17view0
+
+Второй bucket — **adjacent discovery**: новый артист, но на расстоянии одного шага от вкуса пользователя. Это ваш нынешний Last.fm/related-artists сценарий, но его нужно сделать умнее: не тащить автоматически top albums, а сначала строить artist candidates, потом оценивать их по strength of connection, support from multiple source artists, match to user’s subprofile, и только потом извлекать релизы. И уже внутри релизов нужно убирать “слишком очевидный head” как дефолт. Last.fm similarity тут остается полезным, но перестает быть единственным рулем. citeturn4view1turn4view2
+
+Третий bucket — **scene expansion**: артист не сосед первого уровня, а представитель более широкого кластера или сцены, которая пользователю потенциально зайдет. Тут нужна calibration-логика: рекомендации должны быть новыми, но оставаться внутри распределения интересов пользователя — по эпохам, по артистическим кластерам, по “плотности/энергии/инструментальности” или другим proxy-сигналам. Калibration literature как раз про это: не дать алгоритму схлопнуться в один dominant slice вкуса и не вывалиться в нерелевантный шум. citeturn11academia0turn11academia1
+
+Четвертый bucket — **wildcard serendipity**: редкий, но осмысленный “неожиданный” альбом. Он должен быть дозированным, а не дефолтным режимом. Здесь можно использовать long-tail приоры, `tag:hipster` в Spotify Search как один из вспомогательных инструментов для low-pop albums, подбор “атипичных, но объяснимых” кандидатов и сильный explanation layer. Spotify Search официально поддерживает `tag:hipster` для альбомов c lowest 10% popularity. А свежие исследования по music serendipity показывают, что людям проще принять taste-broadening recommendation, если у нее есть хороший контекст и объяснение, а не просто “вот тебе внезапный артист”. citeturn3view0turn9academia0
+
+Дальше поверх этих buckets нужен **policy layer**, который выбирает, какой тип открытия дать сегодня. Моя продуктовая рекомендация для старта — сделать базовый микс вроде: `45% familiar catalog`, `35% adjacent discovery`, `15% scene expansion`, `5% wildcard`. Но это не должны быть вечные константы. Их нужно учить по user feedback и контексту через легкий bandit на уровне bucket selection. Исследования и индустриальные кейсы, включая Spotify Home, показывают, что contextual bandits полезны именно тогда, когда надо балансировать exploit/explore и калибровать смесь контента под конкретного пользователя и ситуацию. citeturn11academia3turn10academia1
+
+Очень важный нюанс: novelty score не должен быть “чем неизвестнее, тем лучше”. Нужен **sweet spot**. Хороший discovery-альбом — это не просто неизвестный альбом, а альбом, который одновременно:
+подходит по вкусу,  
+расширяет вкус,  
+не дублирует уже известное,  
+не является тупо самым популярным выбором на поверхности графа.  
+Это и есть practical serendipity: unexpected **and** useful, а не просто obscure for the sake of obscurity. citeturn14academia0turn14academia2turn9academia0
+
+## Как именно я бы переделал ваш репозиторий
+
+Начинать я бы стал не с новых весов, а с **новой структуры данных о вкусе**.
+
+В `sync-spotify-library/index.ts` и `library-aggregation.ts` я бы перестал делать вид, что библиотека = только альбомы. Текущий threshold `saved_tracks_count >= 4` слишком грубый для музыкального вкуса: он отбрасывает массу важных artist/track-level сигналов. Я бы оставил `user_library` как album-level view для existing features, но параллельно ввел бы отдельные сущности вроде `user_artist_profile` и `user_track_signals`, куда писать: число saved tracks по артисту, число saved albums, recency, first_seen / last_seen, долю collab appearances и т.д. Это позволит строить вкус не только по “количеству альбомов”, а по более правдивой картине. fileciteturn35file0L3-L3 fileciteturn19file0L3-L3
+
+В `taste-extraction.ts` я бы сделал новый составной профиль:
+`library_artists + saved-track artists + Spotify top artists + Spotify top tracks`.
+Spotify официально дает `Get User’s Top Items` по short/medium/long term через `user-top-read`; текущий AOTD уже имеет этот scope и helper для top tracks, но production path почти не использует эти сигналы. Вместо одного массива `topArtists` нужен richer profile: dominant artists, side-clusters, era distribution, popularity tolerance, appetite for novelty. Причем `ratings` тут можно не использовать как прямую preference label, но использовать в отдельном policy-profile. fileciteturn7file0L3-L3 fileciteturn8file0L3-L3 citeturn17view0
+
+В `_shared/` я бы добавил новый helper, условно `artist-catalog.ts`, который ходит в Spotify `GET /artists/{id}/albums` и строит bucket familiar-catalog. Это ключевая дыра текущего продукта: сейчас система умеет искать “похожих артистов”, но не умеет системно делать “неизвестный тебе альбом уже любимого/знакомого артиста”, хотя именно это один из самых ценных и low-risk discovery patтернов. Spotify API для этого есть, и он по сути ближе к твоей продуктовой интуиции, чем Last.fm top albums у похожего артиста. citeturn15view0
+
+`candidate-generation.ts` я бы разрезал на несколько независимых генераторов:  
+`generateFamiliarCatalogCandidates`,  
+`generateAdjacentArtistCandidates`,  
+`generateSceneExpansionCandidates`,  
+`generateWildcardCandidates`.  
+После этого каждый кандидат должен нести с собой не просто similarity и source path, а еще `bucket`, `artist_distance`, `user_knows_artist`, `album_knownness`, `popularity_percentile`, `cluster_id`, `support_count`, `novelty_type`. Тогда `recommendation-algorithm.ts` сможет ранжировать не “одну безликую кучу”, а сравнимые внутри- и межbucket-сценарии. Это уже не просто refactor, а переход от single-score ranking к управляемому discovery system. Текущая bounded архитектура и уже существующие shared helpers позволяют это сделать без полного переписывания сервиса. fileciteturn38file0L3-L3 fileciteturn8file0L3-L3
+
+В `recommendation-algorithm.ts` я бы заменил текущую позитивную popularity-компоненту на **targeted popularity calibration**. Не “больше популярности = лучше”, а “насколько кандидат попадает в комфортный для этого пользователя popularity band”. Для пользователя, который любит нишу, это band должен быть смещен в mid-tail/long-tail; для пользователя с mainstream profile — наоборот. Это прямо соответствует пользовательско-центричному взгляду на popularity bias: один и тот же уровень популярности по-разному воспринимается разными людьми. citeturn13academia0turn13academia2turn11academia0
+
+`curated-fallback.ts` и `prewarm-album-cache/index.ts` я бы тоже разделил по bucket-логике. Сейчас даже taste-aware fallback все равно живет внутри prewarm seed pool, который приходит из global top artists/top albums и bootstrap canon. Это полезно как safety net, но вредно как постоянный источник picks. Лучше иметь prewarm не “мировой топ”, а несколько подготовленных пулов: familiar-catalog seeds, adjacent seeds, long-tail seeds, wildcard seeds. Тогда fallback остается релевантным продукту, а не просто “музыкально уважаемым”. И да, если вы реально хотите вводить `prewarm-user-candidates`, то это очень хорошая идея именно после такого разделения: ночной job может заранее просчитать per-user bucket pools и утром compute будет заниматься mostly policy + rerank, а не дорогим live retrieval. fileciteturn18file0L3-L3 fileciteturn9file0L3-L3
+
+Отдельный важный вывод по источникам сигналов: я бы **не строил будущее discovery вокруг audio features**. Официально endpoint `GET /audio-features` уже deprecated; related artists тоже deprecated. Их можно использовать как optional enrichment, если у тебя уже есть доступ и кэш, но core product should not depend on them. Нужнее и устойчивее опираться на user top items, saved-library structure, artist-catalog traversal, similarity graph caches и precomputed user-level candidate pools. citeturn16view0turn4view0turn17view0
+
+## Как измерять, что discovery стал реально лучше
+
+Если вы будете мерить только “pick created successfully” и общий open rate, вы почти наверняка опять не заметите деградацию discovery до тех пор, пока пользователи сами не начнут говорить “чот это какая-то попса мимо меня”. В research это и есть классическая проблема accuracy-only mindset: beyond-accuracy метрики сильно влияют на реальный user experience. citeturn14academia0turn13academia0turn13academia1
+
+Я бы ввел четыре уровня измерения.
+
+Первый — **pipeline health**: доля primary vs fallback, распределение `fallback_reason`, средний `candidate_count`, количество кандидатов по bucket, latency per stage. Это нужно, чтобы не путать “алгоритм тупой” с “алгоритм часто валится и показывает fallback”. У вас для этого уже есть `is_fallback`, `fallback_reason`, `selection_reason`, diag mode и discoveries RPC. fileciteturn8file0L3-L3 fileciteturn33file0L3-L3 fileciteturn38file0L3-L3
+
+Второй — **recommendation composition**:  
+какая доля picks — `known artist / unseen album`,  
+какая — `new artist / adjacent`,  
+какая — `scene expansion`,  
+какая — `wildcard`;  
+медианный popularity percentile относительно библиотеки пользователя;  
+share long-tail items;  
+artist freshness;  
+catalog coverage.  
+Без такой раскладки невозможно понять, выполняет ли продукт свой discovery contract. Популярность нужно мерить не глобально, а относительно профиля конкретного пользователя — это как раз следует из user-centered popularity bias research. citeturn13academia0turn13academia2
+
+Третий — **acceptance quality**: open rate, rating distribution, share of albums that user later сохранил в библиотеку Spotify, повторно открыл discovery detail, или добавил треки с этого альбома. Если вы не хотите превращать ratings в direct rank target, окей — но как policy feedback и evaluation signal они очень ценны. Contextual bandit будет учиться именно на этом слое: какой тип открытия дает лучший долгосрочный reward у этого пользователя. citeturn11academia3turn10academia1
+
+Четвертый — **serendipity quality**. Тут я бы делал и offline, и online слой. Offline — human QA rubric на реальных профилях: “очевидно”, “понятно, но новое”, “приятно неожиданно”, “не в кассу”. Online — анализ acceptance по distance-to-profile buckets. И обязательно explanation experiments: современные music-discovery исследования показывают, что хороший контекст вокруг рекомендации может заметно повысить шанс, что пользователь примет более смелый pick. То есть explanation в вашем случае — это не только nice-to-have UI, а часть самого discovery engine. citeturn9academia0
+
+Мой любимый безопасный способ внедрения здесь — **shadow mode**. Старая модель продолжает выбирать боевой pick, а новая параллельно пишет “альтернативный today pick” в теневую таблицу вместе с полным breakdown: bucket, novelty, popularity band, familiarity type, reason. Через пару недель у вас будет материал не для спорного “кажется стало лучше”, а для очень конкретного аудита: новая система реально ушла от самых популярных артистов или просто по-другому их объясняет.
+
+## Открытые вопросы и ограничения
+
+Этот разбор опирается на те файлы и документы, которые я смог верифицировать в выбранном GitHub snapshot’е. Checked-in phase-4 docs перечисляют реализованные helper-файлы и миграции, и этот набор местами отличается от списка путей, который ты дал в сообщении; поэтому выводы ниже основаны на верифицированных `compute-album-of-the-day`, `sync-spotify-library`, `_shared/*`, phase-4/5 migrations и post-mortem документах, а не на невидимых мне путях. fileciteturn16file0L3-L3 fileciteturn38file0L3-L3
+
+Я не видел ваши реальные production picks, конкретные `selection_reason` для спорных рекомендаций и текущее соотношение primary/fallback у живых пользователей. Это очень важно: если большинство странных альбомов пришло из fallback, то чинить в первую очередь нужно надежность и prewarm pools; если же они пришли из primary path, то проблема уже именно в retrieval/ranking objective. По текущему репо оба сценария правдоподобны, и различить их можно быстро через уже существующие `is_fallback`, `fallback_reason`, `selection_reason` и diagnostics. fileciteturn8file0L3-L3 fileciteturn33file0L3-L3
+
+Если собрать все в одну фразу, мой главный совет такой: **не пытайся “докрутить веса” у текущего scoring и надеяться, что discovery magically появится**. Discovery у вас должен стать отдельной, явно заданной целью на уровне архитектуры: с bucket-based retrieval, user-specific calibration, anti-popularity control, policy layer для степени новизны и осмысленными объяснениями для пользователя. Именно тогда приложение начнет ощущаться не как “рандомный топ-альбом рядом с моим вкусом”, а как настоящий проводник в новую музыку.

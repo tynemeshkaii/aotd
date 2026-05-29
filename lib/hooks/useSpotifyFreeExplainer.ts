@@ -30,19 +30,32 @@ export function useSpotifyFreeExplainer() {
   const maybeShow = async () => {
     if (!userId || (query.data !== 'free' && query.data !== 'open')) return;
 
+    let alreadyDismissed = false;
     try {
       const key = dismissedKey(userId);
-      const dismissed = await SecureStore.getItemAsync(key);
-      if (dismissed) return;
-
-      await SecureStore.setItemAsync(key, '1');
-      Alert.alert(
-        'Small Spotify heads-up',
-        'Free Spotify may shuffle albums instead of playing them in order. Premium usually keeps the record behaving like a record.',
-      );
+      alreadyDismissed = (await SecureStore.getItemAsync(key)) != null;
+      if (!alreadyDismissed) {
+        // Persist the flag before showing so a storage failure can't make us
+        // nag on every open — but never let storage failure block the alert.
+        await SecureStore.setItemAsync(key, '1');
+      }
     } catch (error) {
       console.warn('Could not persist Spotify Free explainer flag', error);
     }
+
+    if (alreadyDismissed) return;
+
+    // Wait for the user to acknowledge before the caller opens Spotify —
+    // otherwise the app backgrounds into Spotify the instant the alert appears
+    // and the heads-up is never actually seen.
+    await new Promise<void>((resolve) => {
+      Alert.alert(
+        'Small Spotify heads-up',
+        'Free Spotify may shuffle albums instead of playing them in order. Premium usually keeps the record behaving like a record.',
+        [{ text: 'Got it', onPress: () => resolve() }],
+        { onDismiss: () => resolve() },
+      );
+    });
   };
 
   return { maybeShow, spotifyProduct: query.data };

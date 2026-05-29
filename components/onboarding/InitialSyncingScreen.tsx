@@ -8,6 +8,7 @@ import { Text } from '@/components/ui/Text';
 import { useLibrarySyncStatus } from '@/lib/hooks/useLibrarySyncStatus';
 import { useTriggerLibrarySync } from '@/lib/hooks/useTriggerLibrarySync';
 import { isStaleLibrarySync } from '@/lib/library';
+import colors from '@/theme/colors';
 
 export function InitialSyncingScreen() {
   const { status } = useLibrarySyncStatus();
@@ -35,7 +36,7 @@ export function InitialSyncingScreen() {
   return (
     <View className="flex-1 items-center justify-center bg-bg px-8">
       <View className="mb-8 items-center justify-center rounded-full bg-surface p-6">
-        <Ionicons name="musical-notes" size={56} color="#1db954" />
+        <Ionicons name="musical-notes" size={56} color={colors.accent} />
       </View>
 
       {isFailed || isStale ? (

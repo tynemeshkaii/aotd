@@ -126,7 +126,10 @@ export async function fetchAlbumInfo(
 
 export async function fetchGloballyTopAlbums(
   limit = 500,
-  opts: { artistOffset?: number } = {},
+  opts: {
+    artistOffset?: number;
+    topAlbumsForArtist?: typeof fetchTopAlbumsForArtist;
+  } = {},
 ): Promise<
   {
     name: string;
@@ -144,7 +147,7 @@ export async function fetchGloballyTopAlbums(
   for (const a of artists) {
     if (out.length >= limit) break;
     try {
-      const tops = await fetchTopAlbumsForArtist(a.name, 5);
+      const tops = await (opts.topAlbumsForArtist ?? fetchTopAlbumsForArtist)(a.name, 5);
       for (const al of tops) {
         out.push({ name: al.name, artist: a.name, playcount: al.playcount });
         if (out.length >= limit) break;

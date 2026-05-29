@@ -1,4 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { recordExternalApiCall, safeRetryAfterSeconds } from './external-api-log.ts';
+import { reserveExternalApiSlot } from './external-api-rate-limit.ts';
 
 type SpotifyImage = {
   url: string;
@@ -57,6 +59,10 @@ type FetchAllSpotifyPagedOptions = {
   max429Retries?: number;
   logEveryPages?: number;
   label?: string;
+  admin?: SupabaseClient;
+  userId?: string;
+  endpointName?: string;
+  rateLimitIntervalMs?: number;
 };
 
 export async function fetchSpotifyProfile(accessToken: string) {
@@ -170,6 +176,16 @@ export async function fetchAllSpotifyPaged<T>(
       break;
     }
 
+    if (options.admin && options.rateLimitIntervalMs) {
+      await reserveExternalApiSlot(
+        options.admin,
+        'spotify',
+        options.endpointName ?? 'paged_library',
+        options.rateLimitIntervalMs,
+      );
+    }
+
+    const requestStartedAt = Date.now();
     const res = await fetchWithTimeout(
       url,
       {
@@ -177,6 +193,17 @@ export async function fetchAllSpotifyPaged<T>(
       },
       SPOTIFY_FETCH_TIMEOUT_MS,
     );
+    await recordExternalApiCall(options.admin, {
+      service: 'spotify',
+      endpoint: options.endpointName ?? 'paged_library',
+      status: res.status,
+      ok: res.ok,
+      duration_ms: Date.now() - requestStartedAt,
+      retry_after_seconds: safeRetryAfterSeconds(res),
+      error_code: res.ok ? null : `spotify_paged_failed:${res.status}`,
+      request_context: options.label ?? endpoint,
+      user_id: options.userId ?? null,
+    });
 
     if (res.status === 401 && !retriedAuth) {
       retriedAuth = true;
