@@ -84,7 +84,7 @@ export default function AuthCallbackScreen() {
 
     async function finish() {
       if (__DEV__) {
-        console.info('[auth] Callback linkingUrl:', linkingUrl);
+        console.info('[auth] Callback linkingUrl present:', !!linkingUrl);
         console.info('[auth] Callback param keys:', getParamKeys(params));
       }
 

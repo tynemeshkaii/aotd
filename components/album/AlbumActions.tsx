@@ -22,7 +22,7 @@ export function AlbumActions({ opening, sharing, onOpen, onShare }: Props) {
         className="h-12 flex-1 flex-row items-center justify-center gap-2 rounded-lg bg-accent px-4 active:opacity-80 disabled:opacity-60"
       >
         <Ionicons name="play" size={18} color={colors.bg} />
-        <Text className="font-semibold text-bg">{opening ? 'Opening...' : 'Spotify'}</Text>
+        <Text className="font-semibold text-bg">{opening ? 'Opening...' : 'Open in Spotify'}</Text>
       </Pressable>
 
       <Pressable

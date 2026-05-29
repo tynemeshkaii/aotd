@@ -16,7 +16,7 @@ export async function triggerLibrarySync(mode: LibrarySyncMode = 'full_reconcile
 }
 
 export function hasCompletedLibrarySync(status: LibrarySyncStatusLike | null) {
-  return !!status?.completed_at || status?.aggregated_albums_count != null;
+  return status?.status === 'completed' || status?.aggregated_albums_count != null;
 }
 
 export function isActiveLibrarySync(status: LibrarySyncStatusLike | null) {

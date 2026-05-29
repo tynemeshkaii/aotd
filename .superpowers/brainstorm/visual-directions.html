@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Album of the Day — Phase 6 visual directions</title>
+<style>
+  :root {
+    /* Proposed Phase 6 brand palette (dark, "album-cover-y") */
+    --bg:        #120a0c;
+    --surface:   #1d1014;
+    --surface-2: #2a181d;
+    --text:      #f4ebe0;   /* cream */
+    --muted:     #9c8b86;   /* warm taupe */
+    --accent:    #d9a441;   /* gold */
+    --burgundy:  #87263b;   /* brand primary */
+    --loved:     #d9a441;
+    --bad:       #8e3b46;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #07050a;
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+    padding: 40px 24px 80px;
+    -webkit-font-smoothing: antialiased;
+  }
+  .page-head { max-width: 1180px; margin: 0 auto 36px; }
+  .page-head h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.02em; }
+  .page-head p { color: #8a8a96; margin-top: 8px; font-size: 15px; line-height: 1.5; max-width: 720px; }
+
+  /* Palette swatches */
+  .palette { display: flex; gap: 10px; margin-top: 22px; flex-wrap: wrap; }
+  .sw { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+  .sw .chip { width: 84px; height: 44px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.08); }
+  .sw .lbl { font-size: 11px; color: #8a8a96; }
+  .sw .hex { font-size: 11px; color: #c9c4cc; font-variant-numeric: tabular-nums; }
+
+  .row { display: flex; gap: 28px; justify-content: center; flex-wrap: wrap; max-width: 1180px; margin: 0 auto; }
+  .col { width: 340px; }
+  .col > h2 { font-size: 15px; font-weight: 600; text-align: center; margin-bottom: 4px; }
+  .col > .tag { font-size: 12px; color: #8a8a96; text-align: center; margin-bottom: 16px; line-height: 1.4; }
+
+  /* Phone frame */
+  .phone {
+    width: 340px; height: 720px; border-radius: 44px;
+    background: var(--bg); border: 10px solid #000;
+    box-shadow: 0 30px 70px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.04) inset;
+    overflow: hidden; position: relative;
+  }
+  .notch { position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+    width: 130px; height: 26px; background: #000; border-radius: 0 0 18px 18px; z-index: 30; }
+  .screen { position: absolute; inset: 0; overflow-y: auto; }
+  .screen::-webkit-scrollbar { display: none; }
+  .pad { padding: 50px 20px 90px; }
+
+  .eyebrow { font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); font-weight: 600; }
+  .cover { aspect-ratio: 1; border-radius: 14px; overflow: hidden; position: relative; background: linear-gradient(135deg,#3a2f4d,#7c5a8a 55%,#caa15e); }
+  .cover img { width: 100%; height: 100%; object-fit: cover; display:block; }
+  .title { font-size: 26px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.1; }
+  .artist { font-size: 16px; color: var(--muted); margin-top: 4px; }
+  .meta { font-size: 12px; color: var(--muted); margin-top: 8px; }
+  .why { background: var(--surface); border-radius: 14px; padding: 14px 16px; font-size: 13.5px; line-height: 1.45; color: #d8cabf; }
+  .why .k { color: var(--accent); font-weight: 600; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; display:block; margin-bottom:6px;}
+  .btn { border-radius: 16px; padding: 14px; text-align: center; font-weight: 600; font-size: 15px; }
+  .btn-primary { background: var(--accent); color: #1a1106; }
+  .btn-burgundy { background: var(--burgundy); color: var(--text); }
+  .btn-ghost { background: transparent; color: var(--text); border: 1px solid var(--surface-2); }
+  .stack { display: flex; flex-direction: column; }
+  .tabbar { position: absolute; bottom: 0; left: 0; right: 0; height: 72px; background: rgba(10,6,8,0.85);
+    backdrop-filter: blur(12px); border-top: 1px solid var(--surface); display: flex; z-index: 20; }
+  .tabbar div { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; font-size: 10px; color: var(--muted); }
+  .tabbar div.active { color: var(--accent); }
+  .dot { width: 22px; height: 22px; border-radius: 7px; background: currentColor; opacity: 0.85; }
+
+  .rating-row { display:flex; gap:8px; }
+  .pill { flex:1; text-align:center; padding:10px 4px; border-radius:11px; font-size:12px; border:1px solid var(--surface-2); color: var(--muted);}
+  .pill.sel { background: var(--accent); color:#1a1106; border-color: var(--accent); font-weight:600; }
+
+  /* ---- Direction A: restrained / tactile ---- */
+  .A .pad { padding-top: 54px; }
+  .A .cover { box-shadow: 0 10px 30px rgba(0,0,0,0.4); }
+
+  /* ---- Direction B: rich / album-y (gradient bleed from cover) ---- */
+  .B .screen { background:
+      radial-gradient(120% 60% at 50% 0%, rgba(124,90,138,0.55) 0%, rgba(124,90,138,0.0) 55%),
+      var(--bg); }
+  .B .cover { box-shadow: 0 24px 60px rgba(124,90,138,0.45); }
+  .B .title { font-size: 30px; }
+  .B .glassbar { background: rgba(255,255,255,0.06); backdrop-filter: blur(8px); border:1px solid rgba(255,255,255,0.08); }
+
+  /* ---- Direction C: hybrid (rich card head, restrained body) ---- */
+  .C .head { margin: -50px -20px 0; padding: 70px 20px 22px;
+    background: radial-gradient(120% 70% at 50% 0%, rgba(135,38,59,0.6), rgba(135,38,59,0) 60%), var(--bg); }
+  .C .cover { box-shadow: 0 20px 50px rgba(135,38,59,0.4); }
+</style>
+</head>
+<body>
+  <div class="page-head">
+    <h1>Phase 6 — visual direction comparison</h1>
+    <p>The same Home / album-of-the-day card, rendered three ways, all using the proposed brand palette (replacing Spotify-green). Look at how much motion &amp; visual weight each implies, then tell me which feels right. The phone frames are static — imagine the cover parallax-scrolling and the rating pills giving a haptic tap.</p>
+    <div class="palette">
+      <div class="sw"><div class="chip" style="background:#120a0c"></div><span class="lbl">bg</span><span class="hex">#120a0c</span></div>
+      <div class="sw"><div class="chip" style="background:#1d1014"></div><span class="lbl">surface</span><span class="hex">#1d1014</span></div>
+      <div class="sw"><div class="chip" style="background:#2a181d"></div><span class="lbl">surface-2</span><span class="hex">#2a181d</span></div>
+      <div class="sw"><div class="chip" style="background:#f4ebe0"></div><span class="lbl">text (cream)</span><span class="hex">#f4ebe0</span></div>
+      <div class="sw"><div class="chip" style="background:#9c8b86"></div><span class="lbl">muted</span><span class="hex">#9c8b86</span></div>
+      <div class="sw"><div class="chip" style="background:#d9a441"></div><span class="lbl">accent (gold)</span><span class="hex">#d9a441</span></div>
+      <div class="sw"><div class="chip" style="background:#87263b"></div><span class="lbl">burgundy</span><span class="hex">#87263b</span></div>
+    </div>
+  </div>
+
+  <div class="row">
+    <!-- ============ A ============ -->
+    <div class="col A">
+      <h2>A · Restrained &amp; tactile</h2>
+      <div class="tag">Things-3 calm. Flat cover, gold accents,<br>haptics + skeletons. Lowest risk.</div>
+      <div class="phone">
+        <div class="notch"></div>
+        <div class="screen">
+          <div class="pad stack" style="gap:18px">
+            <span class="eyebrow">Today's album</span>
+            <div class="cover"><img src="https://i.scdn.co/image/ab67616d0000b273e8b066f70c206551210d902b" alt=""></div>
+            <div>
+              <div class="title">In Rainbows</div>
+              <div class="artist">Radiohead</div>
+              <div class="meta">2007 · 10 tracks · 42 min</div>
+            </div>
+            <div class="why"><span class="k">Why this album</span>You've been saving stuff by similar artists. We hope you like it — if not, tomorrow's pick is on us.</div>
+            <div class="btn btn-primary">Open in Spotify</div>
+            <div class="btn btn-ghost">Share</div>
+            <div class="rating-row">
+              <div class="pill sel">Loved</div><div class="pill">Liked</div><div class="pill">Alright</div><div class="pill">Meh</div>
+            </div>
+          </div>
+        </div>
+        <div class="tabbar"><div class="active"><span class="dot"></span>Home</div><div><span class="dot"></span>Discoveries</div><div><span class="dot"></span>Profile</div></div>
+      </div>
+    </div>
+
+    <!-- ============ B ============ -->
+    <div class="col B">
+      <h2>B · Rich &amp; "album-y"</h2>
+      <div class="tag">Marvis energy. Color bleeds from the<br>cover, parallax, glass bars. Most "wow".</div>
+      <div class="phone">
+        <div class="notch"></div>
+        <div class="screen">
+          <div class="pad stack" style="gap:18px">
+            <span class="eyebrow">Today's album</span>
+            <div class="cover"><img src="https://i.scdn.co/image/ab67616d0000b273e8b066f70c206551210d902b" alt=""></div>
+            <div>
+              <div class="title">In Rainbows</div>
+              <div class="artist">Radiohead</div>
+              <div class="meta">2007 · 10 tracks · 42 min</div>
+            </div>
+            <div class="why glassbar" style="border-radius:14px;padding:14px 16px;font-size:13.5px;line-height:1.45;color:#efe6dc"><span class="k">Why this album</span>You've been saving stuff by similar artists. We hope you like it — if not, tomorrow's pick is on us.</div>
+            <div class="btn btn-burgundy">Open in Spotify</div>
+            <div class="btn btn-ghost glassbar">Share</div>
+            <div class="rating-row">
+              <div class="pill sel">Loved</div><div class="pill">Liked</div><div class="pill">Alright</div><div class="pill">Meh</div>
+            </div>
+          </div>
+        </div>
+        <div class="tabbar"><div class="active"><span class="dot"></span>Home</div><div><span class="dot"></span>Discoveries</div><div><span class="dot"></span>Profile</div></div>
+      </div>
+    </div>
+
+    <!-- ============ C ============ -->
+    <div class="col C">
+      <h2>C · Hybrid (recommended)</h2>
+      <div class="tag">Rich card head (gradient + parallax cover),<br>calm body &amp; other tabs. Balanced.</div>
+      <div class="phone">
+        <div class="notch"></div>
+        <div class="screen">
+          <div class="pad stack" style="gap:18px;padding-top:0">
+            <div class="head stack" style="gap:16px">
+              <span class="eyebrow">Today's album</span>
+              <div class="cover"><img src="https://i.scdn.co/image/ab67616d0000b273e8b066f70c206551210d902b" alt=""></div>
+              <div>
+                <div class="title">In Rainbows</div>
+                <div class="artist">Radiohead</div>
+                <div class="meta">2007 · 10 tracks · 42 min</div>
+              </div>
+            </div>
+            <div class="why"><span class="k">Why this album</span>You've been saving stuff by similar artists. We hope you like it — if not, tomorrow's pick is on us.</div>
+            <div class="btn btn-primary">Open in Spotify</div>
+            <div class="btn btn-ghost">Share</div>
+            <div class="rating-row">
+              <div class="pill sel">Loved</div><div class="pill">Liked</div><div class="pill">Alright</div><div class="pill">Meh</div>
+            </div>
+          </div>
+        </div>
+        <div class="tabbar"><div class="active"><span class="dot"></span>Home</div><div><span class="dot"></span>Discoveries</div><div><span class="dot"></span>Profile</div></div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
