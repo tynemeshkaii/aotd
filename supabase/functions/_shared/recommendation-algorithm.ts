@@ -1,6 +1,11 @@
 import type { AlbumCandidate } from './candidate-generation.ts';
 import { normalizeArtistName } from './external-cache.ts';
-import { type PopularityBucket, popularityBucket } from './popularity-bucket.ts';
+import {
+  type PopularityBucket,
+  type PopularityProfile,
+  popularityBucket,
+  popularityBucketRelative,
+} from './popularity-bucket.ts';
 import type { TasteSignal } from './taste-extraction.ts';
 import { type CandidateTier, classifyCandidate } from './tier-classifier.ts';
 
@@ -46,6 +51,7 @@ export function scoreCandidates(
   taste: TasteSignal,
   rng: () => number = Math.random,
   weights = DEFAULT_WEIGHTS,
+  popularityProfile?: PopularityProfile | null,
 ): ScoredCandidate[] {
   if (candidates.length === 0) return [];
   const userArtistFrequencies = buildUserArtistFrequencies(taste);
@@ -65,6 +71,11 @@ export function scoreCandidates(
   );
   const maxFreq = Math.max(1, ...candFreq);
 
+  const bucketFn = popularityProfile
+    ? (listeners: number | null | undefined) =>
+        popularityBucketRelative(listeners, popularityProfile)
+    : popularityBucket;
+
   return candidates
     .map((c, i) => {
       const similarity = clamp01(c.best_similarity_match);
@@ -79,7 +90,7 @@ export function scoreCandidates(
         weights.popularity_log_percentile * popularity +
         weights.release_balance * balance +
         weights.sampling_temperature * temperature;
-      const bucket = popularityBucket(c.lastfm_listeners);
+      const bucket = bucketFn(c.lastfm_listeners);
       const tier = classifyCandidate(c, userArtistFrequencies, bucket);
       const adjusted = applyTrackBScore(baseScore, tier, bucket);
 
@@ -103,7 +114,7 @@ export function applyTrackBScore(baseScore: number, tier: CandidateTier, bucket:
   };
   let score = baseScore;
 
-  if (bucket === 'mainstream' && tier !== 'safe_anchor') {
+  if (bucket === 'mainstream' && tier === 'adjacent_artist') {
     multipliers.mainstream_penalty = 0.4;
     score *= multipliers.mainstream_penalty;
   }

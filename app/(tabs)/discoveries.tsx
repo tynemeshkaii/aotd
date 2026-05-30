@@ -1,18 +1,38 @@
 import { type RelativePathString, router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, View } from 'react-native';
+import { FlatList, View } from 'react-native';
 
 import { DiscoveryListItem } from '@/components/album/DiscoveryListItem';
 import { type DiscoveryFilter, StatusTabs } from '@/components/album/StatusTabs';
-import { Button } from '@/components/ui/Button';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { ErrorState } from '@/components/ui/ErrorState';
 import { Screen } from '@/components/ui/Screen';
+import { Skeleton } from '@/components/ui/Skeleton';
 import { Text } from '@/components/ui/Text';
 import { useDiscoveries } from '@/lib/hooks/useDiscoveries';
+
+function ListSkeleton() {
+  return (
+    <View className="mt-4 gap-3">
+      {Array.from({ length: 6 }).map((_, i) => (
+        // biome-ignore lint/suspicious/noArrayIndexKey: static placeholder list
+        <View key={i} className="flex-row gap-3 rounded-2xl bg-surface p-3">
+          <Skeleton className="h-16 w-16 rounded-xl" />
+          <View className="flex-1 justify-center gap-2">
+            <Skeleton className="h-4 w-2/3 rounded-md" />
+            <Skeleton className="h-3 w-1/2 rounded-md" />
+            <Skeleton className="h-3 w-1/3 rounded-md" />
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+}
 
 export default function DiscoveriesScreen() {
   const params = useLocalSearchParams<{ filter?: string }>();
   const [filter, setFilter] = useState<DiscoveryFilter>('all');
-  const { data: discoveries = [], isError, isLoading, refetch } = useDiscoveries();
+  const { data: discoveries = [], isError, isLoading, isRefetching, refetch } = useDiscoveries();
 
   useEffect(() => {
     if (params.filter === 'pending' || params.filter === 'rated' || params.filter === 'all') {
@@ -33,6 +53,11 @@ export default function DiscoveriesScreen() {
         ? 'No journal entries yet.'
         : 'Your first discovery is coming';
 
+  const emptySubtitle =
+    filter === 'all'
+      ? "Each morning we'll pick one album you don't have yet, based on your taste. Check back tomorrow."
+      : undefined;
+
   return (
     <Screen scroll={false}>
       <Text variant="h1">Discoveries</Text>
@@ -43,41 +68,27 @@ export default function DiscoveriesScreen() {
       <StatusTabs value={filter} onChange={setFilter} />
 
       {isLoading ? (
-        <View className="flex-1 items-center justify-center">
-          <ActivityIndicator />
-        </View>
+        <ListSkeleton />
       ) : isError ? (
-        <View className="flex-1 justify-center gap-4 px-8">
-          <Text variant="h2" className="text-center">
-            Could not load discoveries right now.
-          </Text>
-          <Button title="Try again" onPress={() => refetch()} />
-        </View>
+        <ErrorState
+          title="Could not load discoveries right now."
+          retrying={isRefetching}
+          onRetry={() => void refetch()}
+        />
       ) : (
         <FlatList
           className="mt-4 flex-1"
-          contentContainerClassName={filtered.length ? 'gap-3 pb-8' : 'flex-1 justify-center px-8'}
+          contentContainerClassName={filtered.length ? 'gap-3 pb-8' : 'flex-1'}
           data={filtered}
           keyExtractor={(item) => item.aotd_id}
-          renderItem={({ item }) => (
+          renderItem={({ item, index }) => (
             <DiscoveryListItem
               album={item}
+              index={index}
               onPress={() => router.push(`/discoveries/${item.aotd_id}` as RelativePathString)}
             />
           )}
-          ListEmptyComponent={
-            <View className="items-center">
-              <Text variant="h2" className="text-center">
-                {emptyTitle}
-              </Text>
-              {filter === 'all' && (
-                <Text variant="caption" className="mt-3 text-center leading-5">
-                  Each morning we'll pick one album you don't have yet, based on your taste. Check
-                  back tomorrow.
-                </Text>
-              )}
-            </View>
-          }
+          ListEmptyComponent={<EmptyState title={emptyTitle} subtitle={emptySubtitle} />}
           showsVerticalScrollIndicator={false}
         />
       )}

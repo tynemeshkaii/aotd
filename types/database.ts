@@ -152,6 +152,57 @@ export type Database = {
           },
         ]
       }
+      aotd_shadow_picks: {
+        Row: {
+          created_at: string | null
+          date: string
+          id: string
+          live_album_id: string | null
+          same_as_live: boolean | null
+          shadow_album_id: string | null
+          shadow_algorithm_version: number | null
+          shadow_selection_reason: Json | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          date: string
+          id?: string
+          live_album_id?: string | null
+          same_as_live?: boolean | null
+          shadow_album_id?: string | null
+          shadow_algorithm_version?: number | null
+          shadow_selection_reason?: Json | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          date?: string
+          id?: string
+          live_album_id?: string | null
+          same_as_live?: boolean | null
+          shadow_album_id?: string | null
+          shadow_algorithm_version?: number | null
+          shadow_selection_reason?: Json | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "aotd_shadow_picks_live_album_id_fkey"
+            columns: ["live_album_id"]
+            isOneToOne: false
+            referencedRelation: "albums"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "aotd_shadow_picks_shadow_album_id_fkey"
+            columns: ["shadow_album_id"]
+            isOneToOne: false
+            referencedRelation: "albums"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       artist_similarity_cache: {
         Row: {
           fetched_at: string
@@ -970,6 +1021,7 @@ export type Database = {
           state: string
         }[]
       }
+      get_profile_overview: { Args: { p_user_id: string }; Returns: Json }
       prune_external_api_request_log: { Args: never; Returns: undefined }
       record_external_api_circuit_failure: {
         Args: {

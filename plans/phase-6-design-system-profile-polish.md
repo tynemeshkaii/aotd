@@ -2,9 +2,30 @@
 
 > Goal: turn a "functionally working" product into something that feels good to hold. We ship a real brand identity (away from Spotify-green), a rich, motion-led visual treatment for the daily pick, a Profile screen that is full of meaning from day one, and the polish layer — skeletons, haptics, transitions, intentional empty/error states, and final icon/splash.
 
-**Status:** planned (not started)
+**Status:** implemented in working tree (2026-05-29). Remaining before "done": apply the Profile migration on the live DB (`supabase db push` + `npm run db:types`), final app-icon/splash assets, and on-device QA in Expo Go.
 **Depends on:** Phases 4 + 5 implemented in working tree (album detail, ratings, discoveries, share, `get_current_pick` / `get_discoveries` RPCs, library import).
 **Estimated effort:** 2.5–3 weeks @ ~10–15 h/week.
+
+---
+
+## Implementation status (2026-05-29)
+
+Done in the working tree (`tsc --noEmit` and `biome check` both clean):
+
+- **Deps installed:** `expo-haptics`, `expo-image`, `expo-linear-gradient`, `expo-blur` (SDK 54 matrix) + `moti`. Worklets babel plugin auto-applied by `babel-preset-expo`.
+- **Palette swapped** in `theme/colors.js` + `theme/colors.d.ts` — burgundy/cream/gold + `primary`, `on-primary`, `spotify`, and `rate-*` tokens. `SpotifyButton` moved to the dedicated `spotify` token (stays green); all other surfaces inherit the new palette via the single source of truth.
+- **Typography** extended (`title`/`h3`/`label`/`subtle`); `h1` rescaled.
+- **New primitives:** `lib/motion.ts` + `useReduceMotion`, `lib/haptics.ts`, `components/ui/CoverImage` (expo-image + `cssInterop`), `Card` (incl. glass/blur), `Skeleton` (moti, reduce-motion aware), `EmptyState`, `ErrorState`; `Button` extended (variants + haptic + `loading`).
+- **Rich daily pick:** `AlbumDetail` rewritten as a self-contained parallax `Animated.ScrollView` with `CoverBackdrop` (blurred enlarged cover + gradient scrim, Expo-Go-safe), parallax `AlbumHero`, glass `WhyThisAlbum`, burgundy `AlbumActions` + haptics, `RatingEditor` with haptics + semantic tint dots + animated selection. Home + discovery-detail both consume it; Home/detail use skeletons and retryable error states (`PickError`/`ErrorState`).
+- **Discoveries:** skeleton rows, `CoverImage` thumbnails, semantic status dots, staggered entrance (reduce-motion aware), `EmptyState`/`ErrorState`.
+- **Rich Profile:** `get_profile_overview` RPC migration (`20260530000000_phase6_profile_overview.sql`, authenticated-only) + `useProfileOverview` + `TasteSection` + `ListeningSummary` + hero/streak/library/connections/settings, each with skeletons; `lib/copy.ts` tone strings.
+- **Tab bar** active tint is gold automatically (token-driven; glass treatment deferred — see §17).
+
+Not done (intentionally deferred / needs the user):
+
+- Final **app icon + splash** assets (design task; needs user pick + native rebuild).
+- **`supabase db push` + `npm run db:types`** for the new RPC (sandbox-blocked; manual).
+- **On-device QA** in Expo Go (parallax/blur/haptics must be felt on a real iPhone).
 
 ---
 

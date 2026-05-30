@@ -68,12 +68,14 @@ Deno.test('deterministic scoring with seeded RNG', () => {
   assertEquals(run1[1].score, run2[1].score);
 });
 
-Deno.test('Track B penalizes mainstream candidates unless they are safe anchors', () => {
-  const penalized = applyTrackBScore(1, 'known_artist_new_album', 'mainstream');
-  const niche = applyTrackBScore(1, 'adjacent_artist', 'niche');
+Deno.test('Track B penalizes mainstream adjacent_artist but not known_artist_new_album', () => {
+  const knownMainstream = applyTrackBScore(1, 'known_artist_new_album', 'mainstream');
+  const adjacentMainstream = applyTrackBScore(1, 'adjacent_artist', 'mainstream');
+  const adjacentNiche = applyTrackBScore(1, 'adjacent_artist', 'niche');
 
-  assert(penalized.score < niche.score);
-  assertEquals(penalized.multipliers.mainstream_penalty, 0.4);
+  assertEquals(knownMainstream.multipliers.mainstream_penalty, 1);
+  assertEquals(adjacentMainstream.multipliers.mainstream_penalty, 0.4);
+  assert(adjacentMainstream.score < adjacentNiche.score);
 });
 
 Deno.test('Track B known-artist new album can beat unrelated mainstream drift', () => {
@@ -97,6 +99,69 @@ Deno.test('Track B known-artist new album can beat unrelated mainstream drift', 
   const scored = scoreCandidates(candidates, undergroundTaste, () => 0.5);
   assertEquals(scored[0].candidate.spotify_id, 'known_missing_classic');
   assertEquals(scored[0].candidate_tier, 'known_artist_new_album');
+});
+
+Deno.test('pool-relative banding changes popularity buckets correctly', () => {
+  const nicheUserCandidates = [
+    makeCandidate({
+      spotify_id: 'niche_user_mid',
+      primary_artist_name: 'Mid Artist',
+      best_similarity_match: 0.6,
+      source_path_freq: 5,
+      lastfm_listeners: 40_000,
+    }),
+    makeCandidate({
+      spotify_id: 'global_mainstream',
+      primary_artist_name: 'Big Artist',
+      best_similarity_match: 0.6,
+      source_path_freq: 5,
+      lastfm_listeners: 2_000_000,
+    }),
+  ];
+  // Without profile: 40k is 'niche', 2M is 'mainstream' (safe_anchor, no penalty)
+  const withoutProfile = scoreCandidates(nicheUserCandidates, undergroundTaste, () => 0.5);
+  const midWithout = withoutProfile.find((s) => s.candidate.spotify_id === 'niche_user_mid');
+  const bigWithout = withoutProfile.find((s) => s.candidate.spotify_id === 'global_mainstream');
+  assertEquals(midWithout?.popularity_bucket, 'niche');
+  assertEquals(bigWithout?.popularity_bucket, 'mainstream');
+
+  // With pool-relative profile: 40k is p25 (deep), 2M is p75 (known)
+  const profile = { p25: 50_000, p50: 100_000, p75: 3_000_000 };
+  const withProfile = scoreCandidates(
+    nicheUserCandidates,
+    undergroundTaste,
+    () => 0.5,
+    undefined,
+    profile,
+  );
+  const midWith = withProfile.find((s) => s.candidate.spotify_id === 'niche_user_mid');
+  const bigWith = withProfile.find((s) => s.candidate.spotify_id === 'global_mainstream');
+  assertEquals(midWith?.popularity_bucket, 'deep');
+  assertEquals(bigWith?.popularity_bucket, 'known');
+});
+
+Deno.test('pool-relative missing profile falls back to global thresholds', () => {
+  const candidates = [
+    makeCandidate({
+      spotify_id: 'a',
+      primary_artist_name: 'A',
+      best_similarity_match: 0.6,
+      source_path_freq: 5,
+      lastfm_listeners: 5_000,
+    }),
+    makeCandidate({
+      spotify_id: 'b',
+      primary_artist_name: 'B',
+      best_similarity_match: 0.6,
+      source_path_freq: 5,
+      lastfm_listeners: 500_000,
+    }),
+  ];
+  const scored = scoreCandidates(candidates, undergroundTaste, () => 0.5, undefined, null);
+  const a = scored.find((s) => s.candidate.spotify_id === 'a');
+  const b = scored.find((s) => s.candidate.spotify_id === 'b');
+  assertEquals(a?.popularity_bucket, 'deep');
+  assertEquals(b?.popularity_bucket, 'known');
 });
 
 Deno.test('Track B deep discovery bonus requires strong similarity tier', () => {

@@ -1,15 +1,19 @@
 import * as Sharing from 'expo-sharing';
-import { useRef, useState } from 'react';
+import { type ReactNode, useRef, useState } from 'react';
 import { Alert, Image, Platform, Share, View } from 'react-native';
+import Animated, { useAnimatedScrollHandler, useSharedValue } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { captureRef } from 'react-native-view-shot';
 
 import { AlbumActions } from '@/components/album/AlbumActions';
 import { AlbumHero } from '@/components/album/AlbumHero';
+import { CoverBackdrop } from '@/components/album/CoverBackdrop';
 import { RatingEditor } from '@/components/album/RatingEditor';
 import { ShareCard } from '@/components/album/ShareCard';
 import { WhyThisAlbum } from '@/components/album/WhyThisAlbum';
 import { Text } from '@/components/ui/Text';
 import { useOpenAlbum } from '@/lib/hooks/useOpenAlbum';
+import { useReduceMotion } from '@/lib/hooks/useReduceMotion';
 import { useSpotifyFreeExplainer } from '@/lib/hooks/useSpotifyFreeExplainer';
 import type { AlbumDiscovery } from '@/lib/recommendation';
 import { spotifyAlbumUrl } from '@/lib/recommendation';
@@ -17,9 +21,22 @@ import { spotifyAlbumUrl } from '@/lib/recommendation';
 type Props = {
   album: AlbumDiscovery;
   isToday?: boolean;
+  /** Rendered above the hero (e.g. a back button on the detail screen). */
+  header?: ReactNode;
+  /** Rendered after the rating editor (e.g. the "past picks waiting" nudge). */
+  footer?: ReactNode;
 };
 
-export function AlbumDetail({ album, isToday }: Props) {
+export function AlbumDetail({ album, isToday, header, footer }: Props) {
+  const insets = useSafeAreaInsets();
+  const reduceMotion = useReduceMotion();
+  const scrollY = useSharedValue(0);
+  const onScroll = useAnimatedScrollHandler({
+    onScroll: (event) => {
+      scrollY.value = event.contentOffset.y;
+    },
+  });
+
   const shareCardRef = useRef<View>(null);
   const [sharing, setSharing] = useState(false);
   const openAlbum = useOpenAlbum(album);
@@ -88,23 +105,48 @@ export function AlbumDetail({ album, isToday }: Props) {
   };
 
   return (
-    <View className="gap-5">
-      {isToday && (
-        <Text variant="caption" className="uppercase">
-          Today's album
-        </Text>
-      )}
+    <View className="flex-1 bg-bg">
+      <CoverBackdrop
+        uri={album.album_cover_url}
+        scrollY={scrollY}
+        reduceMotion={reduceMotion}
+        topInset={insets.top}
+      />
 
-      <AlbumHero album={album} />
-      <WhyThisAlbum album={album} />
-      <AlbumActions opening={openAlbum.isPending} sharing={sharing} onOpen={open} onShare={share} />
-      {isFreeSpotify && (
-        <Text variant="caption" className="text-muted">
-          Heads up: Free Spotify may shuffle this album. Premium plays it in order.
-        </Text>
-      )}
-      <RatingEditor album={album} />
+      <Animated.ScrollView
+        onScroll={onScroll}
+        scrollEventThrottle={16}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{
+          paddingTop: insets.top + 12,
+          paddingHorizontal: 20,
+          paddingBottom: insets.bottom + 32,
+        }}
+      >
+        <View className="gap-5">
+          {header}
+          {isToday && <Text variant="label">Today's album</Text>}
 
+          <AlbumHero album={album} scrollY={scrollY} reduceMotion={reduceMotion} />
+          <WhyThisAlbum album={album} />
+          <AlbumActions
+            opening={openAlbum.isPending}
+            sharing={sharing}
+            onOpen={open}
+            onShare={share}
+          />
+          {isFreeSpotify && (
+            <Text variant="caption" className="text-muted">
+              Heads up: Free Spotify may shuffle this album. Premium plays it in order.
+            </Text>
+          )}
+          <RatingEditor album={album} />
+          {footer}
+        </View>
+      </Animated.ScrollView>
+
+      {/* Off-screen capture target for the share card. Stays on RN Image for
+          reliable view-shot capture (do not route through expo-image). */}
       <View pointerEvents="none" collapsable={false} className="absolute -left-[2000px] top-0">
         <View ref={shareCardRef} collapsable={false}>
           <ShareCard album={album} />

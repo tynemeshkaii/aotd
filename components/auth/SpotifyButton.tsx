@@ -15,7 +15,7 @@ export function SpotifyButton({ disabled, loading, onPress }: Props) {
     <Pressable
       accessibilityRole="button"
       accessibilityLabel="Continue with Spotify"
-      className={`h-14 w-full flex-row items-center justify-center rounded-full bg-accent px-6 active:opacity-80 ${
+      className={`h-14 w-full flex-row items-center justify-center rounded-full bg-spotify px-6 active:opacity-80 ${
         disabled ? 'opacity-60' : ''
       }`}
       disabled={disabled}

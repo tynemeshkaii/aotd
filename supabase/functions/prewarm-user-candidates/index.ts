@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { generateFamiliarCatalogCandidates } from '../_shared/artist-catalog.ts';
 import {
   countEligibleCachedCandidates,
   newestCandidateFetchedAt,
@@ -26,6 +27,8 @@ const DEFAULT_SPOTIFY_RESOLUTION_TOP_K = 20;
 const MAX_SPOTIFY_RESOLUTION_TOP_K = 40;
 const DEFAULT_MAX_TEXT_ARTIST_LOOKUPS = 40;
 const MAX_TEXT_ARTIST_LOOKUPS = 60;
+const DEFAULT_FAMILIAR_CATALOG_LIMIT = 8;
+const MAX_FAMILIAR_CATALOG_LIMIT = 15;
 const FRESHNESS_DAYS = 7;
 const MIN_FRESH_ELIGIBLE_CANDIDATES = 30;
 const MAX_RUNTIME_MS = 95_000;
@@ -37,6 +40,7 @@ type Payload = {
   source_artist_limit?: number;
   spotify_resolution_top_k?: number;
   max_text_artist_lookups?: number;
+  familiar_catalog_limit?: number;
   force?: boolean;
   diag?: boolean;
 };
@@ -86,6 +90,12 @@ Deno.serve(async (req) => {
     1,
     MAX_TEXT_ARTIST_LOOKUPS,
   );
+  const familiarCatalogLimit = clampInt(
+    payload.familiar_catalog_limit,
+    DEFAULT_FAMILIAR_CATALOG_LIMIT,
+    0,
+    MAX_FAMILIAR_CATALOG_LIMIT,
+  );
   const diag: DiagEvent[] = [];
 
   try {
@@ -109,6 +119,7 @@ Deno.serve(async (req) => {
             sourceArtistLimit,
             spotifyResolutionTopK,
             maxTextArtistLookups,
+            familiarCatalogLimit,
             diag: payload.diag ? diag : undefined,
           }),
         );
@@ -154,6 +165,7 @@ async function prewarmUser(
     sourceArtistLimit: number;
     spotifyResolutionTopK: number;
     maxTextArtistLookups: number;
+    familiarCatalogLimit: number;
     diag?: DiagEvent[];
   },
 ) {
@@ -243,11 +255,39 @@ async function prewarmUser(
 
   await writeCandidatesToCache(admin, candidates);
 
+  let familiarCandidates: AlbumCandidate[] = [];
+  if (opts.familiarCatalogLimit > 0) {
+    try {
+      familiarCandidates = await generateFamiliarCatalogCandidates(
+        admin,
+        token,
+        taste,
+        exclusions,
+        new Set(), // do not apply recent-artist filter during warm — cache for future days
+        {
+          maxSourceArtists: opts.familiarCatalogLimit,
+          maxAlbumsPerArtist: 3,
+          market: 'US',
+          userId,
+          requestContext: 'prewarm_user_candidates_familiar',
+        },
+      );
+      if (familiarCandidates.length > 0) {
+        await writeCandidatesToCache(admin, familiarCandidates, 'spotify');
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.warn(`[prewarm-user-candidates] user=${userId} familiar_catalog_failed error=${msg}`);
+      // familiar warm failure must not discard similar-artist candidates already saved
+    }
+  }
+
   return {
     user_id: userId,
     status: partialReason ? 'partial' : 'warmed',
     ...(partialReason ? { reason: partialReason } : {}),
     candidates: candidates.length,
+    familiar_candidates: familiarCandidates.length,
     took_ms: Date.now() - userStart,
   };
 }

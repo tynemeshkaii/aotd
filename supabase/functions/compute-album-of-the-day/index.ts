@@ -11,6 +11,7 @@ import {
 import { corsHeaders, jsonError, jsonResponse } from '../_shared/cors.ts';
 import { getCuratedFallback } from '../_shared/curated-fallback.ts';
 import { getExternalApiCircuitState } from '../_shared/external-api-breaker.ts';
+import { computePoolRelativeProfile } from '../_shared/popularity-bucket.ts';
 import {
   ALGORITHM_VERSION,
   buildSelectionReason,
@@ -273,6 +274,28 @@ Deno.serve(async (req) => {
       throw new Error('selection_empty');
     }
 
+    // Shadow mode: re-score the same pool with pool-relative popularity banding.
+    // Best-effort; must never fail or slow the real pick.
+    //
+    // Use the deterministic argmax (top-ranked) of each ranking, NOT a sampled
+    // selectFromTop pick. The served pick is sampled + MusicBrainz-validated, so
+    // comparing it against a sampled shadow would confound the banding effect with
+    // RNG noise and MB-asymmetry. Argmax-vs-argmax (`scored[0]` vs `shadowScored[0]`)
+    // isolates exactly what relative banding changed.
+    let shadowChosen: ScoredCandidate | null = null;
+    const liveTop = scored[0] ?? null;
+    try {
+      const profile = computePoolRelativeProfile(candidates.map((c) => c.lastfm_listeners));
+      if (profile) {
+        const shadowScored = scoreCandidates(candidates, taste, undefined, undefined, profile);
+        shadowChosen = shadowScored[0] ?? null;
+      }
+    } catch (shadowErr) {
+      const msg = shadowErr instanceof Error ? shadowErr.message : String(shadowErr);
+      console.warn(`[compute] shadow_scoring_failed user=${userId} error=${msg}`);
+      recordDiag('shadow_scoring_failed', { error: msg });
+    }
+
     // Validate the chosen candidate against MusicBrainz post-scoring. Up to 3 attempts
     // — each MB lookup costs ~1.1 s due to the upstream rate limit. If all attempts fail,
     // ship the best non-validated candidate rather than falling back unnecessarily.
@@ -360,6 +383,94 @@ Deno.serve(async (req) => {
     albumId = albumRow.id;
     selectionReason = buildSelectionReason(chosen, taste, spotifyRelatedAvailable);
     console.log(`[compute] primary_selected user=${userId} album=${chosen.candidate.spotify_id}`);
+
+    // Shadow write — best-effort, short timeout, no throw
+    // same_as_live compares argmax-to-argmax (global banding vs relative banding) to
+    // isolate the banding effect. live_album_id stays the actually-served pick.
+    if (shadowChosen && liveTop && !isFallback) {
+      try {
+        const shadowWriteStart = Date.now();
+        const sameAsLive = shadowChosen.candidate.spotify_id === liveTop.candidate.spotify_id;
+        let shadowAlbumId: string | null = sameAsLive ? albumId : null;
+
+        if (!sameAsLive) {
+          const { data: existing } = await withTimeout(
+            admin
+              .from('albums')
+              .select('id')
+              .eq('spotify_id', shadowChosen.candidate.spotify_id)
+              .maybeSingle(),
+            1_500,
+            'shadow_album_lookup_timeout',
+          );
+          if (existing?.id) {
+            shadowAlbumId = existing.id;
+          } else {
+            const { data: upserted, error: shadowUpsertErr } = await withTimeout(
+              admin
+                .from('albums')
+                .upsert(
+                  {
+                    spotify_id: shadowChosen.candidate.spotify_id,
+                    mb_release_group_id: shadowChosen.candidate.mb_release_group_id ?? null,
+                    title: shadowChosen.candidate.title,
+                    primary_artist_name: shadowChosen.candidate.primary_artist_name,
+                    primary_artist_spotify_id:
+                      shadowChosen.candidate.primary_artist_spotify_id ?? null,
+                    release_year: shadowChosen.candidate.release_year ?? null,
+                    cover_url: shadowChosen.candidate.cover_url ?? null,
+                    total_tracks: shadowChosen.candidate.total_tracks,
+                    duration_ms: shadowChosen.candidate.duration_ms ?? null,
+                    album_type: shadowChosen.candidate.album_type ?? null,
+                    lastfm_listeners: shadowChosen.candidate.lastfm_listeners ?? null,
+                    lastfm_playcount: shadowChosen.candidate.lastfm_playcount ?? null,
+                    metadata_updated_at: new Date().toISOString(),
+                  },
+                  { onConflict: 'spotify_id' },
+                )
+                .select('id')
+                .single(),
+              2_000,
+              'shadow_album_upsert_timeout',
+            );
+            if (!shadowUpsertErr && upserted?.id) {
+              shadowAlbumId = upserted.id;
+            }
+          }
+        }
+
+        if (shadowAlbumId) {
+          await withTimeout(
+            admin.from('aotd_shadow_picks').upsert(
+              {
+                user_id: userId,
+                date: targetDate,
+                live_album_id: albumId,
+                shadow_album_id: shadowAlbumId,
+                shadow_selection_reason: buildSelectionReason(
+                  shadowChosen,
+                  taste,
+                  spotifyRelatedAvailable,
+                ),
+                shadow_algorithm_version: 3,
+                same_as_live: sameAsLive,
+              },
+              { onConflict: 'user_id,date' },
+            ),
+            2_000,
+            'shadow_write_timeout',
+          );
+        }
+        console.log(
+          `[compute] shadow_written user=${userId} same_as_live=${sameAsLive} took=${Date.now() - shadowWriteStart}ms`,
+        );
+      } catch (shadowWriteErr) {
+        const msg =
+          shadowWriteErr instanceof Error ? shadowWriteErr.message : String(shadowWriteErr);
+        console.warn(`[compute] shadow_write_failed user=${userId} error=${msg}`);
+        recordDiag('shadow_write_failed', { error: msg });
+      }
+    }
   } catch (e) {
     const errMsg = e instanceof Error ? e.message : String(e);
     console.warn(`[compute] primary failed for ${userId}: ${errMsg}`);

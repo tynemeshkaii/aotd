@@ -40,7 +40,7 @@ export type SpotifyAudioFeatures = {
 
 export type SpotifyRelatedArtist = { id: string; name: string };
 
-async function spotifyFetch(url: string, token: string, retryCount = 0): Promise<Response> {
+export async function spotifyFetch(url: string, token: string, retryCount = 0): Promise<Response> {
   const res = await fetchWithTimeout(
     url,
     { headers: { Authorization: `Bearer ${token}` } },

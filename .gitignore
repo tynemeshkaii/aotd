@@ -43,3 +43,6 @@ supabase/.temp/
 # generated native folders
 /ios
 /android
+
+# Superpowers brainstorm scratch (visual mockups, session state)
+.superpowers/
