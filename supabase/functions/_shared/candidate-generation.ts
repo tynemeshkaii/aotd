@@ -269,7 +269,7 @@ export async function generateCandidates(
   });
 
   for (const text of rankedTextCandidates) {
-    assertWithinDeadline(o.deadlineAtMs);
+    assertWithinDeadlineWithPartial(o.deadlineAtMs, candidates, spotifyRelatedAvailable);
     if (candidates.length >= o.maxCandidates) break;
     let sp: Awaited<ReturnType<typeof resolveSpotifyAlbumCached>>;
     try {
@@ -414,6 +414,16 @@ export async function validateCandidateWithMb(
 
 function assertWithinDeadline(deadlineAtMs: number) {
   if (Date.now() > deadlineAtMs) throw new Error('compute_timeout');
+}
+
+function assertWithinDeadlineWithPartial(
+  deadlineAtMs: number,
+  candidates: AlbumCandidate[],
+  spotifyRelatedAvailable: boolean,
+) {
+  if (Date.now() > deadlineAtMs) {
+    throw new CandidateGenerationError('compute_timeout', candidates, spotifyRelatedAvailable);
+  }
 }
 
 function mergeSimilar(

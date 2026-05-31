@@ -190,11 +190,23 @@ async function prewarmUser(
     const newest = await newestCandidateFetchedAt(admin, keys);
     const retryKeys = await pendingRetrySourceKeys(admin, keys);
     const cachedEligibleCount = await countEligibleCachedCandidates(admin, keys);
+    const cachedSourceArtistCount = await countDistinctEligibleSourceArtists(admin, keys);
+    opts.diag?.push({
+      at_ms: Date.now() - userStart,
+      stage: 'prewarm_freshness_checked',
+      detail: {
+        newest_fetched_at: newest,
+        cached_eligible_candidates: cachedEligibleCount,
+        cached_source_artists: cachedSourceArtistCount,
+        pending_retry_source_artists: retryKeys.size,
+      },
+    });
     if (
       newest &&
       !isOlderThanDays(newest, FRESHNESS_DAYS) &&
       retryKeys.size === 0 &&
-      cachedEligibleCount >= MIN_FRESH_ELIGIBLE_CANDIDATES
+      cachedEligibleCount >= MIN_FRESH_ELIGIBLE_CANDIDATES &&
+      cachedSourceArtistCount >= MIN_FRESH_SOURCE_ARTISTS
     ) {
       return {
         user_id: userId,
@@ -202,6 +214,7 @@ async function prewarmUser(
         reason: 'fresh',
         newest_fetched_at: newest,
         cached_eligible_candidates: cachedEligibleCount,
+        cached_source_artists: cachedSourceArtistCount,
       };
     }
   }
@@ -232,6 +245,7 @@ async function prewarmUser(
       maxCandidates: 160,
       maxTextArtistLookups: opts.maxTextArtistLookups,
       spotifyResolutionTopK: opts.spotifyResolutionTopK,
+      maxResolvePerSourceArtist: MAX_RESOLVE_PER_SOURCE_ARTIST,
       maxMusicBrainzLookups: 80,
       maxConsecutiveLastfmFailures: 3,
       maxConsecutiveSpotifySearchFailures: 3,
