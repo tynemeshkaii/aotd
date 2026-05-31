@@ -1,6 +1,7 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { generateFamiliarCatalogCandidates } from '../_shared/artist-catalog.ts';
 import {
+  countDistinctEligibleSourceArtists,
   countEligibleCachedCandidates,
   newestCandidateFetchedAt,
   pendingRetrySourceKeys,
@@ -23,14 +24,20 @@ const DEFAULT_LIMIT_USERS = 3;
 const MAX_LIMIT_USERS = 10;
 const DEFAULT_SOURCE_ARTIST_LIMIT = 20;
 const MAX_SOURCE_ARTIST_LIMIT = 30;
-const DEFAULT_SPOTIFY_RESOLUTION_TOP_K = 20;
-const MAX_SPOTIFY_RESOLUTION_TOP_K = 40;
+const DEFAULT_SPOTIFY_RESOLUTION_TOP_K = 40;
+const MAX_SPOTIFY_RESOLUTION_TOP_K = 80;
 const DEFAULT_MAX_TEXT_ARTIST_LOOKUPS = 40;
 const MAX_TEXT_ARTIST_LOOKUPS = 60;
+// Fix 3 (Bug A) — cap resolved candidates per source artist so the pool spreads across
+// many library artists instead of concentrating on the few highest-frequency ones.
+const MAX_RESOLVE_PER_SOURCE_ARTIST = 4;
 const DEFAULT_FAMILIAR_CATALOG_LIMIT = 8;
 const MAX_FAMILIAR_CATALOG_LIMIT = 15;
 const FRESHNESS_DAYS = 7;
 const MIN_FRESH_ELIGIBLE_CANDIDATES = 30;
+// Fix 3 (Bug B) — a pool is only "fresh" if it also spans enough distinct source
+// artists. 39 eligible albums from 4 sources is stale-quality (repetitive picks).
+const MIN_FRESH_SOURCE_ARTISTS = 8;
 const MAX_RUNTIME_MS = 95_000;
 const USER_BUDGET_MS = 40_000;
 

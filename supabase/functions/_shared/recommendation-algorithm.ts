@@ -43,8 +43,32 @@ export interface ScoredCandidate {
     mainstream_penalty: number;
     known_artist_bonus: number;
     deep_discovery_bonus: number;
+    source_repeat_penalty: number;
   };
 }
+
+/**
+ * Fix 1 — source-artist diversity. A candidate's "dominant source artist" is the
+ * library artist (one of the user's top artists) whose similar-artist graph led to
+ * this candidate, with the highest library frequency. Mirrors `buildSelectionReason`'s
+ * `primary_source_artist`, so the penalty targets exactly the artist shown to the user
+ * as "Picked because you've been saving stuff by X".
+ */
+export function dominantSourceArtist(c: AlbumCandidate): string | null {
+  if (c.source_paths.length === 0) return null;
+  let best = c.source_paths[0];
+  for (const p of c.source_paths) {
+    if (p.source_artist.frequency > best.source_artist.frequency) best = p;
+  }
+  return best.source_artist.name;
+}
+
+/**
+ * Multiplier applied to a candidate whose dominant source artist already drove a
+ * recent pick. Strong (not a hard exclude) so a starved candidate pool degrades
+ * gracefully into "less repetition" instead of dropping to curated fallback.
+ */
+export const SOURCE_REPEAT_PENALTY = 0.15;
 
 export function scoreCandidates(
   candidates: AlbumCandidate[],
@@ -52,9 +76,13 @@ export function scoreCandidates(
   rng: () => number = Math.random,
   weights = DEFAULT_WEIGHTS,
   popularityProfile?: PopularityProfile | null,
+  recentSourceArtists: Set<string> = new Set(),
 ): ScoredCandidate[] {
   if (candidates.length === 0) return [];
   const userArtistFrequencies = buildUserArtistFrequencies(taste);
+  const normalizedRecentSources = new Set(
+    [...recentSourceArtists].map((name) => normalizeArtistName(name)),
+  );
 
   const popularityMetrics = candidates.map((c) => c.lastfm_listeners ?? c.lastfm_playcount ?? 0);
   const logPopularity = popularityMetrics.map((v) => Math.log(v + 1));
@@ -94,13 +122,24 @@ export function scoreCandidates(
       const tier = classifyCandidate(c, userArtistFrequencies, bucket);
       const adjusted = applyTrackBScore(baseScore, tier, bucket);
 
+      // Fix 1 — penalize candidates whose dominant source artist drove a recent pick.
+      const domSource = dominantSourceArtist(c);
+      const sourceRepeatPenalty =
+        domSource && normalizedRecentSources.has(normalizeArtistName(domSource))
+          ? SOURCE_REPEAT_PENALTY
+          : 1;
+      const finalScore = adjusted.score * sourceRepeatPenalty;
+
       return {
         candidate: c,
-        score: adjusted.score,
+        score: finalScore,
         breakdown: { similarity, source_freq, popularity, balance, temperature },
         candidate_tier: tier,
         popularity_bucket: bucket,
-        track_b_multipliers: adjusted.multipliers,
+        track_b_multipliers: {
+          ...adjusted.multipliers,
+          source_repeat_penalty: sourceRepeatPenalty,
+        },
       };
     })
     .sort((a, b) => b.score - a.score);
@@ -154,9 +193,10 @@ export function selectFromTop(
   scored: ScoredCandidate[],
   rng: () => number = Math.random,
   topN = 20,
+  maxPerSourceArtist?: number,
 ): ScoredCandidate | null {
   if (scored.length === 0) return null;
-  const top = scored.slice(0, Math.min(topN, scored.length));
+  const top = buildTopPool(scored, topN, maxPerSourceArtist);
   const total = top.reduce((s, x) => s + Math.max(0, x.score), 0);
   if (total <= 0) return top[Math.floor(rng() * top.length)];
   let r = rng() * total;
@@ -165,6 +205,42 @@ export function selectFromTop(
     if (r <= 0) return item;
   }
   return top[top.length - 1];
+}
+
+/**
+ * Fix 2 — build the top-N sampling pool while capping how many candidates a single
+ * dominant source artist may contribute. `scored` is already sorted desc, so we walk
+ * it greedily and skip a candidate once its source artist hit the cap. This breaks the
+ * "one source artist owns most of the pool" monoculture even when the candidate cache
+ * is skewed. When `maxPerSourceArtist` is unset, behaves like the old plain top-N slice.
+ */
+function buildTopPool(
+  scored: ScoredCandidate[],
+  topN: number,
+  maxPerSourceArtist?: number,
+): ScoredCandidate[] {
+  if (!maxPerSourceArtist || maxPerSourceArtist <= 0) {
+    return scored.slice(0, Math.min(topN, scored.length));
+  }
+  const counts = new Map<string, number>();
+  const capped: ScoredCandidate[] = [];
+  for (const item of scored) {
+    if (capped.length >= topN) break;
+    const dom = dominantSourceArtist(item.candidate);
+    const key = dom ? normalizeArtistName(dom) : '';
+    if (key) {
+      const n = counts.get(key) ?? 0;
+      if (n >= maxPerSourceArtist) continue;
+      counts.set(key, n + 1);
+    }
+    capped.push(item);
+  }
+  // Safety: if the cap starved the pool (e.g. every candidate shares one source
+  // artist), fall back to a plain top-N slice so we never return an empty pool.
+  if (capped.length === 0) {
+    return scored.slice(0, Math.min(topN, scored.length));
+  }
+  return capped;
 }
 
 export function buildSelectionReason(

@@ -36,6 +36,13 @@ interface GenerateOpts {
   maxCandidates?: number;
   maxTextArtistLookups?: number;
   spotifyResolutionTopK?: number;
+  /**
+   * Fix 3 (Bug A) — cap how many text candidates per dominant source artist enter the
+   * Spotify resolution slice. Without this, the frequency-biased text ranking concentrates
+   * the whole resolution budget on the few highest-frequency source artists, so the cache
+   * ends up holding candidates from only a handful of sources. 0 = no cap (legacy behavior).
+   */
+  maxResolvePerSourceArtist?: number;
   maxMusicBrainzLookups?: number;
   maxConsecutiveLastfmFailures?: number;
   maxConsecutiveSpotifySearchFailures?: number;
@@ -88,6 +95,7 @@ const DEFAULTS: Required<Omit<GenerateOpts, 'diag' | 'userId' | 'requestContext'
   maxCandidates: 250,
   maxTextArtistLookups: 40,
   spotifyResolutionTopK: 20,
+  maxResolvePerSourceArtist: 0,
   maxMusicBrainzLookups: 40,
   maxConsecutiveLastfmFailures: 2,
   maxConsecutiveSpotifySearchFailures: 2,
@@ -243,10 +251,15 @@ export async function generateCandidates(
     });
   }
 
-  const rankedTextCandidates = [...textCandidates.values()]
+  const scoredTextCandidates = [...textCandidates.values()]
     .map((candidate) => ({ ...candidate, text_score: scoreTextCandidate(candidate) }))
-    .sort((a, b) => b.text_score - a.text_score)
-    .slice(0, Math.min(o.spotifyResolutionTopK, o.maxCandidates));
+    .sort((a, b) => b.text_score - a.text_score);
+  const rankedTextCandidates = capByDominantSource(
+    scoredTextCandidates,
+    Math.min(o.spotifyResolutionTopK, o.maxCandidates),
+    o.maxResolvePerSourceArtist,
+    (c) => dominantSourcePathName(c.source_paths),
+  );
   console.log(
     `[candidates] text_pool_ready count=${textCandidates.size} resolving=${rankedTextCandidates.length} ${elapsedTag(startMs)}`,
   );
@@ -491,6 +504,59 @@ function scoreTextCandidate(candidate: TextCandidate): number {
   const sourceFrequency = Math.log1p(Math.max(candidate.source_artist_frequency, 0)) / Math.log(20);
   const playcount = Math.log1p(Math.max(candidate.lastfm_playcount ?? 0, 0)) / Math.log(5_000_000);
   return 0.55 * similarity + 0.3 * clamp01(sourceFrequency) + 0.15 * clamp01(playcount);
+}
+
+/**
+ * Fix 3 (Bug A) — the dominant source artist of a candidate is the user library artist
+ * (highest library frequency among its source paths) that led to it. Same notion as
+ * `buildSelectionReason`'s `primary_source_artist`.
+ */
+export function dominantSourcePathName(
+  paths: { source_artist: UserArtist; similar_match: number }[],
+): string | null {
+  if (paths.length === 0) return null;
+  let best = paths[0];
+  for (const p of paths) {
+    if (p.source_artist.frequency > best.source_artist.frequency) best = p;
+  }
+  return best.source_artist.name;
+}
+
+/**
+ * Fix 3 (Bug A) — take the top `topK` items while allowing at most `maxPerKey` items
+ * sharing the same key (dominant source artist). Diversity-first: a fair spread is
+ * selected first, then any leftover budget is backfilled from the overflow so the full
+ * resolution budget is still used. `maxPerKey <= 0` disables the cap (plain top-K slice).
+ */
+export function capByDominantSource<T>(
+  ranked: T[],
+  topK: number,
+  maxPerKey: number,
+  keyOf: (item: T) => string | null,
+): T[] {
+  if (!maxPerKey || maxPerKey <= 0) return ranked.slice(0, Math.max(0, topK));
+  const counts = new Map<string, number>();
+  const picked: T[] = [];
+  const overflow: T[] = [];
+  for (const item of ranked) {
+    if (picked.length >= topK) break;
+    const raw = keyOf(item);
+    const key = raw ? raw.toLowerCase().trim() : '';
+    if (key) {
+      const n = counts.get(key) ?? 0;
+      if (n >= maxPerKey) {
+        overflow.push(item);
+        continue;
+      }
+      counts.set(key, n + 1);
+    }
+    picked.push(item);
+  }
+  for (const item of overflow) {
+    if (picked.length >= topK) break;
+    picked.push(item);
+  }
+  return picked;
 }
 
 function clamp01(value: number) {

@@ -32,6 +32,9 @@ const FALLBACK_STAGE_TIMEOUT_MS = 12_000;
 const POST_SELECTION_DETAILS_TIMEOUT_MS = 4_000;
 const MIN_CACHE_POOL_SIZE = 30;
 const MIN_TOTAL_POOL_SIZE = 5;
+// Fix 1/2 — source-artist diversity controls.
+const RECENT_SOURCE_WINDOW = 7;
+const MAX_PER_SOURCE_ARTIST = 3;
 
 type FallbackReason =
   | 'no_candidates'
@@ -187,6 +190,28 @@ Deno.serve(async (req) => {
         .filter(isNonEmptyString),
     );
 
+    // Fix 1 — recent *source* artists (the library artist shown as
+    // "Picked because you've been saving stuff by X"). Distinct from recentArtists,
+    // which excludes recent *candidate* artists. Penalizes serving the same source
+    // artist's similarity graph day after day. Window: last RECENT_SOURCE_WINDOW picks.
+    const { data: recentSourcePicks } = await admin
+      .from('albums_of_the_day')
+      .select('selection_reason, date')
+      .eq('user_id', userId)
+      .order('date', { ascending: false })
+      .limit(RECENT_SOURCE_WINDOW);
+    const recentSourceArtists = new Set(
+      ((recentSourcePicks ?? []) as { selection_reason: Record<string, unknown> | null }[])
+        .map((r) => {
+          const reason = r.selection_reason as { primary_source_artist?: unknown } | null;
+          return typeof reason?.primary_source_artist === 'string'
+            ? reason.primary_source_artist
+            : null;
+        })
+        .filter(isNonEmptyString),
+    );
+    recordDiag('recent_source_artists', { count: recentSourceArtists.size });
+
     const exclusions = buildCandidateExclusions(libRows, historyRows);
     recordDiag('exclusions_built', {
       lib_rows: libRows.length,
@@ -267,8 +292,15 @@ Deno.serve(async (req) => {
       throw new Error('no_candidates');
     }
 
-    const scored = scoreCandidates(candidates, taste);
-    let chosen = selectFromTop(scored);
+    const scored = scoreCandidates(
+      candidates,
+      taste,
+      undefined,
+      undefined,
+      undefined,
+      recentSourceArtists,
+    );
+    let chosen = selectFromTop(scored, undefined, undefined, MAX_PER_SOURCE_ARTIST);
     if (!chosen) {
       fallbackReason = 'no_candidates';
       throw new Error('selection_empty');
@@ -287,7 +319,14 @@ Deno.serve(async (req) => {
     try {
       const profile = computePoolRelativeProfile(candidates.map((c) => c.lastfm_listeners));
       if (profile) {
-        const shadowScored = scoreCandidates(candidates, taste, undefined, undefined, profile);
+        const shadowScored = scoreCandidates(
+          candidates,
+          taste,
+          undefined,
+          undefined,
+          profile,
+          recentSourceArtists,
+        );
         shadowChosen = shadowScored[0] ?? null;
       }
     } catch (shadowErr) {

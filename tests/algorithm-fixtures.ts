@@ -124,6 +124,7 @@ export function makeCandidate(
     primary_artist_name: string;
     best_similarity_match: number;
     source_path_freq: number;
+    source_artist_name?: string;
   },
 ): AlbumCandidate {
   return {
@@ -132,11 +133,11 @@ export function makeCandidate(
     primary_artist_name: opts.primary_artist_name,
     total_tracks: opts.total_tracks ?? 10,
     best_similarity_match: opts.best_similarity_match,
-    source_paths: [
+    source_paths: opts.source_paths ?? [
       {
         source_artist: {
           spotify_id: 'src',
-          name: 'Source',
+          name: opts.source_artist_name ?? 'Source',
           frequency: opts.source_path_freq,
         },
         similar_match: opts.best_similarity_match,

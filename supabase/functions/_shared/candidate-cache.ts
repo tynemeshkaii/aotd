@@ -119,6 +119,29 @@ export async function countEligibleCachedCandidates(
   ).size;
 }
 
+/**
+ * Fix 3 (Bug B) — count the distinct source artists that currently have eligible cached
+ * candidates. The freshness gate needs this: a pool of 39 eligible albums from only 4
+ * source artists is NOT fresh — it produces repetitive picks. Diversity must be a
+ * freshness criterion, not just raw album count.
+ */
+export async function countDistinctEligibleSourceArtists(
+  admin: SupabaseClient,
+  sourceKeys: string[],
+): Promise<number> {
+  if (sourceKeys.length === 0) return 0;
+  const { data, error } = await admin
+    .from('recommendation_candidates')
+    .select('source_artist_key')
+    .in('source_artist_key', sourceKeys)
+    .eq('eligibility_status', 'eligible')
+    .not('spotify_album_id', 'is', null);
+  if (error) throw new Error(`candidate_cache_source_count_failed:${error.message}`);
+  return new Set(
+    ((data ?? []) as { source_artist_key: string }[]).map((row) => row.source_artist_key),
+  ).size;
+}
+
 export async function pendingRetrySourceKeys(
   admin: SupabaseClient,
   sourceKeys: string[],

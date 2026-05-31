@@ -1,6 +1,12 @@
 import { assert, assertEquals } from 'https://deno.land/std/testing/asserts.ts';
 import { makeCandidate, undergroundTaste } from '../../../tests/algorithm-fixtures.ts';
-import { applyTrackBScore, scoreCandidates, selectFromTop } from './recommendation-algorithm.ts';
+import {
+  applyTrackBScore,
+  dominantSourceArtist,
+  SOURCE_REPEAT_PENALTY,
+  scoreCandidates,
+  selectFromTop,
+} from './recommendation-algorithm.ts';
 import { makeRng } from './rng.ts';
 
 Deno.test('selectFromTop returns null on empty', () => {
@@ -162,6 +168,124 @@ Deno.test('pool-relative missing profile falls back to global thresholds', () =>
   const b = scored.find((s) => s.candidate.spotify_id === 'b');
   assertEquals(a?.popularity_bucket, 'deep');
   assertEquals(b?.popularity_bucket, 'known');
+});
+
+Deno.test('Fix 1 — dominantSourceArtist returns the highest-frequency source path', () => {
+  const c = makeCandidate({
+    spotify_id: 'multi',
+    primary_artist_name: 'Carrier',
+    best_similarity_match: 0.6,
+    source_path_freq: 3,
+    source_artist_name: 'Low Freq Source',
+  });
+  c.source_paths.push({
+    source_artist: { spotify_id: null, name: 'Blawan', frequency: 10 },
+    similar_match: 0.6,
+  });
+  assertEquals(dominantSourceArtist(c), 'Blawan');
+});
+
+Deno.test('Fix 1 — recent source artist gets penalized and loses to a fresh source', () => {
+  const fromRecentSource = makeCandidate({
+    spotify_id: 'from_blawan',
+    primary_artist_name: 'Carrier',
+    best_similarity_match: 0.9,
+    source_path_freq: 10,
+    source_artist_name: 'Blawan',
+  });
+  const fromFreshSource = makeCandidate({
+    spotify_id: 'from_maara',
+    primary_artist_name: 'Some Adjacent',
+    best_similarity_match: 0.6,
+    source_path_freq: 7,
+    source_artist_name: 'Maara',
+  });
+
+  // Without the guard, the Blawan candidate (higher similarity + freq) wins.
+  const baseline = scoreCandidates(
+    [fromRecentSource, fromFreshSource],
+    undergroundTaste,
+    () => 0.5,
+  );
+  assertEquals(baseline[0].candidate.spotify_id, 'from_blawan');
+
+  // With Blawan as a recent source artist, it is penalized and the fresh source wins.
+  const guarded = scoreCandidates(
+    [fromRecentSource, fromFreshSource],
+    undergroundTaste,
+    () => 0.5,
+    undefined,
+    undefined,
+    new Set(['Blawan']),
+  );
+  assertEquals(guarded[0].candidate.spotify_id, 'from_maara');
+  const penalized = guarded.find((s) => s.candidate.spotify_id === 'from_blawan');
+  assertEquals(penalized?.track_b_multipliers?.source_repeat_penalty, SOURCE_REPEAT_PENALTY);
+});
+
+Deno.test('Fix 1 — recent-source matching is case/whitespace insensitive', () => {
+  const c = makeCandidate({
+    spotify_id: 'x',
+    primary_artist_name: 'Y',
+    best_similarity_match: 0.6,
+    source_path_freq: 5,
+    source_artist_name: 'Nicolas Jaar',
+  });
+  const scored = scoreCandidates(
+    [c],
+    undergroundTaste,
+    () => 0.5,
+    undefined,
+    undefined,
+    new Set(['  nicolas   jaar  ']),
+  );
+  assertEquals(scored[0].track_b_multipliers?.source_repeat_penalty, SOURCE_REPEAT_PENALTY);
+});
+
+Deno.test('Fix 2 — selectFromTop caps how many picks one source artist contributes', () => {
+  const candidates = [
+    ...['b1', 'b2', 'b3', 'b4', 'b5'].map((id) =>
+      makeCandidate({
+        spotify_id: id,
+        primary_artist_name: `cand-${id}`,
+        best_similarity_match: 0.9,
+        source_path_freq: 10,
+        source_artist_name: 'Blawan',
+      }),
+    ),
+    makeCandidate({
+      spotify_id: 'm1',
+      primary_artist_name: 'cand-m1',
+      best_similarity_match: 0.5,
+      source_path_freq: 7,
+      source_artist_name: 'Maara',
+    }),
+  ];
+  const scored = scoreCandidates(candidates, undergroundTaste, () => 0.5);
+
+  const selectedIds = new Set<string>();
+  for (let seed = 0; seed < 200; seed++) {
+    const pick = selectFromTop(scored, makeRng(seed), 20, 2);
+    if (pick) selectedIds.add(pick.candidate.spotify_id);
+  }
+  const blawanSelected = [...selectedIds].filter((id) => id.startsWith('b'));
+  assert(blawanSelected.length <= 2, `expected <=2 Blawan, got ${blawanSelected.length}`);
+  assert(selectedIds.has('m1'), 'Maara candidate must be reachable in the capped pool');
+});
+
+Deno.test('Fix 2 — cap never starves the pool when all share one source artist', () => {
+  const candidates = ['a', 'b', 'c'].map((id) =>
+    makeCandidate({
+      spotify_id: id,
+      primary_artist_name: `cand-${id}`,
+      best_similarity_match: 0.7,
+      source_path_freq: 8,
+      source_artist_name: 'OnlySource',
+    }),
+  );
+  const scored = scoreCandidates(candidates, undergroundTaste, () => 0.5);
+  const pick = selectFromTop(scored, makeRng(1), 20, 2);
+  assert(pick !== null, 'must still return a pick even if every candidate shares a source');
 });
 
 Deno.test('Track B deep discovery bonus requires strong similarity tier', () => {
