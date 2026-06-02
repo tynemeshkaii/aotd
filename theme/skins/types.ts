@@ -24,8 +24,13 @@ export type SkinChrome = {
   tabBar: {
     backgroundColor: string;
     borderTopColor: string;
+    borderTopWidth: number;
     activeTintColor: string;
     inactiveTintColor: string;
+    activeIndicatorColor: string;
+    labelFontFamily: string;
+    labelFontSize: number;
+    iconSize: number;
   };
 };
 

@@ -7,18 +7,22 @@ import { AlbumDetail } from '@/components/album/AlbumDetail';
 import { Text } from '@/components/ui/Text';
 import { useDiscoveries } from '@/lib/hooks/useDiscoveries';
 import { useTodayPick } from '@/lib/hooks/useTodayPick';
+import { useTabContentBottomPadding } from '@/lib/navigationChrome';
 import { useSkinComponents } from '@/theme/skins/registry';
 
 function HomeStateShell({ children }: { children: ReactNode }) {
   const { chrome } = useSkinComponents();
   const insets = useSafeAreaInsets();
+  const bottomPadding = useTabContentBottomPadding();
 
   return (
     <View
       className="flex-1"
       style={{ paddingTop: insets.top, backgroundColor: chrome.rootBackground }}
     >
-      <View className="flex-1 px-5 pt-4 pb-24">{children}</View>
+      <View className="flex-1 px-5 pt-4" style={{ paddingBottom: bottomPadding }}>
+        {children}
+      </View>
     </View>
   );
 }

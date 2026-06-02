@@ -36,6 +36,7 @@ import { type LibrarySyncStatus, useLibrarySyncStatus } from '@/lib/hooks/useLib
 import { useReduceMotion } from '@/lib/hooks/useReduceMotion';
 import { useSaveRating } from '@/lib/hooks/useSaveRating';
 import { isStaleLibrarySync } from '@/lib/library';
+import { getPageBottomPadding, getTabContentBottomPadding } from '@/lib/navigationChrome';
 import {
   type AlbumDiscovery,
   formatAlbumDuration,
@@ -309,6 +310,9 @@ function EditorialAlbumDetailView(props: Parameters<SkinComponentSet['AlbumDetai
   const date = formatIssueDate(props.album.pick_date);
   const markers = albumCoverMarkers(props.album);
   const showStandaloneKicker = props.isToday || !props.header;
+  const bottomPadding = props.isToday
+    ? getTabContentBottomPadding(props.bottomInset)
+    : getPageBottomPadding(props.bottomInset);
   const onScroll = useAnimatedScrollHandler({
     onScroll: (event) => {
       props.scrollY.value = event.contentOffset.y;
@@ -334,7 +338,7 @@ function EditorialAlbumDetailView(props: Parameters<SkinComponentSet['AlbumDetai
         contentContainerStyle={{
           paddingTop: props.topInset + 12,
           paddingHorizontal: 20,
-          paddingBottom: props.bottomInset + 36,
+          paddingBottom: bottomPadding,
         }}
       >
         <View>
@@ -485,6 +489,7 @@ function ListSkeleton() {
 
 function EditorialDiscoveriesView(props: Parameters<SkinComponentSet['DiscoveriesView']>[0]) {
   const insets = useSafeAreaInsets();
+  const bottomPadding = getTabContentBottomPadding(insets.bottom);
 
   return (
     <View className="flex-1" style={{ backgroundColor: editorialColors.paper }}>
@@ -570,8 +575,8 @@ function EditorialDiscoveriesView(props: Parameters<SkinComponentSet['Discoverie
             className="mt-5 flex-1"
             contentContainerStyle={
               props.filtered.length
-                ? { paddingBottom: insets.bottom + 96 }
-                : { flex: 1, paddingBottom: insets.bottom + 96 }
+                ? { paddingBottom: bottomPadding }
+                : { flex: 1, paddingBottom: bottomPadding }
             }
             data={props.filtered}
             keyExtractor={(item) => item.aotd_id}
@@ -836,6 +841,7 @@ function EditorialArchiveLink({ onPress }: { onPress: () => void }) {
 
 function EditorialProfileView(props: Parameters<SkinComponentSet['ProfileView']>[0]) {
   const insets = useSafeAreaInsets();
+  const bottomPadding = getTabContentBottomPadding(insets.bottom, 32);
   const streak = props.overview?.streak ?? 0;
   const discovered = props.overview?.total_discovered ?? 0;
   const rated = props.overview?.listening.total_rated ?? 0;
@@ -853,7 +859,7 @@ function EditorialProfileView(props: Parameters<SkinComponentSet['ProfileView']>
       contentContainerStyle={{
         paddingHorizontal: 20,
         paddingTop: Math.max(16, insets.top + 8),
-        paddingBottom: Math.max(108, insets.bottom + 104),
+        paddingBottom: bottomPadding,
         gap: 24,
       }}
       style={{ backgroundColor: editorialColors.paper }}
@@ -1354,8 +1360,13 @@ export const editorialSkin: SkinComponentSet = {
     tabBar: {
       backgroundColor: editorialColors.paper,
       borderTopColor: editorialColors.ink,
+      borderTopWidth: 2,
       activeTintColor: editorialColors.ink,
       inactiveTintColor: editorialColors.muted,
+      activeIndicatorColor: editorialColors.accentStatic,
+      labelFontFamily: 'SpaceMono_700Bold',
+      labelFontSize: 11,
+      iconSize: 22,
     },
   },
   AlbumDetailView: EditorialAlbumDetailView,

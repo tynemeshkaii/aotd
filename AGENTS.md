@@ -75,7 +75,7 @@ Manual step reminders:
 - `components/skins/editorial/` - current presentation skin.
 - `theme/skins/` - skin registry, font loading, shared accent animation.
 - `components/ui/` - app primitives such as `Text`, `Button`, `Screen`, `Card`, `Badge`, states, progress, cover image.
-- `lib/` - Supabase client, auth, env, copy, formatting, query hooks, recommendation helpers, haptics/motion.
+- `lib/` - Supabase client, auth, env, copy, formatting, query hooks, recommendation helpers, haptics/motion, navigation chrome helpers.
 - `supabase/migrations/` - database schema, policies, grants, RPCs, operational views.
 - `supabase/functions/` - Deno Edge Functions and shared recommendation/API modules.
 - `types/database.ts` - generated from Supabase; do not hand-edit except as a temporary fallback if CLI/login is unavailable.
@@ -119,6 +119,15 @@ Important contracts:
 - `AlbumDetail` owns full-bleed/parallax success surfaces and is not wrapped in `Screen`.
 - Off-screen `ShareCard` must remain backed by React Native `Image`, not `expo-image`, so view-shot capture stays reliable.
 
+Bottom navigation contracts:
+
+- `app/(tabs)/_layout.tsx` owns the bottom tab chrome. Keep visible tab labels exactly Home / Discoveries / Profile.
+- The tab bar is safe-area-aware. Use `lib/navigationChrome.ts` helpers for tab bar height, top/bottom padding, item height, and tab-screen bottom content padding instead of hardcoded `pb-24`, `height: 76`, or hand-rolled `insets.bottom + ...` values.
+- `SkinChrome.tabBar` carries tab-bar visual tokens including background, border, active/inactive tint, active indicator, label font/size, and icon size. Keep new tab-bar visual changes flowing through these tokens where practical.
+- The editorial tab bar uses a printed-rule active indicator, static ink/paper styling, and best-effort haptics through `lib/haptics.ts`. Do not replace it with glass, pill/card, floating, or old dark SaaS navigation treatments.
+- `tabBarHideOnKeyboard` should stay enabled so rating notes and other text inputs are not crowded by the bottom navigation.
+- Today’s Home success surface is tab-screen content and should use tab-aware bottom spacing. Discovery detail is outside `(tabs)` and remains a focused detail route with its back button rather than a persistent bottom tab bar.
+
 Editorial design contracts:
 
 - Palette source of truth is `theme/colors.js` and `components/skins/shared/skinStyles.ts`.
@@ -128,7 +137,7 @@ Editorial design contracts:
 - Tags/chips are static ink/paper markers, not flowing accent.
 - Editorial Profile is a listening identity page first, not a settings ledger. Keep identity, Taste map, and Listening visually strongest; Production notes, Connections, and Log out should stay quieter.
 - Profile loading must be honest: do not render placeholder zero metrics while `overviewLoading` is true. Use skeleton/loading treatments and only show empty states after overview data has finished loading.
-- Profile uses safe-area-aware top and bottom padding via `useSafeAreaInsets()`, accounting for notched iPhones, the tab bar, and the home indicator.
+- Profile uses safe-area-aware top padding via `useSafeAreaInsets()` and tab-aware bottom padding via `lib/navigationChrome.ts`, accounting for notched iPhones, the tab bar, and the home indicator.
 - Profile Spotify Free/Premium markers use ink/paper editorial styling. Do not use Spotify green for Profile badges; reserve Spotify green for Spotify-branded sign-in/opening UI.
 - Taste map artist names should wrap cleanly, generally up to two lines, with stable rank/count alignment. Decade data should keep visible text counts and an editorial ruled/shelf feel, not a bare utility progress bar.
 - Listening summary should use the five emotional rating labels when summarizing mood. Avoid overemphasizing numeric averages.
