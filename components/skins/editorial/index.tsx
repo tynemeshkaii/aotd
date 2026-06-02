@@ -1245,7 +1245,7 @@ function EditorialInitialSyncingView(props: Parameters<SkinComponentSet['Initial
         {props.isFailed || props.isStale
           ? props.isStale
             ? 'You can safely restart the library import.'
-            : (props.errorMessage ?? 'Unknown error')
+            : 'Library sync could not finish. Try again from Profile.'
           : props.isStarting
             ? 'Connecting to Spotify...'
             : `Importing ${props.processed} of ${props.total || '?'}`}

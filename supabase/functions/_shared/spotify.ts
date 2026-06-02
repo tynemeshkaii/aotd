@@ -134,7 +134,7 @@ export async function getValidSpotifyToken(admin: SupabaseClient, userId: string
   const refreshed = await refreshSpotifyAccessToken(data.refresh_token);
   const newExpiresAt = new Date(Date.now() + refreshed.expires_in * 1000).toISOString();
 
-  await admin
+  const { error: updateError } = await admin
     .from('streaming_connections')
     .update({
       access_token: refreshed.access_token,
@@ -143,6 +143,10 @@ export async function getValidSpotifyToken(admin: SupabaseClient, userId: string
     })
     .eq('user_id', userId)
     .eq('provider', 'spotify');
+
+  if (updateError) {
+    throw new Error('db_update_failed');
+  }
 
   return refreshed.access_token;
 }

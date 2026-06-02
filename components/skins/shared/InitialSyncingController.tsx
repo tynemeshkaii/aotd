@@ -35,7 +35,6 @@ export function InitialSyncingController() {
       isFailed={isFailed}
       isStale={isStale}
       isStarting={isStarting}
-      errorMessage={status?.error_message}
       processed={processed}
       total={total}
       ratio={ratio}
