@@ -27,6 +27,8 @@ export type ProfileOverview = {
   };
 };
 
+export const PROFILE_OVERVIEW_KEY = (userId?: string) => ['profile-overview', userId];
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
@@ -92,9 +94,10 @@ function parseProfileOverview(value: unknown): ProfileOverview {
 export function useProfileOverview() {
   const { session } = useSession();
   const userId = session?.user.id;
+  const queryKey = PROFILE_OVERVIEW_KEY(userId);
 
   return useQuery({
-    queryKey: ['profile-overview', userId],
+    queryKey,
     enabled: !!userId,
     queryFn: async (): Promise<ProfileOverview> => {
       if (!userId) {

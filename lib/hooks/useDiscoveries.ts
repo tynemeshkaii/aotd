@@ -14,9 +14,9 @@ type UseDiscoveriesOptions = {
   offset?: number;
 };
 
-export const DISCOVERIES_KEY = (userId?: string, limit?: number, offset?: number) => [
-  'discoveries',
-  userId,
+export const DISCOVERIES_KEY = (userId?: string) => ['discoveries', userId];
+const DISCOVERIES_PAGE_KEY = (userId?: string, limit?: number, offset?: number) => [
+  ...DISCOVERIES_KEY(userId),
   limit,
   offset,
 ];
@@ -26,7 +26,10 @@ export function useDiscoveries(options: UseDiscoveriesOptions = {}) {
   const userId = session?.user.id;
   const limit = options.limit ?? DEFAULT_DISCOVERIES_LIMIT;
   const offset = options.offset ?? 0;
-  const queryKey = useMemo(() => DISCOVERIES_KEY(userId, limit, offset), [userId, limit, offset]);
+  const queryKey = useMemo(
+    () => DISCOVERIES_PAGE_KEY(userId, limit, offset),
+    [userId, limit, offset],
+  );
   const realtimeQueryKey = useMemo(() => DISCOVERIES_KEY(userId), [userId]);
 
   const query = useQuery({
