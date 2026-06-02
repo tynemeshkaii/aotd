@@ -1,3 +1,55 @@
+## Agent Operating Mode
+
+Optimize for high-signal work and low token spend.
+
+Before editing:
+
+- Read only the context needed for the task. Start with this file, the touched file(s), and the nearest related controller/hook/test; do not crawl the repo.
+- Prefer `rg`/`rtk grep` for discovery, then open only the matching files and narrow line ranges.
+- Check `rtk git status` before edits. If `AGENTS.md` or touched files are already dirty, preserve user changes and patch around them.
+- Do not read `.env*`, secrets, service-role keys, generated caches, or large build artifacts.
+- Do not use `README.md` for product truth unless this file and current code do not answer the question.
+
+Shell/token rules:
+
+- Use RTK for noisy commands:
+  - `rtk git status`
+  - `rtk git diff -- <path>`
+  - `rtk ls <path>`
+  - `rtk read <file>`
+  - `rtk grep "<pattern>" <path>`
+  - `rtk test "<command>"`
+  - `rtk tsc`
+  - `rtk lint`
+- Do not use raw `cat`, raw `git diff`, broad `ls -R`, or huge test logs unless exact full output is explicitly required.
+- Prefer targeted commands over broad ones: one file diff, one focused grep, one relevant test file, then expand only if evidence says to.
+- For long-running or verbose tools, use quiet flags where available and summarize failures by file/line/error instead of pasting logs.
+- If a command fails because RTK filtered too much for diagnosis, rerun the smallest possible raw command with exact scope.
+
+Implementation rules:
+
+- Make the smallest coherent change that satisfies the request and preserves the product contracts below.
+- Keep route files thin; put behavior in shared controllers/hooks and presentation in the editorial skin.
+- Avoid speculative refactors, new dependencies, broad formatting, or touching generated files unless the task requires it.
+- When changing database functions, policies, auth, sync, or recommendation code, inspect the relevant migration/function and grants before editing.
+- When changing UI, inspect the existing component/skin pattern first and reuse tokens/components before introducing literals.
+
+Validation rules:
+
+- Run only the validation that matches the touched surface:
+  - app/client TypeScript: `rtk tsc`
+  - lint/style: `rtk lint`
+  - focused npm test: `rtk test "<test command>"`
+  - Supabase/Deno logic: targeted Deno test for the touched function/module
+- Use `make check` only when the change has broad app impact or the user asks for full validation.
+- If validation cannot run because of missing credentials, linked Supabase state, Expo device constraints, or unavailable tooling, state that clearly and list the exact command the user should run.
+
+Final-response rules:
+
+- Lead with what changed and where; mention validation in one short line.
+- Do not paste large diffs or logs. Reference files and commands.
+- Include manual follow-up reminders only when they are actually required by the change, such as migration push, DB type regeneration, function deploy, dependency install, or Metro cache clear.
+
 # Album of the Day - Agent Guide
 
 Last updated from the working tree on 2026-06-02.
@@ -121,6 +173,7 @@ Important contracts:
 - Pull-to-refresh (`RefreshControl`, ink tint, `progressViewOffset` set to top inset) is wired on the Home today pick, the Discoveries archive list, and Profile. The album surface refresh is optional: `AlbumDetailView` only renders a `RefreshControl` when `onRefresh` is passed, so Home gets it (via `useTodayPick` refetch) but the discovery detail route does not. Profile's `onRefresh` fans out to all four profile queries; `refreshing` tracks the overview query.
 - The album detail `Animated.ScrollView` sets `automaticallyAdjustKeyboardInsets`, `keyboardDismissMode="interactive"`, and `keyboardShouldPersistTaps="handled"` so the private rating note is not hidden by the keyboard. Keep these when touching that scroll view.
 - The app boot/loading splashes in `app/_layout.tsx` (`BootSplash`) use the editorial `BrandMark` plus a mono caption on paper, not bare `Text`. Keep all three gate states (fonts, session, music profile) routed through `BootSplash`.
+- `RouterGuard` in `app/_layout.tsx` renders a `Stack` (not `Slot`) at the root with `headerShown: false`. The root `Stack` is required so cross-group pushes (e.g. tab → `app/discoveries/[aotdId].tsx`) actually stack; with `Slot` at root, `router.push` degraded to a no-stack navigation and `router.back()` from discovery detail fell through to a `replace('/(tabs)/discoveries')` that landed on the default first tab (Home) instead of Discoveries.
 
 Bottom navigation contracts:
 
