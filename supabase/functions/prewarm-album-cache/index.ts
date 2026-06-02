@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import { corsHeaders, jsonError, jsonResponse } from '../_shared/cors.ts';
 import { fetchGloballyTopAlbums } from '../_shared/lastfm.ts';
 import { getLastfmTopAlbumsCached } from '../_shared/lastfm-top-albums-cache.ts';
+import { logInfo, logWarn } from '../_shared/logger.ts';
 import { isRecommendationReleaseLike } from '../_shared/release-eligibility.ts';
 import { resolveSpotifyAlbumCached } from '../_shared/spotify-album-resolution-cache.ts';
 import { fetchAlbumDetails, getServiceSpotifyToken } from '../_shared/spotify-extended.ts';
@@ -36,13 +37,13 @@ Deno.serve(async (req) => {
   const startedAt = Date.now();
 
   try {
-    console.log(`[prewarm] start limit=${limit} artist_offset=${artistOffset} source=${source}`);
+    logInfo(`[prewarm] start limit=${limit} artist_offset=${artistOffset} source=${source}`);
     const spotifyToken = await withTimeout(
       getServiceSpotifyToken(),
       SPOTIFY_TOKEN_TIMEOUT_MS,
       'spotify_token_timeout',
     );
-    console.log('[prewarm] spotify_token_ok');
+    logInfo('[prewarm] spotify_token_ok');
     const topAlbums =
       source !== 'bootstrap' && Date.now() - startedAt < MAX_RUNTIME_MS
         ? await withTimeout(
@@ -54,11 +55,11 @@ Deno.serve(async (req) => {
             30_000,
             'lastfm_batch_timeout',
           ).catch((e) => {
-            console.warn(`[prewarm] lastfm_failed=${formatError(e)}`);
+            logWarn(`[prewarm] lastfm_failed=${formatError(e)}`);
             return [];
           })
         : [];
-    console.log(`[prewarm] lastfm_fetched=${topAlbums.length} artist_offset=${artistOffset}`);
+    logInfo(`[prewarm] lastfm_fetched=${topAlbums.length} artist_offset=${artistOffset}`);
     const seeds = mergeBootstrapSeeds(topAlbums, includeBootstrap);
 
     let inserted = 0;
@@ -71,27 +72,23 @@ Deno.serve(async (req) => {
     )) {
       if (Date.now() - startedAt > MAX_RUNTIME_MS) {
         stoppedReason = 'runtime_budget_exceeded';
-        console.warn(
-          `[prewarm] stopping_before_timeout attempted=${attempted} inserted=${inserted}`,
-        );
+        logWarn(`[prewarm] stopping_before_timeout attempted=${attempted} inserted=${inserted}`);
         break;
       }
       attempted += 1;
       await new Promise((r) => setTimeout(r, 100));
-      console.log(`[prewarm] attempt=${attempted} artist="${item.artist}" album="${item.name}"`);
+      logInfo(`[prewarm] attempt=${attempted}`);
       let sp: Awaited<ReturnType<typeof resolveSpotifyAlbumCached>>;
       try {
         sp = await resolveSpotifyAlbumCached(admin, spotifyToken, item.artist, item.name, {
           requestContext: 'prewarm_album_cache',
         });
       } catch (e) {
-        console.warn(
-          `[prewarm] spotify_search_failed artist="${item.artist}" album="${item.name}" error=${formatError(e)}`,
-        );
+        logWarn(`[prewarm] spotify_search_failed error=${formatError(e)}`);
         consecutiveSpotifySearchFailures += 1;
         if (consecutiveSpotifySearchFailures >= MAX_CONSECUTIVE_SPOTIFY_SEARCH_FAILURES) {
           stoppedReason = 'spotify_search_unavailable';
-          console.warn(
+          logWarn(
             `[prewarm] stopping_spotify_search_unavailable consecutive_failures=${consecutiveSpotifySearchFailures}`,
           );
           break;
@@ -100,9 +97,7 @@ Deno.serve(async (req) => {
       }
       if (!sp) {
         consecutiveSpotifySearchFailures = 0;
-        console.log(
-          `[prewarm] spotify_search_no_match artist="${item.artist}" album="${item.name}"`,
-        );
+        logInfo('[prewarm] spotify_search_no_match');
         continue;
       }
       consecutiveSpotifySearchFailures = 0;
@@ -115,9 +110,7 @@ Deno.serve(async (req) => {
           SPOTIFY_DETAILS_TIMEOUT_MS,
           'spotify_album_details_timeout',
         ).catch((e) => {
-          console.warn(
-            `[prewarm] spotify_details_failed spotify_id=${sp.id} artist="${item.artist}" album="${item.name}" error=${formatError(e)}`,
-          );
+          logWarn(`[prewarm] spotify_details_failed error=${formatError(e)}`);
           return null;
         });
         durationMs = details?.duration_ms ?? null;
@@ -128,9 +121,7 @@ Deno.serve(async (req) => {
         });
       }
       if (!releaseLike) {
-        console.log(
-          `[prewarm] release_not_eligible spotify_id=${sp.id} type=${sp.album_type} tracks=${sp.total_tracks}`,
-        );
+        logInfo(`[prewarm] release_not_eligible type=${sp.album_type} tracks=${sp.total_tracks}`);
         continue;
       }
 
@@ -148,19 +139,17 @@ Deno.serve(async (req) => {
         is_prewarm_seed: true,
         metadata_updated_at: new Date().toISOString(),
       }).catch((e) => {
-        console.warn(
-          `[prewarm] upsert_failed spotify_id=${sp.id} artist="${item.artist}" album="${item.name}" error=${formatError(e)}`,
-        );
+        logWarn(`[prewarm] upsert_failed error=${formatError(e)}`);
         return false;
       });
 
       if (upserted) inserted += 1;
       if (attempted % 25 === 0) {
-        console.log(`[prewarm] progress attempted=${attempted} inserted=${inserted}`);
+        logInfo(`[prewarm] progress attempted=${attempted} inserted=${inserted}`);
       }
     }
 
-    console.log(`[prewarm] done attempted=${attempted} inserted=${inserted}`);
+    logInfo(`[prewarm] done attempted=${attempted} inserted=${inserted}`);
     return jsonResponse({
       ok: true,
       fetched: topAlbums.length,

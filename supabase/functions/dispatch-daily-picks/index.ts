@@ -70,7 +70,7 @@ Deno.serve(async (req) => {
               status: res.status,
               error: errorBody || res.statusText,
             });
-            console.warn(`[dispatch] compute failed for ${u.user_id}: ${res.status} ${errorBody}`);
+            console.warn(`[dispatch] compute_failed status=${res.status} error=${errorBody}`);
           }
         } catch (e) {
           const message = e instanceof Error ? e.message : String(e);
@@ -79,7 +79,7 @@ Deno.serve(async (req) => {
             target_date: u.target_date,
             error: message,
           });
-          console.warn(`[dispatch] error for ${u.user_id}: ${message}`);
+          console.warn(`[dispatch] compute_error error=${message}`);
         }
       }),
     );

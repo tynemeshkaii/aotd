@@ -10,6 +10,15 @@ type UpsertBody = {
   scopes?: string[];
 };
 
+async function parseJsonBody(req: Request): Promise<UpsertBody> {
+  const text = await req.text();
+  if (!text.trim()) {
+    return {};
+  }
+
+  return JSON.parse(text) as UpsertBody;
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -45,7 +54,13 @@ Deno.serve(async (req) => {
       return jsonError(401, 'invalid_user');
     }
 
-    const body = (await req.json()) as UpsertBody;
+    let body: UpsertBody;
+    try {
+      body = await parseJsonBody(req);
+    } catch {
+      return jsonError(400, 'invalid_json_body');
+    }
+
     if (!body.provider_token) {
       return jsonError(400, 'missing_provider_token');
     }

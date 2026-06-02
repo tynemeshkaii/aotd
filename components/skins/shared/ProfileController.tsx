@@ -1,16 +1,14 @@
-import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { Alert } from 'react-native';
 
-import { useSession } from '@/components/auth/AuthProvider';
 import { signOut } from '@/lib/auth';
 import { copy } from '@/lib/copy';
-import { useLibraryStats } from '@/lib/hooks/useLibraryStats';
 import { useLibrarySyncStatus } from '@/lib/hooks/useLibrarySyncStatus';
+import { useProfileIdentity } from '@/lib/hooks/useProfileIdentity';
 import { useProfileOverview } from '@/lib/hooks/useProfileOverview';
+import { useSpotifyConnection } from '@/lib/hooks/useSpotifyConnection';
 import { useTriggerLibrarySync } from '@/lib/hooks/useTriggerLibrarySync';
 import { isActiveLibrarySync, isStaleLibrarySync } from '@/lib/library';
-import { supabase } from '@/lib/supabase';
 import { useAccentFlowFocus } from '@/theme/skins/AccentFlowProvider';
 import { useSkinComponents } from '@/theme/skins/registry';
 
@@ -24,43 +22,14 @@ function productLabel(product?: string | null): string | null {
 export function ProfileController() {
   const components = useSkinComponents();
   useAccentFlowFocus();
-  const { session } = useSession();
-  const userId = session?.user.id;
 
   const {
     data: profile,
     isLoading: profileLoading,
     refetch: refetchProfile,
-  } = useQuery({
-    queryKey: ['profile', userId],
-    enabled: !!userId,
-    queryFn: async () => {
-      if (!userId) throw new Error('missing_user_id');
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('display_name, avatar_url')
-        .eq('id', userId)
-        .single();
-      if (error) throw error;
-      return data;
-    },
-  });
+  } = useProfileIdentity();
 
-  const { data: connection, refetch: refetchConnection } = useQuery({
-    queryKey: ['streaming-connection', userId],
-    enabled: !!userId,
-    queryFn: async () => {
-      if (!userId) throw new Error('missing_user_id');
-      const { data, error } = await supabase
-        .from('streaming_connections_safe')
-        .select('provider, connected_at, spotify_product')
-        .eq('user_id', userId)
-        .eq('provider', 'spotify')
-        .maybeSingle();
-      if (error) throw error;
-      return data;
-    },
-  });
+  const { data: connection, refetch: refetchConnection } = useSpotifyConnection();
 
   const {
     data: overview,
@@ -68,11 +37,6 @@ export function ProfileController() {
     isRefetching: overviewRefetching,
     refetch: refetchOverview,
   } = useProfileOverview();
-  const {
-    data: libraryStats,
-    isLoading: libraryStatsLoading,
-    refetch: refetchLibraryStats,
-  } = useLibraryStats();
   const triggerSync = useTriggerLibrarySync();
   const { status: syncStatus } = useLibrarySyncStatus();
   const isSyncing =
@@ -82,7 +46,6 @@ export function ProfileController() {
     void refetchProfile();
     void refetchConnection();
     void refetchOverview();
-    void refetchLibraryStats();
   };
 
   const handleSyncNow = () => {
@@ -116,8 +79,11 @@ export function ProfileController() {
       connection={connection}
       overview={overview}
       overviewLoading={overviewLoading}
-      libraryStats={libraryStats}
-      libraryStatsLoading={libraryStatsLoading}
+      libraryStats={{
+        albumsTracked: overview?.library_stats.albums_tracked ?? null,
+        lastSyncedAt: overview?.library_stats.last_synced_at ?? null,
+      }}
+      libraryStatsLoading={overviewLoading}
       syncStatus={syncStatus}
       isSyncing={isSyncing}
       onSyncNow={handleSyncNow}

@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
+import { PROFILE_OVERVIEW_KEY } from '@/lib/hooks/useProfileOverview';
 import { triggerLibrarySync } from '@/lib/library';
 
 export function useTriggerLibrarySync() {
@@ -9,6 +10,7 @@ export function useTriggerLibrarySync() {
     onSettled: () => {
       qc.invalidateQueries({ queryKey: ['library-sync-status'] });
       qc.invalidateQueries({ queryKey: ['library-stats'] });
+      qc.invalidateQueries({ queryKey: PROFILE_OVERVIEW_KEY() });
     },
   });
 }

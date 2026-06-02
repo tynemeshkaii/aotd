@@ -152,7 +152,9 @@ export async function fetchGloballyTopAlbums(
         out.push({ name: al.name, artist: a.name, playcount: al.playcount });
         if (out.length >= limit) break;
       }
-    } catch {}
+    } catch {
+      // Optional chart source: skip this artist if Last.fm cannot return top albums.
+    }
   }
   return out;
 }

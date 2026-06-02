@@ -11,6 +11,7 @@ import {
 import { corsHeaders, jsonError, jsonResponse } from '../_shared/cors.ts';
 import { getCuratedFallback } from '../_shared/curated-fallback.ts';
 import { getExternalApiCircuitState } from '../_shared/external-api-breaker.ts';
+import { logInfo, logWarn } from '../_shared/logger.ts';
 import { getArtistCountryCached } from '../_shared/musicbrainz.ts';
 import { computePoolRelativeProfile } from '../_shared/popularity-bucket.ts';
 import {
@@ -143,7 +144,7 @@ Deno.serve(async (req) => {
 
   try {
     const primaryDeadlineAtMs = Date.now() + PRIMARY_COMPUTE_BUDGET_MS;
-    console.log(`[compute] primary_start user=${userId} date=${targetDate}`);
+    logInfo(`[compute] primary_start date=${targetDate}`);
     recordDiag('primary_start');
     if (payload.force_fallback) {
       fallbackReason = 'compute_timeout';
@@ -154,7 +155,7 @@ Deno.serve(async (req) => {
       SPOTIFY_TOKEN_STAGE_TIMEOUT_MS,
       'spotify_token_timeout',
     );
-    console.log(`[compute] spotify_token_ok user=${userId}`);
+    logInfo('[compute] spotify_token_ok');
     recordDiag('spotify_token_ok');
     taste = await withTimeout(
       extractTasteSignal(admin, userId, spotifyToken, {
@@ -163,13 +164,12 @@ Deno.serve(async (req) => {
       TASTE_STAGE_TIMEOUT_MS,
       'taste_signal_timeout',
     );
-    console.log(
-      `[compute] taste_ready user=${userId} library_size=${taste.librarySize} top_artists=${taste.topArtists.length}`,
+    logInfo(
+      `[compute] taste_ready library_size=${taste.librarySize} top_artists=${taste.topArtists.length}`,
     );
     recordDiag('taste_ready', {
       library_size: taste.librarySize,
       top_artists: taste.topArtists.length,
-      source_artists: taste.topArtists.slice(0, 8).map((artist) => artist.name),
     });
     if (taste.topArtists.length < 5) {
       fallbackReason = 'library_too_small';
@@ -187,7 +187,7 @@ Deno.serve(async (req) => {
       .from('recommendation_history')
       .select('album:albums(spotify_id, mb_release_group_id, primary_artist_name, title)')
       .eq('user_id', userId);
-    const historyRows = (hist ?? []) as unknown as HistoryRow[];
+    const historyRows = (hist ?? []) as HistoryRow[];
 
     const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
     const { data: recentPicks } = await admin
@@ -196,7 +196,7 @@ Deno.serve(async (req) => {
       .eq('user_id', userId)
       .gte('date', since);
     const recentArtists = new Set(
-      ((recentPicks ?? []) as unknown as RecentPickRow[])
+      ((recentPicks ?? []) as RecentPickRow[])
         .map((r) => r.album?.primary_artist_name)
         .filter(isNonEmptyString),
     );
@@ -243,7 +243,7 @@ Deno.serve(async (req) => {
       'candidate_cache_timeout',
     );
     let spotifyRelatedAvailable = false;
-    console.log(`[compute] cache_candidates_ready user=${userId} count=${candidates.length}`);
+    logInfo(`[compute] cache_candidates_ready count=${candidates.length}`);
     recordDiag('cache_candidates_ready', { count: candidates.length });
 
     if (candidates.length < MIN_CACHE_POOL_SIZE && Date.now() < primaryDeadlineAtMs - 1_000) {
@@ -284,15 +284,15 @@ Deno.serve(async (req) => {
         try {
           await writeCandidatesToCache(admin, liveRecovery.candidates);
         } catch (cacheWriteError) {
-          console.warn(
-            `[compute] candidate_cache_write_failed user=${userId} error=${
+          logWarn(
+            `[compute] candidate_cache_write_failed error=${
               cacheWriteError instanceof Error ? cacheWriteError.message : String(cacheWriteError)
             }`,
           );
         }
         candidates = mergeCandidates(candidates, liveRecovery.candidates);
-        console.log(
-          `[compute] live_recovery_done user=${userId} live=${liveRecovery.candidates.length} total=${candidates.length}`,
+        logInfo(
+          `[compute] live_recovery_done live=${liveRecovery.candidates.length} total=${candidates.length}`,
         );
         recordDiag('live_recovery_done', {
           live_count: liveRecovery.candidates.length,
@@ -301,7 +301,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    console.log(`[compute] candidates_ready user=${userId} count=${candidates.length}`);
+    logInfo(`[compute] candidates_ready count=${candidates.length}`);
     recordDiag('candidates_ready', { count: candidates.length });
 
     if (candidates.length < MIN_TOTAL_POOL_SIZE) {
@@ -348,7 +348,7 @@ Deno.serve(async (req) => {
       }
     } catch (shadowErr) {
       const msg = shadowErr instanceof Error ? shadowErr.message : String(shadowErr);
-      console.warn(`[compute] shadow_scoring_failed user=${userId} error=${msg}`);
+      logWarn(`[compute] shadow_scoring_failed error=${msg}`);
       recordDiag('shadow_scoring_failed', { error: msg });
     }
 
@@ -382,17 +382,15 @@ Deno.serve(async (req) => {
             }
           } catch (countryError) {
             const msg = countryError instanceof Error ? countryError.message : String(countryError);
-            console.warn(
-              `[compute] artist_country_failed user=${userId} album=${chosen.candidate.spotify_id} error=${msg}`,
-            );
+            logWarn(`[compute] artist_country_failed error=${msg}`);
             recordDiag('artist_country_failed', { error: msg });
           }
         }
         break;
       }
       mbAttempts += 1;
-      console.log(
-        `[compute] mb_rejected user=${userId} album=${chosen.candidate.spotify_id} reason=${
+      logInfo(
+        `[compute] mb_rejected reason=${
           validation.rg ? 'not_album_like_or_dup' : 'unknown'
         } attempt=${mbAttempts}`,
       );
@@ -420,9 +418,7 @@ Deno.serve(async (req) => {
         }
       } catch (detailsError) {
         const msg = detailsError instanceof Error ? detailsError.message : String(detailsError);
-        console.warn(
-          `[compute] post_selection_album_details_failed user=${userId} album=${chosen.candidate.spotify_id} error=${msg}`,
-        );
+        logWarn(`[compute] post_selection_album_details_failed error=${msg}`);
         recordDiag('post_selection_details_failed', { error: msg });
       }
     }
@@ -462,7 +458,7 @@ Deno.serve(async (req) => {
 
     albumId = albumRow.id;
     selectionReason = buildSelectionReason(chosen, taste, spotifyRelatedAvailable);
-    console.log(`[compute] primary_selected user=${userId} album=${chosen.candidate.spotify_id}`);
+    logInfo('[compute] primary_selected');
 
     // Shadow write — best-effort, short timeout, no throw
     // same_as_live compares argmax-to-argmax (global banding vs relative banding) to
@@ -541,21 +537,21 @@ Deno.serve(async (req) => {
             'shadow_write_timeout',
           );
         }
-        console.log(
-          `[compute] shadow_written user=${userId} same_as_live=${sameAsLive} took=${
+        logInfo(
+          `[compute] shadow_written same_as_live=${sameAsLive} took=${
             Date.now() - shadowWriteStart
           }ms`,
         );
       } catch (shadowWriteErr) {
         const msg =
           shadowWriteErr instanceof Error ? shadowWriteErr.message : String(shadowWriteErr);
-        console.warn(`[compute] shadow_write_failed user=${userId} error=${msg}`);
+        logWarn(`[compute] shadow_write_failed error=${msg}`);
         recordDiag('shadow_write_failed', { error: msg });
       }
     }
   } catch (e) {
     const errMsg = e instanceof Error ? e.message : String(e);
-    console.warn(`[compute] primary failed for ${userId}: ${errMsg}`);
+    logWarn(`[compute] primary_failed error=${errMsg}`);
     recordDiag('primary_failed', { error: errMsg });
     isFallback = true;
     if (!fallbackReason) {
@@ -578,7 +574,7 @@ Deno.serve(async (req) => {
     if (!fb) {
       return jsonError(500, 'no_album_available', String(e));
     }
-    console.log(`[compute] fallback_selected user=${userId} reason=${fallbackReason}`);
+    logInfo(`[compute] fallback_selected reason=${fallbackReason}`);
     albumId = fb.album_id;
     const fallbackScored: ScoredCandidate = {
       candidate: {

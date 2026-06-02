@@ -39,10 +39,6 @@ function getUrlParam(url: string | null, key: string) {
   return new URLSearchParams(parsedUrl.hash.replace(/^#/, '')).get(key);
 }
 
-function getParamKeys(params: CallbackParams) {
-  return Object.keys(params).sort();
-}
-
 function hasOAuthParams(url: string | null, params: CallbackParams) {
   return OAUTH_PARAM_KEYS.some((key) => getUrlParam(url, key) || getParam(params, key));
 }
@@ -87,11 +83,6 @@ export default function AuthCallbackScreen() {
     let mounted = true;
 
     async function finish() {
-      if (__DEV__) {
-        console.info('[auth] Callback linkingUrl present:', !!linkingUrl);
-        console.info('[auth] Callback param keys:', getParamKeys(params));
-      }
-
       if (!hasOAuthParams(linkingUrl, params)) {
         setStatus('Waiting for Spotify callback...');
         return;

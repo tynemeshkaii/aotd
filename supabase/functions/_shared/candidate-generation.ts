@@ -4,6 +4,7 @@ import { ExternalApiCircuitOpenError } from './external-api-breaker.ts';
 import { getLastfmSimilarCached, getSpotifyRelatedCached } from './external-cache.ts';
 import { fetchAlbumInfo } from './lastfm.ts';
 import { getLastfmTopAlbumsCached } from './lastfm-top-albums-cache.ts';
+import { logInfo, logWarn } from './logger.ts';
 import { getReleaseGroupCached, isAlbumLike, type MbReleaseGroup } from './musicbrainz.ts';
 import { isRecommendationReleaseLike } from './release-eligibility.ts';
 import { resolveSpotifyAlbumCached } from './spotify-album-resolution-cache.ts';
@@ -133,7 +134,7 @@ export async function generateCandidates(
   const o = { ...DEFAULTS, ...rest };
   const sourceArtists = taste.topArtists.slice(0, o.maxSourceArtists);
   const startMs = Date.now();
-  console.log(
+  logInfo(
     `[candidates] start sources=${sourceArtists.length} maxCandidates=${o.maxCandidates} skipMb=${o.skipMusicBrainz} skipInfo=${o.skipAlbumInfoLookup}`,
   );
   pushDiag(diag, startMs, 'candidates_start', {
@@ -157,13 +158,13 @@ export async function generateCandidates(
     const stageStart = Date.now();
     const lfmSim = await getLastfmSimilarCached(admin, src.name, src.spotify_id).catch((e) => {
       const msg = e instanceof Error ? e.message : String(e);
-      console.warn(`[candidates] lastfm_similar_failed artist="${src.name}" error=${msg}`);
+      logWarn(`[candidates] lastfm_similar_failed source_idx=${srcIdx} error=${msg}`);
       return null;
     });
     if (!lfmSim) {
       consecutiveLastfmFailures += 1;
-      console.warn(
-        `[candidates] source[${srcIdx}] "${src.name}" lfm_similar=null failures=${consecutiveLastfmFailures} ${elapsedTag(startMs)}`,
+      logWarn(
+        `[candidates] source[${srcIdx}] lfm_similar=null failures=${consecutiveLastfmFailures} ${elapsedTag(startMs)}`,
       );
       if (consecutiveLastfmFailures >= o.maxConsecutiveLastfmFailures) {
         throw new Error('lastfm_unavailable');
@@ -183,19 +184,18 @@ export async function generateCandidates(
         }
       }
     }
-    console.log(
-      `[candidates] source[${srcIdx}] "${src.name}" similars=${lfmSim.length} pool=${similarMap.size} took=${Date.now() - stageStart}ms ${elapsedTag(startMs)}`,
+    logInfo(
+      `[candidates] source[${srcIdx}] similars=${lfmSim.length} pool=${similarMap.size} took=${Date.now() - stageStart}ms ${elapsedTag(startMs)}`,
     );
     pushDiag(diag, startMs, 'source_done', {
       idx: srcIdx,
-      artist: src.name,
       similars: lfmSim.length,
       pool: similarMap.size,
       took_ms: Date.now() - stageStart,
     });
   }
 
-  console.log(`[candidates] similar_pool_ready size=${similarMap.size} ${elapsedTag(startMs)}`);
+  logInfo(`[candidates] similar_pool_ready size=${similarMap.size} ${elapsedTag(startMs)}`);
   pushDiag(diag, startMs, 'similar_pool_ready', { size: similarMap.size });
 
   const candidates: AlbumCandidate[] = [];
@@ -216,7 +216,7 @@ export async function generateCandidates(
     assertWithinDeadline(o.deadlineAtMs);
     const simStageStart = Date.now();
     const currentSimIdx = simIdx++;
-    pushDiag(diag, startMs, 'sim_start', { idx: currentSimIdx, artist: sim.name });
+    pushDiag(diag, startMs, 'sim_start', { idx: currentSimIdx });
     const simNameLower = sim.name.toLowerCase().trim();
     if ([...recentArtistsToAvoid].some((a) => a.toLowerCase().trim() === simNameLower)) continue;
 
@@ -225,7 +225,7 @@ export async function generateCandidates(
       topAlbums = await getLastfmTopAlbumsCached(admin, sim.name, o.maxAlbumsPerSimilar);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      console.warn(`[candidates] lastfm_top_albums_failed artist="${sim.name}" error=${msg}`);
+      logWarn(`[candidates] lastfm_top_albums_failed sim_idx=${currentSimIdx} error=${msg}`);
       consecutiveLastfmFailures += 1;
       if (consecutiveLastfmFailures >= o.maxConsecutiveLastfmFailures) {
         throw new Error('lastfm_unavailable');
@@ -239,12 +239,11 @@ export async function generateCandidates(
       if (exclusions.normalizedAlbumKeys.has(normalizeAlbumKey(sim.name, ta.name))) continue;
       mergeTextCandidate(textCandidates, sim, ta);
     }
-    console.log(
-      `[candidates] sim[${currentSimIdx}] "${sim.name}" top=${topAlbums.length} text_candidates=${textCandidates.size} took=${Date.now() - simStageStart}ms ${elapsedTag(startMs)}`,
+    logInfo(
+      `[candidates] sim[${currentSimIdx}] top=${topAlbums.length} text_candidates=${textCandidates.size} took=${Date.now() - simStageStart}ms ${elapsedTag(startMs)}`,
     );
     pushDiag(diag, startMs, 'sim_done', {
       idx: currentSimIdx,
-      artist: sim.name,
       top: topAlbums.length,
       text_candidates: textCandidates.size,
       took_ms: Date.now() - simStageStart,
@@ -260,7 +259,7 @@ export async function generateCandidates(
     o.maxResolvePerSourceArtist,
     (c) => dominantSourcePathName(c.source_paths),
   );
-  console.log(
+  logInfo(
     `[candidates] text_pool_ready count=${textCandidates.size} resolving=${rankedTextCandidates.length} ${elapsedTag(startMs)}`,
   );
   pushDiag(diag, startMs, 'text_pool_ready', {
@@ -286,9 +285,7 @@ export async function generateCandidates(
       );
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      console.warn(
-        `[candidates] spotify_search_failed artist="${text.candidate_artist_name}" album="${text.candidate_album_name}" error=${msg}`,
-      );
+      logWarn(`[candidates] spotify_search_failed error=${msg}`);
       consecutiveSpotifySearchFailures += 1;
       const isCircuitOpen =
         e instanceof ExternalApiCircuitOpenError || msg.includes('circuit_open');
@@ -306,13 +303,8 @@ export async function generateCandidates(
     }
     if (!sp) {
       consecutiveSpotifySearchFailures = 0;
-      console.log(
-        `[candidates] spotify_search_no_match artist="${text.candidate_artist_name}" album="${text.candidate_album_name}" ${elapsedTag(startMs)}`,
-      );
-      pushDiag(diag, startMs, 'spotify_search_no_match', {
-        artist: text.candidate_artist_name,
-        album: text.candidate_album_name,
-      });
+      logInfo(`[candidates] spotify_search_no_match ${elapsedTag(startMs)}`);
+      pushDiag(diag, startMs, 'spotify_search_no_match');
       continue;
     }
     consecutiveSpotifySearchFailures = 0;
@@ -359,7 +351,7 @@ export async function generateCandidates(
     });
   }
 
-  console.log(`[candidates] gather_done count=${candidates.length} ${elapsedTag(startMs)}`);
+  logInfo(`[candidates] gather_done count=${candidates.length} ${elapsedTag(startMs)}`);
   pushDiag(diag, startMs, 'gather_done', { count: candidates.length });
 
   if (o.skipMusicBrainz) {
@@ -376,8 +368,8 @@ export async function generateCandidates(
         ? await getReleaseGroupCached(admin, c.primary_artist_name, c.title)
         : null;
     if (idx < o.maxMusicBrainzLookups) {
-      console.log(
-        `[candidates] mb[${idx}] "${c.primary_artist_name} - ${c.title}" ok=${rg ? 'yes' : 'null'} took=${Date.now() - mbStart}ms ${elapsedTag(startMs)}`,
+      logInfo(
+        `[candidates] mb[${idx}] ok=${rg ? 'yes' : 'null'} took=${Date.now() - mbStart}ms ${elapsedTag(startMs)}`,
       );
     }
     if (rg && !isAlbumLike(rg)) continue;
@@ -388,7 +380,7 @@ export async function generateCandidates(
     }
     filtered.push(c);
   }
-  console.log(`[candidates] mb_done filtered=${filtered.length} ${elapsedTag(startMs)}`);
+  logInfo(`[candidates] mb_done filtered=${filtered.length} ${elapsedTag(startMs)}`);
 
   return { candidates: filtered, spotifyRelatedAvailable };
 }

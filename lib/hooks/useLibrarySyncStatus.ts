@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useId, useMemo } from 'react';
 
 import { useSession } from '@/components/auth/AuthProvider';
+import { PROFILE_OVERVIEW_KEY } from '@/lib/hooks/useProfileOverview';
 import { supabase } from '@/lib/supabase';
 import type { Database } from '@/types/database';
 
@@ -57,6 +58,7 @@ export function useLibrarySyncStatus(): { status: LibrarySyncStatus | null; load
           if (next) {
             qc.setQueryData(queryKey, next);
             qc.invalidateQueries({ queryKey: ['library-stats', userId] });
+            qc.invalidateQueries({ queryKey: PROFILE_OVERVIEW_KEY(userId) });
           }
         },
       )

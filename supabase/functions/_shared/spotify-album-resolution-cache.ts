@@ -7,6 +7,7 @@ import {
 } from './external-api-breaker.ts';
 import { recordExternalApiCall } from './external-api-log.ts';
 import { reserveExternalApiSlot } from './external-api-rate-limit.ts';
+import { logInfo } from './logger.ts';
 import {
   isStrongAlbumSearchMatch,
   type SpotifyAlbumSearchItem,
@@ -116,9 +117,7 @@ export async function resolveSpotifyAlbumCached(
     next_retry_at: null,
   });
   if (status === 'bad_match') {
-    console.log(
-      `[spotify-resolution] bad_match requested="${artist} - ${album}" spotify="${sp?.artists[0]?.name ?? '?'} - ${sp?.name ?? '?'}"`,
-    );
+    logInfo('[spotify-resolution] bad_match');
     return null;
   }
   return sp;

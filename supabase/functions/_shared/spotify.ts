@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { recordExternalApiCall, safeRetryAfterSeconds } from './external-api-log.ts';
 import { reserveExternalApiSlot } from './external-api-rate-limit.ts';
+import { logInfo } from './logger.ts';
 
 type SpotifyImage = {
   url: string;
@@ -134,7 +135,7 @@ export async function getValidSpotifyToken(admin: SupabaseClient, userId: string
   const refreshed = await refreshSpotifyAccessToken(data.refresh_token);
   const newExpiresAt = new Date(Date.now() + refreshed.expires_in * 1000).toISOString();
 
-  await admin
+  const { error: updateError } = await admin
     .from('streaming_connections')
     .update({
       access_token: refreshed.access_token,
@@ -143,6 +144,10 @@ export async function getValidSpotifyToken(admin: SupabaseClient, userId: string
     })
     .eq('user_id', userId)
     .eq('provider', 'spotify');
+
+  if (updateError) {
+    throw new Error('db_update_failed');
+  }
 
   return refreshed.access_token;
 }
@@ -170,7 +175,7 @@ export async function fetchAllSpotifyPaged<T>(
 
   while (url) {
     if (pagesFetched >= maxPages) {
-      console.log(
+      logInfo(
         `[spotify] stopped ${options.label ?? endpoint} after ${pagesFetched} pages (${totalFetched} items)`,
       );
       break;
@@ -245,7 +250,7 @@ export async function fetchAllSpotifyPaged<T>(
     retriedAuth = false;
 
     if (options.logEveryPages && pagesFetched % options.logEveryPages === 0) {
-      console.log(
+      logInfo(
         `[spotify] fetched ${totalFetched}/${page.total} ${options.label ?? endpoint} items (${pagesFetched} pages)`,
       );
     }

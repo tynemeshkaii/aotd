@@ -99,7 +99,6 @@ export type InitialSyncingViewProps = {
   isFailed: boolean;
   isStale: boolean;
   isStarting: boolean;
-  errorMessage?: string | null;
   processed: number;
   total: number;
   ratio: number;
