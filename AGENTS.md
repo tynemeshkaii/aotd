@@ -118,6 +118,9 @@ Important contracts:
 - Discovery and Profile route files render shared controllers.
 - `AlbumDetail` owns full-bleed/parallax success surfaces and is not wrapped in `Screen`.
 - Off-screen `ShareCard` must remain backed by React Native `Image`, not `expo-image`, so view-shot capture stays reliable.
+- Pull-to-refresh (`RefreshControl`, ink tint, `progressViewOffset` set to top inset) is wired on the Home today pick, the Discoveries archive list, and Profile. The album surface refresh is optional: `AlbumDetailView` only renders a `RefreshControl` when `onRefresh` is passed, so Home gets it (via `useTodayPick` refetch) but the discovery detail route does not. Profile's `onRefresh` fans out to all four profile queries; `refreshing` tracks the overview query.
+- The album detail `Animated.ScrollView` sets `automaticallyAdjustKeyboardInsets`, `keyboardDismissMode="interactive"`, and `keyboardShouldPersistTaps="handled"` so the private rating note is not hidden by the keyboard. Keep these when touching that scroll view.
+- The app boot/loading splashes in `app/_layout.tsx` (`BootSplash`) use the editorial `BrandMark` plus a mono caption on paper, not bare `Text`. Keep all three gate states (fonts, session, music profile) routed through `BootSplash`.
 
 Bottom navigation contracts:
 
@@ -127,6 +130,7 @@ Bottom navigation contracts:
 - The editorial tab bar uses a printed-rule active indicator, static ink/paper styling, and best-effort haptics through `lib/haptics.ts`. Do not replace it with glass, pill/card, floating, or old dark SaaS navigation treatments.
 - `tabBarHideOnKeyboard` should stay enabled so rating notes and other text inputs are not crowded by the bottom navigation.
 - Today’s Home success surface is tab-screen content and should use tab-aware bottom spacing. Discovery detail is outside `(tabs)` and remains a focused detail route with its back button rather than a persistent bottom tab bar.
+- The discovery detail back button uses `goBackToDiscoveries()`: native `router.back()` when `router.canGoBack()` (preserves list scroll position and the iOS edge-swipe gesture), falling back to `router.replace('/(tabs)/discoveries')` only for cold deep links. Do not revert it to an unconditional `replace`.
 
 Editorial design contracts:
 
@@ -139,6 +143,9 @@ Editorial design contracts:
 - Profile loading must be honest: do not render placeholder zero metrics while `overviewLoading` is true. Use skeleton/loading treatments and only show empty states after overview data has finished loading.
 - Profile uses safe-area-aware top padding via `useSafeAreaInsets()` and tab-aware bottom padding via `lib/navigationChrome.ts`, accounting for notched iPhones, the tab bar, and the home indicator.
 - Profile Spotify Free/Premium markers use ink/paper editorial styling. Do not use Spotify green for Profile badges; reserve Spotify green for Spotify-branded sign-in/opening UI.
+- The Profile hero avatar is square (`Avatar` `rounded={false}`) to match the press grid. `Avatar` defaults to `rounded` so other call sites are unaffected.
+- The Spotify Free explainer callout on the album surface uses ink border + `paperAlt` background with a small "Spotify Free" mono label — not a green-bordered box. The green is reserved for the Spotify-branded sign-in/open button only.
+- The sign-in screen (`EditorialSignInView`) is safe-area-aware via `useSafeAreaInsets()` (top + 28 / bottom + 28); do not revert to a fixed `py-10` that collides with the notch/home indicator. The Spotify sign-in button is square (no `rounded-full`) with mono-bold uppercase label to match the skin, keeping Spotify green.
 - Taste map artist names should wrap cleanly, generally up to two lines, with stable rank/count alignment. Decade data should keep visible text counts and an editorial ruled/shelf feel, not a bare utility progress bar.
 - Listening summary should use the five emotional rating labels when summarizing mood. Avoid overemphasizing numeric averages.
 - `EditorialActionButton` preserves its provided `title` while loading, so callers should pass specific loading copy such as `Syncing...`, `Retrying...`, or `Saving...`.
@@ -158,6 +165,7 @@ Motion/accessibility contracts:
 - `AccentFlowProvider` owns one shared Reanimated progress value, gated by focused screen, app active state, and Reduce Motion.
 - `lib/motion.ts`, `useReduceMotion`, and `lib/haptics.ts` must keep parallax, shimmer, entrance animations, and haptics respectful of Reduce Motion.
 - `components/ui/Text` allows system font scaling by default. Only opt out for specialized animated/masked text where scaling would break rendering; do not disable scaling for ordinary Profile/body text.
+- Large fixed-size editorial mastheads (e.g. "Colophon", "Archive", the Home title, the "your album of the day" headline, profile display name) cap Dynamic Type via `maxFontSizeMultiplier` (~1.3–1.4) and, for single-line mastheads, `adjustsFontSizeToFit numberOfLines={1}`. This keeps them from overflowing at large accessibility text sizes without fully disabling scaling. The masked `AccentText` "day" stays `allowFontScaling={false}` by design, so a slight size divergence at extreme Dynamic Type is expected and acceptable.
 - Haptics are best-effort and must never throw into a user action.
 - FlatList entrance animations should run once per item key per app session; see `DiscoveryListItem`.
 - iOS shadows need two layers when clipping rounded content: outer shadow view, inner `overflow-hidden` clip view.
@@ -350,6 +358,7 @@ Home:
 - `WaitingForPick` is only for a successful RPC response with no row for the user's local date.
 - RPC/network failures must render retryable `PickError`, not waiting/brewing copy.
 - Today's successful pick renders `AlbumDetail` directly and may include a footer nudge for old unrated picks.
+- Home passes `refreshing`/`onRefresh` (from `useTodayPick`) into `AlbumDetail` for pull-to-refresh.
 
 Discoveries:
 
@@ -357,6 +366,7 @@ Discoveries:
 - Filters are All / Waiting / Rated in the editorial skin. The `pending` filter value means not rated, so it includes both `pending` and `opened` rows.
 - History detail lives at `app/discoveries/[aotdId].tsx` and uses `get_discovery_detail`.
 - Keep explicit error/retry states. Do not mask RPC/network failures as empty history or not found.
+- The archive list `RefreshControl` reuses the controller's `retrying`/`onRetry` (the `useDiscoveries` refetch) for pull-to-refresh.
 
 Profile:
 
@@ -366,6 +376,8 @@ Profile:
 - Profile shows library status and manual sync. `SyncBanner` should stay Profile-only and visually subordinate unless sync has failed or gone stale.
 - The Taste map restores library span copy when `span_min` and `span_max` are available, wraps long artist names, and keeps decade counts readable in text.
 - Listening summary should distinguish loading, empty, and rated states. Rated states summarize journal mood with emotional rating language derived from `avg_score`.
+- Profile supports pull-to-refresh: `ProfileController` exposes `onRefresh` (fans out to profile, connection, overview, and library-stats refetches) and `refreshing` (overview query).
+- When no Spotify connection row exists, the Connections section reads "No Spotify connection yet" (not "syncing").
 - Push time and delete account are future work unless explicitly requested.
 
 ## Environment And Secrets

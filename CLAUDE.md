@@ -1,134 +1,173 @@
 @AGENTS.md
 
-# Working on this codebase
+# Claude Code working notes
 
-## Dependency rules (don't skip)
+`AGENTS.md` (imported above) is the source of truth for this project — architecture,
+dependency rules, Supabase/database contracts, the editorial skin system, the
+recommendation pipeline, and all product invariants live there and are kept current.
+Read it first. This file only adds Claude-Code-harness specifics that do not belong in
+the shared agent guide.
 
-- **`npm install` must be run with `--legacy-peer-deps`.** Several deps (NativeWind, Supabase, etc.) have peer-dep conflicts with the Expo SDK's pinned RN/React. Plain `npm install` fails ERESOLVE.
-- **Pin `react` and `react-native` to exact versions** (no `^`, no `~`). RN bundles its renderer locked to a specific React patch, so a caret range will let npm pick a newer 19.x and crash at runtime with "Incompatible React versions". When bumping either, use `npm install --save-exact`.
-- **Before bumping Expo SDK**, open Expo Go on the device → Profile → "Supported SDK". App Store ships Expo Go behind npm by weeks. If npm has SDK 56 but App Store Expo Go reports SDK 54, the project must stay on 54 — otherwise the bundle loads to a "requires newer Expo Go" wall. Pin all `expo-*` packages to that SDK's matrix and use `npx expo install --check` to verify.
-- **For SDK 54, `expo-auth-session` is bundled as `~7.0.11`.** Older notes that say "expo-auth-session v6" apply to SDK 53. Use the exact SDK 54 docs before touching OAuth, and verify with `npx expo install --check`.
-- **Reanimated 4 needs `react-native-worklets` installed explicitly.** The babel worklet plugin moved out of `react-native-reanimated` in v4. Missing it surfaces as `Cannot find module 'react-native-worklets/plugin'` from `babel-preset-expo`.
-- **Stray `node_modules` in any parent directory (e.g. `/Users/pesnya/node_modules`) will poison resolution** — Node walks up the tree. If you see version mismatch errors that `npm ls` can't explain, check parent dirs.
-- In the Codex desktop shell, `node` may come from the app bundle while `npm`/`npx` live under `/opt/homebrew/bin`. If `npx` or nested `npm install` is missing, run commands with `PATH=/opt/homebrew/bin:$PATH`.
+> Do not re-document product/state/convention contracts here. When something changes,
+> update `AGENTS.md` (and the relevant `plans/*.md`), not this file — a second copy just
+> drifts. An earlier version of this file did exactly that and ended up describing a long-
+> dead "rich/album-y" Phase 6 brand palette; the shipping skin is the editorial PRESS skin
+> documented in `AGENTS.md`.
 
 ## Sandbox behavior
 
 The Claude Code sandbox blocks a few things relevant to this repo:
 
-- When a change requires the user to run commands outside the assistant session (for example `supabase db push`, `supabase functions deploy ...`, `npm install`, app store / Expo Go checks, or any manual CLI step), explicitly remind the user in the final response. Include the exact commands, the required order, and why the order matters.
-- `rm -rf node_modules` — denied even with sandbox off. Ask the user to run it manually.
-- `supabase` CLI — writes to `~/.supabase/telemetry.json`, blocked by default. Run with `dangerouslyDisableSandbox: true`.
-- `npm install` writes to `~/.npm/_cacache` — same, needs sandbox off.
-- Anything under `~/.ssh`, `~/.aws`, or `./.env*` is read-blocked.
+- When a change requires the user to run commands outside the assistant session (for
+  example `supabase db push`, `supabase functions deploy ...`, `npm install --legacy-peer-deps`,
+  App Store / Expo Go SDK checks, or any manual CLI step), explicitly remind the user in the
+  final response. Include the exact commands, the required order, and why the order matters
+  (e.g. migrations must apply before `npm run db:types` so generated types reflect the live DB).
+- `rm -rf node_modules` — denied even with the sandbox off. Ask the user to run it manually.
+- `supabase` CLI — writes to `~/.supabase/telemetry.json`, blocked by default. Run with
+  `dangerouslyDisableSandbox: true`.
+- `npm install` writes to `~/.npm/_cacache` — same, needs the sandbox off.
+- Anything under `~/.ssh`, `~/.aws`, or `./.env*` is read-blocked. Never inspect or commit
+  `.env*`, service-role keys, Spotify secrets, or Supabase JWT secrets.
+- In the Codex desktop shell, `node` may come from the app bundle while `npm`/`npx` live under
+  `/opt/homebrew/bin`. If `npx` or nested `npm install` is missing, prefix commands with
+  `PATH=/opt/homebrew/bin:$PATH`.
 
-## Supabase
+<!-- rtk-instructions v2 -->
+# RTK (Rust Token Killer) - Token-Optimized Commands
 
-- Schema lives in `supabase/migrations/`. Phase 1 ships only the `profiles` table + `handle_new_user` trigger.
-- To regenerate types from the live DB: `supabase login` (interactive — user must do this), then `npm run db:types`.
-- `types/database.ts` should normally be generated from the linked Supabase project. If CLI/login is unavailable, hand-written updates are only a temporary fallback; regenerate after migrations are applied.
-- Service role keys never go in the app or repo. Only the `anon` key belongs in `.env.local`.
-- Phase 2 adds `streaming_connections` for Spotify tokens. Do **not** grant client `SELECT` on the base table and do **not** add a `select_own` RLS policy there; that would expose `access_token` and `refresh_token`. Client code reads only `public.streaming_connections_safe`.
-- Keep `public.streaming_connections_safe` as default/security definer (`security_invoker = false`) with the explicit `where auth.uid() = user_id` filter. Do not set `security_invoker = true` unless you also redesign base-table grants/RLS, because authenticated users intentionally cannot `SELECT` from `streaming_connections`.
-- Edge Functions under `supabase/functions/` use Deno and per-function `deno.json` import maps. They are excluded from the app `tsconfig.json`; validate them with Supabase/Deno tooling, not the Expo app `tsc`.
-- `upsert-streaming-connection` and `refresh-spotify-token` have `verify_jwt = false` in `supabase/config.toml` because they handle CORS preflight and validate `Authorization` themselves. Keep that validation in the function code if changing them.
-- Spotify refresh tokens may not be returned on every OAuth login. Preserve the existing DB refresh token when `provider_refresh_token` is absent.
-- `refresh-spotify-token` must tolerate an empty request body for authenticated user refreshes and derive `user_id` from JWT. Invalid JSON should return `400 invalid_json_body`.
-- Phase 3 adds `user_library` and `library_sync_status` tables + `user_library_active` view. Client writes to neither — all writes go through service role (Edge Function `sync-spotify-library`). Client reads via RLS `select_own`. `sync-spotify-library` also has `verify_jwt = false` and validates JWT itself.
-- **Never detach `supabase.rpc` (or any supabase-js method) from the client object.** Patterns like `const fn = supabase.rpc; await fn('name', args)` lose the `this` binding and crash at runtime with `TypeError: Cannot read property 'rest' of undefined`. Always call `await supabase.rpc('name', args)` inline. When the RPC is not yet in `types/database.ts` (e.g. between a new migration and `npm run db:types`), cast through `never`: `await supabase.rpc('foo' as never, { ... } as never)` and assert the return shape after — do not extract `supabase.rpc` into a local variable.
-- **Function `EXECUTE` grants must be locked down explicitly.** PostgreSQL grants function `EXECUTE` to `PUBLIC` by default, and the live Supabase project was also found to have direct `anon`/`authenticated` grants on several `security definer` RPCs. For service-only helpers such as `try_start_library_sync`, `ensure_recommendation_atomic`, `find_users_due_for_compute`, `resolve_user_compute_context`, `reserve_external_api_slot`, `get_external_api_circuit_state`, `record_external_api_circuit_*`, and `prune_external_api_request_log`, revoke from `public`, `anon`, and `authenticated`, then grant only to `service_role`. Client RPCs (`get_current_pick`, `get_discoveries`, `get_discovery_detail`, `save_album_rating`, `safe_profile_timezone`) should grant `authenticated` only, never `anon`. This was fixed in live audit migrations `20260529093424_lock_down_function_execute_grants.sql` and `20260529094742_revoke_direct_function_execute_grants.sql`; keep future RPC migrations consistent.
-- `profiles` is client-readable/updatable only for authenticated users. Live audit tightened table grants to `authenticated: SELECT, UPDATE` and no `anon` grants in `20260529094742_revoke_direct_function_execute_grants.sql`; do not re-grant broad table privileges such as INSERT/DELETE/TRUNCATE/TRIGGER/REFERENCES.
-- **CRITICAL — upsert vs update on tables with NOT NULL columns:** PostgreSQL evaluates NOT NULL constraints *before* resolving ON CONFLICT. A `.upsert()` with a partial payload (missing `status`, `provider`, etc.) will fail at the INSERT phase even when the row already exists. Pattern: use a dedicated *create* upsert (all NOT NULL fields included) for initial row creation, then use plain `.update().eq('user_id', userId)` for incremental progress patches. Never use `.upsert()` for progress patches on `library_sync_status`.
-- `user_library_active` view follows the same security pattern as `streaming_connections_safe`: `security_invoker = false` (security definer) with an explicit `where auth.uid() = user_id` filter. Do not set `security_invoker = true` unless redesigning base-table grants/RLS.
+## Golden Rule
 
-## Conventions
+**Always prefix commands with `rtk`**. If RTK has a dedicated filter, it uses it. If not, it passes through unchanged. This means RTK is always safe to use.
 
-- Path alias `@/*` resolves to repo root (see `tsconfig.json`).
-- Styling via NativeWind v4 — Tailwind class names on RN components. Color tokens have a single source of truth in `theme/colors.js` (typed via `theme/colors.d.ts`); `tailwind.config.js` requires it and JS-level usages (e.g. `tabBarStyle`, `Ionicons`/`ActivityIndicator` `color`, `placeholderTextColor`) import the default: `import colors from '@/theme/colors'`. Reach for the token before introducing hex literals — do **not** re-hardcode palette hex in components. **Phase 6 shipped the brand palette** (burgundy/cream/gold): `accent` is now **gold** (`#d9a441` — highlights, active tab, selected states, eyebrows), `primary` is **burgundy** (`#87263b` — main CTAs) with `on-primary` cream text, plus `rate-*` semantic tints and a dedicated `spotify` token (`#1db954`). The Spotify sign-in button is the **only** green element (`bg-spotify`, Spotify Design Guidelines) — never recolor it to the brand palette, and never reintroduce `#1db954` as a literal.
-- `global.css` is intentionally excluded from Biome (`@tailwind` directives are unknown to its CSS linter).
-- UI primitives in `components/ui/` (`Screen`, `Text`, `Button`) — extend these rather than touching `react-native` components directly in screens.
-- Env reads go through `lib/env.ts` (zod-validated). Don't `process.env.*` in app code.
-- Supabase Auth in React Native uses SecureStore, `detectSessionInUrl: false`, `flowType: 'pkce'`, and AppState-driven `startAutoRefresh` / `stopAutoRefresh` in `lib/supabase.ts`.
-- OAuth callback handling lives in `lib/auth.ts` and `app/auth/callback.tsx`: PKCE callbacks use `exchangeCodeForSession(code)`, with `setSession` only as an implicit-flow fallback. Keep the explicit `auth/callback` path so Expo Router can finish deep links that arrive outside the `openAuthSessionAsync` promise. Callback parsing must accept OAuth params from both query strings and hash fragments, and dev logs should print only param keys, never callback codes or tokens.
-- `components/ui/Button` takes `title`, not `label`. The Spotify sign-in button is a dedicated `components/auth/SpotifyButton.tsx`.
+**Important**: Even in command chains with `&&`, use `rtk`:
+```bash
+# ❌ Wrong
+git add . && git commit -m "msg" && git push
 
-## Current product state
+# ✅ Correct
+rtk git add . && rtk git commit -m "msg" && rtk git push
+```
 
-- Bottom tabs are **Home / Discoveries / Profile** (3 tabs). The old `Library` tab was removed in the Discoveries pivot (2026-05-24). The `Friends` tab was removed in the v1-scope cut (2026-05-25) — all social features deferred to v2, tracked in `plans/v2-social.md`. The `Stats` tab was removed in the concept-refinement pass (2026-05-25) — its content (taste DNA, top genres, decade distribution, streaks) is merged into a rich `Profile` screen rather than living in its own tab. Do not recreate `library.tsx`, `friends.tsx`, or `stats.tsx`.
-- A general OS-level Share Sheet on the album card (no social graph, just `expo-sharing` + `react-native-view-shot` for a generated share card with cover) is in scope for v1 and lives in phase 5.
-- **V1 target audience: English-speaking only.** All UI copy is in English. Localization (RU, etc.) is deferred until after v1 launch. Do not add i18n infrastructure or Russian strings in v1.
-- **No skip mechanic.** Users do not skip albums. If they don't open or rate today's pick, it simply remains in their Discoveries list with `status='pending'`. The `albums_of_the_day.status` enum is `pending | opened | rated` only — there is no `skipped` value.
-- **Rating system: 5 emotional levels** (`Loved it / Liked it / It was alright / Not for me / Bad`), internally mapped to integers 5/4/3/2/1 for storage. No numeric sliders, no star pickers, no emojis as the primary visual. Plain word labels.
-- **Ratings are a personal journal, NOT an algorithm input.** The recommendation algorithm reads only `user_library` + `recommendation_history` (for dedup). It does not read `ratings`. This is a deliberate design choice — see `plans/master-plan.md` §4. Do not silently feed ratings back into scoring without an explicit plan change. When a user first rates an album, show microcopy clarifying: ratings are for their journal/stats/sharing, not for tuning future recommendations.
-- **Phase 5 ratings are RPC-written.** Authenticated clients should not write directly to `public.ratings`; use `save_album_rating(p_user_id, p_aotd_id, p_score, p_comment)`. The RPC validates ownership, upserts by `(user_id, album_id)`, forces `is_public=false`, trims empty comments to `null`, and moves the AOTD row to `rated`. `authenticated` is granted **only SELECT** on `ratings` (no table-level INSERT/UPDATE), and the previously-unreachable `ratings_insert_own_private` / `ratings_update_own_private` policies were dropped in `20260529000000_phase5_ratings_policy_cleanup.sql` to make the "RPC-only writes" contract explicit. If direct client writes are ever wanted, add policies deliberately alongside the matching grants — and never let clients rate arbitrary albums outside their own `albums_of_the_day` rows.
-- Live SQL audit removed three old QA/test `ratings` rows whose `album_of_the_day_id` was null and could not be backfilled to an owned AOTD row. In v1, new ratings should normally have `album_of_the_day_id` set by `save_album_rating`; if future live checks find null AOTD ratings, treat them as migration/test residue unless there is an explicit plan to support ratings outside recommendations.
-- **`save_album_rating` conflict handling uses the explicit unique constraint.** Keep `on conflict on constraint ratings_user_id_album_id_key`; in PL/pgSQL, output parameters named `user_id` / `album_id` can make `on conflict (user_id, album_id)` ambiguous at runtime.
-- **`get_current_pick` now returns rating fields.** Phase 5 changed the RPC return shape to the shared `AlbumDiscovery` shape used by Home and Discoveries. Any future migration that changes an existing Postgres function return table must `drop function ...` before recreating it; `create or replace function` alone cannot change return types.
-- **Home must not mask pick-read errors as waiting.** `WaitingForPick` is only for a successful `get_current_pick` response with no row for the user's local date. RPC/network failures should render the retryable `PickError` state so ops issues do not look like normal brewing.
-- **Algorithm does NOT rank by genre taxonomy.** Genres in music are too fragmented and noisy (especially in underground). The algorithm uses artist similarity (Last.fm `artist.getSimilar` + Spotify `/artists/{id}/related-artists`) and audio features (Spotify `/audio-features`) as primary signals, not genre tags. `selection_reason` UI copy similarly references artists from the user's library, not genres.
-- **Recommendations must be real releases, not singles.** Eligible picks are album/EP/mixtape-like releases. Reject one-track singles, Spotify `compilation` album_type rows, MusicBrainz `Single`, compilation/live/soundtrack/remix/DJ-mix release groups, and any prewarm seed that fails `isRecommendationReleaseLike`. Spotify classifies many EPs as `album_type='single'`; allow those only when they are EP-like (currently >=3 tracks or >=10 minutes when duration is known).
-- **Phase 4 recommendation pipeline is implemented and production-hardened.** Current data layer includes the Phase 4 schema/RPC migrations plus `20260528010000_daily_pick_timezone_and_catchup.sql`, the Phase 5 migrations, cleanup migrations `20260529000000_phase5_ratings_policy_cleanup.sql` (drops dead ratings write policies) and `20260529010000_get_discoveries_pagination.sql` (adds `p_limit`/`p_offset` to `get_discoveries`), and live-audit grant hardening migrations `20260529093424_lock_down_function_execute_grants.sql` / `20260529094742_revoke_direct_function_execute_grants.sql`. Edge Functions include `compute-album-of-the-day`, `dispatch-daily-picks`, `prewarm-album-cache`, and `prewarm-user-candidates`. The Home screen reads today's pick through `useTodayPick()` and `get_current_pick`. **After applying new migrations run `supabase db push` then `npm run db:types`**.
-- **v2.1 discovery improvements (familiar catalog + pool-relative banding + shadow mode)** are implemented per `plans/discovery-improvements-v2.1.md` (which has a locked "Resolved decisions" block at the top). The familiar-catalog generator (`_shared/artist-catalog.ts`) pages Spotify `GET /artists/{id}/albums` with `include_groups=album,single` (page cap 2), keeps only releases where the source artist is the **primary** artist (`album.artists[0].id === sourceArtist.spotify_id` — Spotify returns featured/collab rows otherwise), filters exclusions and `isRecommendationReleaseLike`, dedupes via `album-dedupe.ts`, and writes into `recommendation_candidates` with `source='spotify'` (reuses the existing `source` column as the familiar-origin marker — no migration). Each familiar candidate gets `best_similarity_match = 1.0` and `lastfm_listeners` left **undefined** (decision #4: no Last.fm fetch during warm → it buckets as `unknown`, ranking on the `known_artist_new_album` ×1.25 tier bonus + similarity, not popularity). The generator goes through the **same** external-API discipline as other Spotify calls — `assertExternalApiCircuitAllows` + `reserveExternalApiSlot` + `recordExternalApiCall` + circuit success/failure under the normalized endpoint name **`artist_albums`** (fail-closed on 429/5xx with a 15-min min cooldown). It runs after similar-artist warming in `prewarm-user-candidates`, gated by `familiar_catalog_limit` (default 8, max 15 source artists × ≤3 albums); failure is caught and must **not** discard similar-artist candidates already saved. During warm it is called with an **empty** `recentArtistsToAvoid` set (cache for future days, not just today). Mainstream penalty in `applyTrackBScore` applies **only** to `tier === 'adjacent_artist'` (`bucket === 'mainstream' && tier === 'adjacent_artist'`); `known_artist_new_album`, `safe_anchor`, `deep_discovery` are all exempt. Pool-relative popularity banding (`popularityBucketRelative` + `computePoolRelativeProfile`, min sample 5) computes p25/p50/p75 from the candidate pool at score time; `scoreCandidates` takes an optional `popularityProfile` (5th arg) — the live path passes none (global thresholds), the shadow path passes the relative profile. Shadow mode (in `compute-album-of-the-day`) re-scores the **same** pool with relative banding and compares **deterministic argmax to argmax** — `same_as_live = shadowScored[0] === scored[0]`, **not** the sampled/MB-validated served pick — to isolate the banding effect from RNG + MusicBrainz-swap noise. `live_album_id` still records the actually-served pick. Divergent shadow albums are upserted into `albums` on-the-fly if missing. Shadow is best-effort (short timeouts, try/catch, primary-path only, never on fallback) and must never fail or slow the real pick. Shadow algorithm version is `3`; live remains `2`. Tables/migration: `aotd_shadow_picks` (`20260530010000_aotd_shadow_picks.sql`, service-role only — RLS on, all grants revoked from `anon`/`authenticated`, no policies).
-- **Daily pick timezone is device-synced.** `profiles.timezone` defaults to `UTC`, so the app must sync `Intl.DateTimeFormat().resolvedOptions().timeZone` after OAuth and once per restored app session via `lib/profile.ts`. This keeps `get_current_pick`, `resolve_user_compute_context`, and cron dispatch aligned with the user's phone. If users report late picks, first verify `profiles.timezone`, `preferred_push_time`, and `(now() at time zone public.safe_profile_timezone(timezone))`.
-- **Phase 4 discovery recommendation v2 is cache-first.** The main candidate table is `public.recommendation_candidates`: one row per `(source_artist, candidate_album)` pair, service-role only. `compute-album-of-the-day` should normally call `loadCachedCandidates()` and aggregate by Spotify album ID before scoring; live generation is only bounded recovery when the aggregated eligible pool is too small. Do not reintroduce broad Spotify Search in the hot compute path.
-- **`prewarm-user-candidates` owns user-specific candidate warming.** It is cron-secret protected (`verify_jwt=false`), accepts `user_id`, `limit_users`, `source_artist_limit`, `spotify_resolution_top_k`, `max_text_artist_lookups`, `familiar_catalog_limit`, `force`, and `diag`, and is triggered fire-and-forget after successful initial/full library sync before day-1 compute. Manual QA should start with low `source_artist_limit` in Spotify Development Mode and inspect `recommendation_candidates` before recomputing. Fix 3 is now implemented here: freshness requires both `MIN_FRESH_ELIGIBLE_CANDIDATES` (currently 30+ unique Spotify albums) and `MIN_FRESH_SOURCE_ARTISTS` (currently 8+ distinct source artists), `diag` includes `prewarm_freshness_checked`, and similar-artist Spotify resolution is capped by `MAX_RESOLVE_PER_SOURCE_ARTIST` (currently 4) so one dominant library artist cannot consume the whole `spotify_resolution_top_k` budget.
-- **Warm-cache QA must check the compute-visible pool, not just raw table rows.** `recommendation_candidates` can have 30+ unique Spotify albums globally while `compute-album-of-the-day` sees fewer after source-artist filtering, library/history exclusions, and 30-day recent-artist filtering. `cache_candidates_ready >= 30` means fully warm / no live recovery expected; `cache_candidates_ready >= 5` is enough for primary selection but may still run bounded live recovery. A successful QA run on 2026-05-26 created `is_fallback=false` with `cache_candidates_ready=20`, `live_recovery_done`, and total compute under 3s — healthy but not purely cache-only.
-- **Partial candidate warming is intentional.** `CandidateGenerationError` can carry already-found candidates when Spotify Search fails mid-run or when the candidate-generation deadline is reached during Spotify resolution. `prewarm-user-candidates` must save those partial candidates and return `status='partial'` with a reason instead of discarding useful rows. A tiny or narrow partial cache must not count as "fresh"; freshness checks require both a healthy eligible candidate count and healthy source-artist coverage before skipping prewarm. A 2026-05-31 QA run exposed the failure mode: 21 resolved Spotify albums were written only to `spotify_album_resolution_cache`, then `compute_timeout` happened before `recommendation_candidates` write; `generateCandidates` now throws `CandidateGenerationError('compute_timeout', candidates, ...)` in that resolution loop so partial candidates are persisted.
-- **Fix 3 prewarm QA baseline (2026-05-31):** after deploying the source-diversity freshness gate, per-source resolution cap, and timeout-partial persistence, manual prewarm for the test user returned `status='warmed'`, `candidates=36`, `familiar_candidates=0`, `took_ms≈22.8s`; cache coverage improved from 4 source artists / 39 eligible albums to 18 source artists / 64 eligible albums. A diagnostic compute for 2026-06-01 created `is_fallback=false` with `cache_candidates_ready=37` and total compute around 1.3s. Treat this as the expected healthy shape for similar large libraries: source coverage matters as much as raw album count.
-- **`compute-album-of-the-day` accepts `"diag": true` in the request body** and returns a `diag` array of per-stage timings (request-relative for compute stages, candidate-internal-relative for candidate-generation stages — note the two time-bases). Use this to debug timing regressions without chasing Supabase Edge logs through the UI.
-- **`spotifyFetch` in `_shared/spotify-extended.ts` caps 429 retries to 1 attempt with Retry-After ≤ 1s.** Previously, default Retry-After=2 plus 3 retries could burn ~20s on a single Spotify Search when Dev Mode quota was exhausted, masking the real failure as `compute_timeout`. The cap turns a 429 cascade into a fast `spotify_search_failed` fallback (~3–7s). Don't raise the cap without ensuring the candidate-stage budget is also widened.
-- **Spotify Search no-match is not an API failure.** `searchAlbum()` throws on non-2xx Spotify responses/timeouts but returns `null` for a normal 2xx "no album match" result. Candidate generation and prewarm must skip `null` matches without incrementing `maxConsecutiveSpotifySearchFailures`; only thrown API failures should move compute/prewarm toward `spotify_search_failed` / `spotify_search_unavailable`.
-- **Spotify album resolution must go through the global resolver cache.** Use `resolveSpotifyAlbumCached(admin, token, artist, album, opts)` from `_shared/spotify-album-resolution-cache.ts` instead of direct `searchAlbum()` in recommendation/prewarm paths. It stores `resolved`, `no_match`, `bad_match`, `rate_limited`, and `spotify_unavailable` outcomes in `spotify_album_resolution_cache`, logs `spotify:search_album`, uses the DB-backed limiter, and coordinates the `spotify:search_album` circuit breaker. Do not cache weak Spotify matches as `resolved`; weak artist/album matches should be `bad_match` and return `null`.
-- **Spotify Search circuit breaker is fail-closed.** 429, 403, Spotify 5xx, timeouts, and network errors should open/write cooldown state instead of retrying aggressively. While `spotify:search_album` is open, `prewarm-user-candidates` should return `skipped`/`partial`, and `compute-album-of-the-day` should skip live Spotify recovery and use cache/fallback. Half-open must allow only one probe request; do not change breaker SQL in a way that lets parallel workers all probe at once.
-- **External API observability is service-role only.** API calls are logged to `external_api_request_log` with normalized endpoints such as `search_album`, `artist_albums` (familiar-catalog `/artists/{id}/albums`), `artist_get_top_albums`, `release_group_search`, `artist_lookup`, `paged_library_albums`, and `paged_library_tracks`; never log raw Spotify query URLs, auth headers, callback codes, or tokens. Use `v1_external_api_health` from SQL/dashboard to inspect 429s/failures. Keep retention via `prune_external_api_request_log`.
-- **Distributed API limiting is DB-backed for high-risk endpoints.** Use `reserve_external_api_slot(admin, service, endpoint, intervalMs)` for Spotify Search, MusicBrainz release-group search, Last.fm top albums, and bounded library paging. Keep local in-memory throttles as a cheap extra layer only; they are not authoritative across Edge Function instances.
-- **Primary candidate generation uses late Spotify binding.** `generateCandidates` first builds a bounded text pool from similar artists + cached Last.fm top albums, pre-scores text candidates, then resolves only top K through `resolveSpotifyAlbumCached`. Keep `maxTextArtistLookups` and `spotifyResolutionTopK` conservative, especially in `compute-album-of-the-day`, or cold runs can spend the whole budget on Last.fm before reaching Spotify. This algorithm still uses artist similarity/audio signals only — do not add genre taxonomy or ratings.
-- **Last.fm `artist.getTopAlbums` is globally cached.** Use `getLastfmTopAlbumsCached(admin, artistName, limit)` in candidate generation and global prewarm. If Last.fm fails and stale cache exists, stale cache is acceptable; only throw when there is no cache. `fetchGloballyTopAlbums` accepts a `topAlbumsForArtist` override so `prewarm-album-cache` can use the cache helper.
-- **Primary candidate generation skips non-critical lookups.** `generateCandidates` in `_shared/candidate-generation.ts` accepts `skipAlbumInfoLookup`, `skipAlbumDetailsLookup`, `skipMusicBrainz`, `maxTextArtistLookups`, and `spotifyResolutionTopK` knobs. `compute-album-of-the-day` enables the skip flags for the primary path: playcount comes from cached `artist.getTopAlbums`, short-track albums are rejected without a Spotify detail fetch, and MusicBrainz validation is deferred to a single post-scoring pass on the chosen candidate (up to 3 retries via `validateCandidateWithMb`). This was necessary to fit primary compute within the 25s budget.
-- **Track B scoring metadata is additive QA data.** `selection_reason` may include `candidate_tier`, `popularity_bucket`, `source_artist_count`, and `track_b_multipliers`. UI copy should keep using the existing human "Why this album" formatter; these fields are primarily for SQL inspection and tuning. Ratings remain personal-journal only and must not feed this scoring.
-- **Recommendation quality guardrails.** Taste extraction must ignore low-signal pseudo-artists such as `Various Artists` and `Unknown`; those rows can exist in `user_library` from compilations, but they must not consume source-artist slots. If primary compute falls back, `curated-fallback` should prefer prewarm albums whose artists match cached similar-artist affinity for the user's top library artists before using global popularity/randomness.
-- **Cron/external Phase 4 functions share the same auth surface.** `compute-album-of-the-day`, `dispatch-daily-picks`, `prewarm-album-cache`, and `prewarm-user-candidates` all need an OPTIONS handler, POST-only method guard, and explicit `!cronSecret` check because `verify_jwt=false` is set in `supabase/config.toml`.
-- **Daily dispatch has a catch-up window.** `dispatch-daily-picks` calls `find_users_due_for_compute(60, 720)`: 60 minutes of lead time plus 12 hours of same-local-day catch-up if hourly cron missed the exact pre-push window. A user whose `albums_of_the_day` row already exists for their local date should not appear in the due list. `dispatch-daily-picks` returns `failed_count` / `failed` and uses HTTP `207` for partial failures, so do not treat every pg_net success as proof compute succeeded; inspect `net._http_response.content`.
-- **pg_cron is live for Phase 4.** Scheduled jobs currently include `dispatch-daily-picks` at `5 * * * *`, `prewarm-album-cache` at `0 3 * * *`, and `prewarm-user-candidates-nightly` at `30 2 * * *`. `cron_secret` is read from Supabase Vault for all jobs; `project_url = https://<project-ref>.supabase.co` (no trailing slash) also exists in Vault. Live audit found `prewarm-user-candidates-nightly` already builds its URL from `project_url`, while `dispatch-daily-picks` and `prewarm-album-cache` still have the project URL literal in `cron.job.command` but do not hardcode the secret. Prefer Vault-based URLs for any new/updated cron command; do not hardcode secrets in `cron.job.command` because they persist in pg dumps. `net.http_post(...)` returns a queue id; check the actual response in `net._http_response`. Check scheduled job health via `cron.job_run_details` joined to `cron.job`. The pg_cron / pg_net / supabase_vault extensions must be enabled in the project (Dashboard → Database → Extensions).
-- **`is_prewarm_seed` is intentionally a permissive flag.** Any album that passes through `prewarm-album-cache` upsert gets `is_prewarm_seed: true`, even if the row already existed from user activity. This is by design: the flag means "verified-by-top-charts, safe for curated fallback", not "exclusively a seed". Do not add an RPC to preserve original values without an explicit plan change.
-- **Recommendation idempotency must stay race-safe.** `ensure_recommendation_atomic` uses `INSERT ... ON CONFLICT (user_id, date) DO NOTHING` and then returns the existing pick if another worker created it first. Do not reintroduce check-then-insert idempotency.
-- **Repeat guard is broader than `recommendation_history.album_id`.** Candidate generation and curated fallback must exclude albums by exact Spotify album ID, MusicBrainz release group ID, and normalized `artist + album` via `supabase/functions/_shared/album-dedupe.ts`. This prevents remasters, deluxe editions, and alternate Spotify releases from being recommended as repeats.
-- **`albums_of_the_day` client updates are status-only and forward-only.** Authenticated clients may move `pending -> opened -> rated` and Phase 5 also allows direct `pending -> rated` when a user rates without opening Spotify first; recommendation fields are immutable, and `opened_at` is set/protected by the DB trigger. Do not add skip states or arbitrary client updates.
-- **Spotify Free vs Premium detection.** On every OAuth and connection refresh, parse `product` from Spotify `/me` response and store in `streaming_connections.spotify_product`. For `free`/`open` accounts, `AlbumDetail` renders a persistent soft badge ("Free Spotify may shuffle this album. Premium plays it in order."), and `useSpotifyFreeExplainer.maybeShow()` shows a one-time dismissible alert. The explainer **awaits its dismissal** before `useOpenAlbum` opens Spotify — otherwise the app backgrounds into Spotify the instant the alert appears and the heads-up is never seen. The "already shown" SecureStore flag is best-effort and must not block opening. Not a blocker, just a soft heads-up.
-- **"Why this album" block on the album card is mandatory.** Parse `albums_of_the_day.selection_reason` jsonb and render a short, plain-language line — e.g. "Picked because you've been saving stuff by similar artists" or "Based on your library. We hope you like it. If not — tomorrow's pick is on us." Tone is humorous + low-pressure across the whole app.
-- **Phase 5 album detail is shared.** `components/album/AlbumDetail.tsx` is the common surface for Home and `/discoveries/[aotdId]`; keep album hero, "Why this album", the visible `Open in Spotify` button wording, Share, and rating editor behavior consistent there instead of duplicating separate Home/Discoveries implementations.
-- **Album duration comes from post-selection Spotify details enrichment.** The primary recommendation path skips per-candidate detail lookups for speed, but `compute-album-of-the-day` should fetch details once for the chosen candidate before upserting `albums.duration_ms`. Do not reintroduce per-candidate album detail fetches without widening the compute budget.
-- **Spotify opening should not depend on status writes.** `useOpenAlbum` opens `spotify:album:{id}` when available and falls back to the Spotify web URL. It may update `pending -> opened` afterward, but DB update failures should not block playback. iOS native Spotify detection relies on `LSApplicationQueriesSchemes: ['spotify']` in `app.config.ts`.
-- **Share Sheet is file-first.** Phase 5 captures `ShareCard` with `react-native-view-shot`. On iOS use React Native `Share.share` so the payload can include PNG + text/Spotify URL; on other platforms `expo-sharing.shareAsync` shares the generated PNG. Prefetch cover art before capture so share cards do not render blank covers on slow networks.
-- **SecureStore one-time flags must use valid key characters and never fail the main action.** Expo SecureStore keys should use only alphanumeric characters plus `.`, `-`, `_`; avoid `:`. Rating microcopy and Spotify Free explainer flags are best-effort side effects and must catch/log storage errors so successful rating/open mutations do not show false failure alerts.
-- Phase 3 library import pipeline is fully implemented: `user_library` + `library_sync_status` tables, `sync-spotify-library` Edge Function, `lib/library.ts` (`triggerLibrarySync`), `lib/hooks/useLibrarySyncStatus.ts`, `lib/hooks/useTriggerLibrarySync.ts`, `lib/hooks/useLibraryStats.ts`, `components/library/SyncBanner.tsx`, `components/ui/ProgressBar.tsx`.
-- `Discoveries` is implemented as the recommendation history at `app/(tabs)/discoveries.tsx`, backed by `get_discoveries`, with `All / Unrated / Rated` tabs. The middle filter (`DiscoveryFilter` value `'pending'`) shows everything not yet rated — both `pending` and `opened` rows — so its label is **"Unrated"**, not "Pending", to match the content (an opened-but-unrated album keeps its own per-item "Opened" badge). Historical details live at `app/discoveries/[aotdId].tsx` and use `get_discovery_detail`. Keep explicit error/retry states there; do not mask RPC/network failures as empty history or "not found".
-- **`get_discoveries` is paginated.** Signature is `get_discoveries(p_user_id, p_limit int default 365, p_offset int default 0)`. The client calls it with only `p_user_id` (defaults apply), so it returns the most recent 365 picks — bounded against unbounded growth without a pagination UI yet. If you add infinite scroll, pass `p_limit`/`p_offset`. The return table is unchanged; any further signature change must `drop function` first.
-- Spotify library import remains backend data for the recommendation algorithm. Keep `user_library`, `library_sync_status`, `sync-spotify-library`, `lib/library.ts`, `useLibrarySyncStatus`, and `useTriggerLibrarySync`; do not delete or rename that pipeline just because the Library UI is gone.
-- Deleted on purpose: `components/library/LibraryListItem.tsx`, `components/library/LibrarySearchBar.tsx`, and `lib/hooks/useLibrary.ts`. Avoid reintroducing these unless a future plan explicitly restores a user-facing library list.
-- `SyncBanner` should render only in Profile. Home and Discoveries should not show sync progress or sync errors.
-- Profile owns manual library sync and library status. It uses `useLibraryStats()` for `aggregated_albums_count` and `last_synced_at`, and `relativeTime()` from `lib/format.ts` for compact timestamps.
-- Initial library sync after OAuth is fire-and-forget from both `app/(auth)/sign-in.tsx` and `app/auth/callback.tsx`, after Spotify connection and device timezone sync. Both call sites go through the shared `bootstrapSpotifySession(session)` in `lib/auth.ts`, which **dedupes the whole bootstrap (connection upsert + timezone sync + `triggerLibrarySync('initial')`) per userId** for the JS-context lifetime. This matters because the sign-in screen and the explicit `/auth/callback` deep link can both resolve the same OAuth session — without dedup we'd double-hit Spotify `/me` and risk a Dev Mode 429 cascade. A failed run clears the dedupe entry so a retry isn't suppressed, and `signOut()` clears it so a fresh login (even same user) re-runs the connection upsert to save the new provider token. `syncDeviceTimeZone` now reads the stored timezone first and skips the write (and today-pick invalidation) when it already matches the device. `RouterGuard` in `app/_layout.tsx` blocks tabs with `InitialSyncingScreen` only while `aggregated_albums_count` is null and sync status is missing, queued, syncing, or failed. It waits for `useLibrarySyncStatus` to finish loading first to avoid flashing the splash for existing users.
-- `sync-spotify-library` supports explicit modes: `initial`, `bounded`, and `full_reconcile`. OAuth first sync from `app/(auth)/sign-in.tsx` and `app/auth/callback.tsx` must call `triggerLibrarySync('initial')`; stale restore auto-sync in `AuthProvider` must call `triggerLibrarySync('bounded')`; Profile/manual sync uses `triggerLibrarySync('full_reconcile')`. Bounded sync fetches only the first few pages, skips soft-delete reconciliation, but **must still update `streaming_connections.last_synced_at`** so the 24-hour auto-sync cooldown works. Full/initial sync may reconcile removals and trigger day-1 prewarm/compute; bounded sync should not trigger day-1 prewarm/compute.
-- `components/auth/AuthProvider.tsx` handles stale auto-sync after session restore, but it should skip auto-sync until a Spotify connection row exists. Initial OAuth sync is handled by sign-in/callback, not by racing AuthProvider against connection creation. `maybeAutoSync` has three guards: (1) skip if `library_sync_status.status` is `queued` or `syncing`; (2) 60-min cooldown after `failed`; (3) `autoSyncedRef` (`useRef<Set<string>>`) ensures it fires at most once per userId per app session even if the `session` object identity changes.
-- **Spotify rate limit risk in Development Mode:** Spotify Development Mode apps have strict per-client_id rate limits. A cascade of auto-syncs (e.g. caused by a bug that prevents sync completion) can trigger 429 errors that block *all* Spotify API calls including OAuth `/me` — breaking login for hours. Always check `library_sync_status.status` before triggering a new sync, and always verify that syncs actually reach `completed` in logs before shipping auto-sync code.
-- **Realtime channel naming in hooks:** `supabase-js` reuses channels by name. If the same hook (e.g. `useLibrarySyncStatus`) mounts in multiple components simultaneously (SyncBanner on Home + Profile + etc.), the second `.on()` call throws "cannot add postgres_changes callbacks after subscribe()". Fix: append `useId()` to the channel name so each component instance gets its own channel. Example: `` `sync-status-${userId}-${instanceId}` ``.
-- The authoritative pivot plan is `plans/discoveries-pivot.md`; `plans/phase-3-library-import.md` contains older Library UI details with a post-pivot note. When they conflict, the Discoveries pivot wins for client UI.
-- **Phase 6 (design system + rich Profile + polish) is implemented in the working tree.** Source of truth: `plans/phase-6-design-system-profile-polish.md` (has a Done / Not-done status block at the top). Chosen visual direction is **B — rich/"album-y"**: color bleeds from the cover, parallax, glass surfaces, visible motion. Remaining manual steps: apply the Profile migration (`supabase db push` + `npm run db:types`), final app icon/splash assets, on-device QA in Expo Go.
-- **Phase 6 added these deps** (Expo SDK 54 matrix, all Expo-Go-safe): `expo-haptics`, `expo-image`, `expo-linear-gradient`, `expo-blur`, plus JS-only `moti`. Install Expo modules with `npx expo install` and `moti` with `npm install --legacy-peer-deps`. `babel-preset-expo` auto-applies the `react-native-worklets` plugin (worklets is installed), so moti/Reanimated worklets transform without extra babel config.
-- **"Color from the cover" is done with a blurred enlarged copy of the cover, NOT pixel color extraction.** `components/album/CoverBackdrop.tsx` renders the album art via `expo-image` `blurRadius` + an `expo-linear-gradient` scrim fading to `bg`, with parallax tied to scroll. Do **not** add `react-native-image-colors` or any unlisted native module — it won't load in Expo Go.
-- **Shared UI primitives (Phase 6):** `components/ui/CoverImage` (expo-image wrapper; registers `cssInterop` so NativeWind `className` maps to `style` on the third-party component), `Card` (`surface` or frosted-`glass` via `BlurView` as an absolute fill behind a padded content view — do not put `className` padding on `BlurView` directly), `Skeleton` (moti pulse, reduce-motion aware), `EmptyState`, `ErrorState`. `Button` now has variants `primary` (burgundy) / `accent` (gold) / `secondary` / `ghost` / `glass`, an inline `loading` spinner, and a press haptic (`haptic={false}` to opt out). `Text` gained `title`/`h3`/`label`/`subtle` variants and `h1` was rescaled (album title uses `title`).
-- **Third-party components need `cssInterop` for `className`.** `expo-image`'s `Image` and `moti`'s `MotiView` (when styled by class) are registered via `cssInterop(Component, { className: 'style' })`. When using `MotiView` only for animation (no class), pass animation props + children and leave styling to inner views.
-- **`AlbumDetail` is now a self-contained, full-bleed parallax surface** (`Animated.ScrollView` from Reanimated + `useSafeAreaInsets` for the top inset + `CoverBackdrop`). It is **not** wrapped in `Screen`. Home (`app/(tabs)/index.tsx`) and `app/discoveries/[aotdId].tsx` render `<AlbumDetail/>` directly for the success case (Home passes `isToday` + an optional `footer` nudge; detail passes a `header` back button), while loading/error/waiting/not-found states still render inside `Screen` with `AlbumDetailSkeleton` / `PickError` / `WaitingForPick` / `EmptyState` / `ErrorState`. Keep the off-screen `ShareCard` on RN `Image` (not `expo-image`) so `react-native-view-shot` capture stays reliable.
-- **Motion + haptics honor "Reduce Motion".** `lib/motion.ts` holds a live OS reduce-motion flag (`getReduceMotion()` + `subscribeReduceMotion`); `lib/hooks/useReduceMotion.ts` exposes it to components, and `lib/haptics.ts` (named intents: `selection`/`impactLight`/`impactMedium`/`success`/`warning`) no-ops when it's on. Gate parallax, entrance animations, and skeleton shimmer behind it. Haptics are best-effort (wrapped in try/catch) and must never throw into a user action.
-- **FlatList recycle + entrance animations:** `DiscoveryListItem` animates its fade-in only once per `aotd_id` per session (a module-level `Set`), because FlatList remounts rows on scroll and realtime refetches would otherwise replay the animation. Reuse this pattern for any list-item entrance motion.
-- **iOS shadow gotcha:** a view with `overflow: hidden` clips its own shadow. Use two layers — an outer shadow view (with `borderRadius`/`backgroundColor`/`elevation`) wrapping an inner `overflow-hidden` clip view — as in `AlbumHero`.
-- **Profile is rich and reads `get_profile_overview`.** Migration `20260530000000_phase6_profile_overview.sql` adds a `security definer`, `authenticated`-only RPC returning jsonb: `{ streak, total_discovered, taste{top_artists, decades, span_min, span_max}, listening{rated_this_month, loved_count, avg_score, total_rated} }`. It aggregates base tables server-side (a library can be 10k+ rows), excludes pseudo-artists (`Various Artists`/`Unknown`/…) from top artists, and computes the **streak** as consecutive local-timezone days (via `safe_profile_timezone`) where the pick was `opened` OR `rated`, with a grace window so an un-opened *today* doesn't reset a streak earned through yesterday. Client hook: `lib/hooks/useProfileOverview.ts` (calls `supabase.rpc('get_profile_overview' as never, …)` inline until `npm run db:types` regenerates types). Profile sections: hero+streak, `TasteSection`, `ListeningSummary`, library status (`SyncBanner` stays Profile-only), connections (+ Free/Premium badge), settings (sign out; push time + delete account are Phase 7). Recurring tone strings live in `lib/copy.ts`.
-- **First-load spinners are skeletons now**, except where a spinner is genuinely correct: `SpotifyButton` (inline busy state) and `InitialSyncingScreen` (indeterminate connect step) keep `ActivityIndicator`.
-- **Safe discovery observability is implemented** per `plans/safe-discovery-observability-plan.md` (status: implemented). Adds `public.v_discovery_pick_observability` — a service-role-only view joining `albums_of_the_day`, `albums`, and `aotd_shadow_picks` into one analysis surface for live-vs-shadow inspection. Columns include live/shadow tier, popularity bucket, candidate origin, source artist, fallback flags, and `same_as_live`. Uses defensive JSONB extraction; missing keys return `null` so existing rows stay readable. Adds `candidate_origin` to `selection_reason` via `buildSelectionReason` in `supabase/functions/_shared/recommendation-algorithm.ts`: `familiar_catalog` when the primary artist matches the source artist (by Spotify ID or normalized name), `similar_artist` otherwise, `unknown` when source paths are empty, and `fallback` for fallback picks. No DB backfill required — old rows simply show `null` in the view. Includes 9 new safety-contract Deno tests (32 total, all green) covering origin classification, the `applyTrackBScore` mainstream-penalty invariant (`adjacent_artist` only, `known_artist_new_album` exempt), global vs pool-relative bucketing isolation, and an explicit marker that ratings modules are not imported by scoring code. No live-ranking arguments changed; no new Spotify API calls added.
+## RTK Commands by Workflow
 
-## Phase plans
+### Build & Compile (80-90% savings)
+```bash
+rtk cargo build         # Cargo build output
+rtk cargo check         # Cargo check output
+rtk cargo clippy        # Clippy warnings grouped by file (80%)
+rtk tsc                 # TypeScript errors grouped by file/code (83%)
+rtk lint                # ESLint/Biome violations grouped (84%)
+rtk prettier --check    # Files needing format only (70%)
+rtk next build          # Next.js build with route metrics (87%)
+```
 
-`plans/phase-*.md` are the source of truth for scope, but treat the *tooling* sections as advisory — they were written against a specific SDK snapshot and drift quickly (e.g. `sentry-expo` is deprecated in SDK 50+, NativeWind v2 babel syntax differs from v4). Verify package names and versions against current SDK docs before installing.
-- `plans/phase-4-discovery-recommendation-v2.md` is the source of truth for the cache-first discovery recommendation extension: `recommendation_candidates`, `prewarm-user-candidates`, cache-first compute, popularity buckets, and candidate tiers.
-- `plans/api-request-optimization-plan.md` is the implementation roadmap for reducing Spotify/Last.fm/MusicBrainz pressure: Spotify album resolution cache, external API request logging, circuit breakers, DB-backed rate limiting, Last.fm top-albums cache, late Spotify binding, bounded sync modes, and cron jitter.
+### Test (60-99% savings)
+```bash
+rtk cargo test          # Cargo test failures only (90%)
+rtk go test             # Go test failures only (90%)
+rtk jest                # Jest failures only (99.5%)
+rtk vitest              # Vitest failures only (99.5%)
+rtk playwright test     # Playwright failures only (94%)
+rtk pytest              # Python test failures only (90%)
+rtk rake test           # Ruby test failures only (90%)
+rtk rspec               # RSpec test failures only (60%)
+rtk test <cmd>          # Generic test wrapper - failures only
+```
+
+### Git (59-80% savings)
+```bash
+rtk git status          # Compact status
+rtk git log             # Compact log (works with all git flags)
+rtk git diff            # Compact diff (80%)
+rtk git show            # Compact show (80%)
+rtk git add             # Ultra-compact confirmations (59%)
+rtk git commit          # Ultra-compact confirmations (59%)
+rtk git push            # Ultra-compact confirmations
+rtk git pull            # Ultra-compact confirmations
+rtk git branch          # Compact branch list
+rtk git fetch           # Compact fetch
+rtk git stash           # Compact stash
+rtk git worktree        # Compact worktree
+```
+
+Note: Git passthrough works for ALL subcommands, even those not explicitly listed.
+
+### GitHub (26-87% savings)
+```bash
+rtk gh pr view <num>    # Compact PR view (87%)
+rtk gh pr checks        # Compact PR checks (79%)
+rtk gh run list         # Compact workflow runs (82%)
+rtk gh issue list       # Compact issue list (80%)
+rtk gh api              # Compact API responses (26%)
+```
+
+### JavaScript/TypeScript Tooling (70-90% savings)
+```bash
+rtk pnpm list           # Compact dependency tree (70%)
+rtk pnpm outdated       # Compact outdated packages (80%)
+rtk pnpm install        # Compact install output (90%)
+rtk npm run <script>    # Compact npm script output
+rtk npx <cmd>           # Compact npx command output
+rtk prisma              # Prisma without ASCII art (88%)
+```
+
+### Files & Search (60-75% savings)
+```bash
+rtk ls <path>           # Tree format, compact (65%)
+rtk read <file>         # Code reading with filtering (60%)
+rtk grep <pattern>      # Search grouped by file (75%). Format flags (-c, -l, -L, -o, -Z) run raw.
+rtk find <pattern>      # Find grouped by directory (70%)
+```
+
+### Analysis & Debug (70-90% savings)
+```bash
+rtk err <cmd>           # Filter errors only from any command
+rtk log <file>          # Deduplicated logs with counts
+rtk json <file>         # JSON structure without values
+rtk deps                # Dependency overview
+rtk env                 # Environment variables compact
+rtk summary <cmd>       # Smart summary of command output
+rtk diff                # Ultra-compact diffs
+```
+
+### Infrastructure (85% savings)
+```bash
+rtk docker ps           # Compact container list
+rtk docker images       # Compact image list
+rtk docker logs <c>     # Deduplicated logs
+rtk kubectl get         # Compact resource list
+rtk kubectl logs        # Deduplicated pod logs
+```
+
+### Network (65-70% savings)
+```bash
+rtk curl <url>          # Compact HTTP responses (70%)
+rtk wget <url>          # Compact download output (65%)
+```
+
+### Meta Commands
+```bash
+rtk gain                # View token savings statistics
+rtk gain --history      # View command history with savings
+rtk discover            # Analyze Claude Code sessions for missed RTK usage
+rtk proxy <cmd>         # Run command without filtering (for debugging)
+rtk init                # Add RTK instructions to CLAUDE.md
+rtk init --global       # Add RTK to ~/.claude/CLAUDE.md
+```
+
+## Token Savings Overview
+
+| Category | Commands | Typical Savings |
+|----------|----------|-----------------|
+| Tests | vitest, playwright, cargo test | 90-99% |
+| Build | next, tsc, lint, prettier | 70-87% |
+| Git | status, log, diff, add, commit | 59-80% |
+| GitHub | gh pr, gh run, gh issue | 26-87% |
+| Package Managers | pnpm, npm, npx | 70-90% |
+| Files | ls, read, grep, find | 60-75% |
+| Infrastructure | docker, kubectl | 85% |
+| Network | curl, wget | 65-70% |
+
+Overall average: **60-90% token reduction** on common development operations.
+<!-- /rtk-instructions -->

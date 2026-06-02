@@ -76,5 +76,13 @@ export default function HomeScreen() {
       </Pressable>
     ) : null;
 
-  return <AlbumDetail album={pick} isToday footer={footer} />;
+  return (
+    <AlbumDetail
+      album={pick}
+      isToday
+      footer={footer}
+      refreshing={isRefetching}
+      onRefresh={() => void refetch()}
+    />
+  );
 }

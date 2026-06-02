@@ -8,6 +8,7 @@ import { View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AuthProvider, useSession } from '@/components/auth/AuthProvider';
+import { BrandMark } from '@/components/brand/BrandMark';
 import { InitialSyncingScreen } from '@/components/onboarding/InitialSyncingScreen';
 import { Text } from '@/components/ui/Text';
 import { useLibrarySyncStatus } from '@/lib/hooks/useLibrarySyncStatus';
@@ -34,19 +35,30 @@ export default function RootLayout() {
   );
 }
 
+function BootSplash({ label }: { label: string }) {
+  const components = useSkinComponents();
+  return (
+    <View
+      className="flex-1 items-center justify-center gap-5 px-8"
+      style={{ backgroundColor: components.chrome.rootBackground }}
+    >
+      <BrandMark size={60} muted />
+      <Text
+        className="text-center font-mono text-[11px] uppercase"
+        style={{ color: components.chrome.muted, letterSpacing: 1 }}
+      >
+        {label}
+      </Text>
+    </View>
+  );
+}
+
 function SkinGate() {
   const [fontsLoaded] = useSkinFonts();
   const components = useSkinComponents();
 
   if (!fontsLoaded) {
-    return (
-      <View
-        className="flex-1 items-center justify-center px-5"
-        style={{ backgroundColor: components.chrome.rootBackground }}
-      >
-        <Text variant="caption">Loading...</Text>
-      </View>
-    );
+    return <BootSplash label="Loading" />;
   }
 
   return (
@@ -58,7 +70,6 @@ function SkinGate() {
 }
 
 function RouterGuard() {
-  const components = useSkinComponents();
   const { session, loading } = useSession();
   const { status: syncStatus, loading: syncStatusLoading } = useLibrarySyncStatus();
   const segments = useSegments();
@@ -82,25 +93,11 @@ function RouterGuard() {
   }, [loading, router, segments, session]);
 
   if (loading) {
-    return (
-      <View
-        className="flex-1 items-center justify-center px-5"
-        style={{ backgroundColor: components.chrome.rootBackground }}
-      >
-        <Text variant="caption">Loading session...</Text>
-      </View>
-    );
+    return <BootSplash label="Loading session" />;
   }
 
   if (session && syncStatusLoading) {
-    return (
-      <View
-        className="flex-1 items-center justify-center px-5"
-        style={{ backgroundColor: components.chrome.rootBackground }}
-      >
-        <Text variant="caption">Loading music profile...</Text>
-      </View>
-    );
+    return <BootSplash label="Loading music profile" />;
   }
 
   const isFirstTimeSync =

@@ -7,6 +7,16 @@ import { Screen } from '@/components/ui/Screen';
 import { useDiscoveryDetail } from '@/lib/hooks/useDiscoveryDetail';
 import { useSkinComponents } from '@/theme/skins/registry';
 
+function goBackToDiscoveries() {
+  // Prefer native pop (preserves the list scroll position and the iOS
+  // edge-swipe gesture); fall back to replace for cold deep links.
+  if (router.canGoBack()) {
+    router.back();
+  } else {
+    router.replace('/(tabs)/discoveries');
+  }
+}
+
 function BackButton({
   color,
   borderColor,
@@ -20,7 +30,7 @@ function BackButton({
     <Pressable
       accessibilityRole="button"
       accessibilityLabel="Back to Discoveries"
-      onPress={() => router.replace('/(tabs)/discoveries')}
+      onPress={goBackToDiscoveries}
       className="h-11 w-11 items-center justify-center border-2 active:opacity-80"
       style={{ borderColor, backgroundColor }}
     >
@@ -41,7 +51,7 @@ export default function DiscoveryDetailScreen() {
   const { aotdId } = useLocalSearchParams<{ aotdId?: string }>();
   const { data: album, isError, isLoading, isRefetching, refetch } = useDiscoveryDetail(aotdId);
 
-  const goBack = () => router.replace('/(tabs)/discoveries');
+  const goBack = goBackToDiscoveries;
 
   if (isLoading) {
     return (

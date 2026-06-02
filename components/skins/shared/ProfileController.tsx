@@ -27,7 +27,11 @@ export function ProfileController() {
   const { session } = useSession();
   const userId = session?.user.id;
 
-  const { data: profile, isLoading: profileLoading } = useQuery({
+  const {
+    data: profile,
+    isLoading: profileLoading,
+    refetch: refetchProfile,
+  } = useQuery({
     queryKey: ['profile', userId],
     enabled: !!userId,
     queryFn: async () => {
@@ -42,7 +46,7 @@ export function ProfileController() {
     },
   });
 
-  const { data: connection } = useQuery({
+  const { data: connection, refetch: refetchConnection } = useQuery({
     queryKey: ['streaming-connection', userId],
     enabled: !!userId,
     queryFn: async () => {
@@ -58,12 +62,28 @@ export function ProfileController() {
     },
   });
 
-  const { data: overview, isLoading: overviewLoading } = useProfileOverview();
-  const { data: libraryStats, isLoading: libraryStatsLoading } = useLibraryStats();
+  const {
+    data: overview,
+    isLoading: overviewLoading,
+    isRefetching: overviewRefetching,
+    refetch: refetchOverview,
+  } = useProfileOverview();
+  const {
+    data: libraryStats,
+    isLoading: libraryStatsLoading,
+    refetch: refetchLibraryStats,
+  } = useLibraryStats();
   const triggerSync = useTriggerLibrarySync();
   const { status: syncStatus } = useLibrarySyncStatus();
   const isSyncing =
     triggerSync.isPending || (isActiveLibrarySync(syncStatus) && !isStaleLibrarySync(syncStatus));
+
+  const handleRefresh = () => {
+    void refetchProfile();
+    void refetchConnection();
+    void refetchOverview();
+    void refetchLibraryStats();
+  };
 
   const handleSyncNow = () => {
     triggerSync.mutate(undefined, {
@@ -107,6 +127,8 @@ export function ProfileController() {
       }
       product={productLabel(connection?.spotify_product)}
       heroSubtitle={heroSubtitle}
+      refreshing={overviewRefetching}
+      onRefresh={handleRefresh}
     />
   );
 }

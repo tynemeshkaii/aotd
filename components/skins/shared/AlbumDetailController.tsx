@@ -18,9 +18,18 @@ type Props = {
   isToday?: boolean;
   header?: ReactNode;
   footer?: ReactNode;
+  refreshing?: boolean;
+  onRefresh?: () => void;
 };
 
-export function AlbumDetailController({ album, isToday, header, footer }: Props) {
+export function AlbumDetailController({
+  album,
+  isToday,
+  header,
+  footer,
+  refreshing,
+  onRefresh,
+}: Props) {
   const components = useSkinComponents();
   useAccentFlowFocus();
   const insets = useSafeAreaInsets();
@@ -97,6 +106,8 @@ export function AlbumDetailController({ album, isToday, header, footer }: Props)
         onOpen={open}
         onShare={share}
         isFreeSpotify={isFreeSpotify}
+        refreshing={refreshing}
+        onRefresh={onRefresh}
       />
 
       <View pointerEvents="none" collapsable={false} className="absolute -left-[2000px] top-0">

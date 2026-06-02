@@ -5,6 +5,7 @@ import {
   ActivityIndicator,
   Image,
   Pressable,
+  RefreshControl,
   ScrollView,
   TextInput,
   type TextStyle,
@@ -335,6 +336,20 @@ function EditorialAlbumDetailView(props: Parameters<SkinComponentSet['AlbumDetai
         onScroll={onScroll}
         scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}
+        automaticallyAdjustKeyboardInsets
+        keyboardDismissMode="interactive"
+        keyboardShouldPersistTaps="handled"
+        refreshControl={
+          props.onRefresh ? (
+            <RefreshControl
+              refreshing={!!props.refreshing}
+              onRefresh={props.onRefresh}
+              tintColor={editorialColors.ink}
+              colors={[editorialColors.ink]}
+              progressViewOffset={props.topInset}
+            />
+          ) : undefined
+        }
         contentContainerStyle={{
           paddingTop: props.topInset + 12,
           paddingHorizontal: 20,
@@ -370,6 +385,7 @@ function EditorialAlbumDetailView(props: Parameters<SkinComponentSet['AlbumDetai
               <Text
                 className="mt-[7px] lowercase"
                 style={[type.display34, { color: editorialColors.ink }]}
+                maxFontSizeMultiplier={1.4}
               >
                 your album of the{'\n'}
                 <AccentText fallback className="lowercase" style={type.display34}>
@@ -385,12 +401,15 @@ function EditorialAlbumDetailView(props: Parameters<SkinComponentSet['AlbumDetai
               className="uppercase"
               style={[type.display34, { color: editorialColors.ink, zIndex: 2 }]}
               numberOfLines={4}
+              adjustsFontSizeToFit
+              minimumFontScale={0.8}
+              maxFontSizeMultiplier={1.4}
             >
               {props.album.album_title}
             </Text>
             <View
               className="aspect-square w-full overflow-hidden"
-              style={{ backgroundColor: editorialColors.paperAlt, marginTop: -14, zIndex: 1 }}
+              style={{ backgroundColor: editorialColors.paperAlt, marginTop: -8, zIndex: 1 }}
             >
               <Animated.View style={[{ flex: 1 }, coverStyle]}>
                 {props.album.album_cover_url ? (
@@ -438,7 +457,19 @@ function EditorialAlbumDetailView(props: Parameters<SkinComponentSet['AlbumDetai
           </View>
 
           {props.isFreeSpotify ? (
-            <View className="mt-6 border-2 px-3 py-2" style={{ borderColor: '#1db954' }}>
+            <View
+              className="mt-6 border-2 px-3 py-2"
+              style={{
+                borderColor: editorialColors.ink,
+                backgroundColor: editorialColors.paperAlt,
+              }}
+            >
+              <Text
+                className="mb-1 font-mono-bold text-[10px] uppercase leading-4"
+                style={{ color: editorialColors.muted, letterSpacing: 0.9 }}
+              >
+                Spotify Free
+              </Text>
               <Text
                 className="font-prose-medium text-sm leading-5"
                 style={{ color: editorialColors.ink }}
@@ -503,6 +534,9 @@ function EditorialDiscoveriesView(props: Parameters<SkinComponentSet['Discoverie
           <Text
             className="uppercase"
             style={[type.archiveMasthead, { color: editorialColors.ink }]}
+            maxFontSizeMultiplier={1.3}
+            adjustsFontSizeToFit
+            numberOfLines={1}
           >
             Archive
           </Text>
@@ -577,6 +611,14 @@ function EditorialDiscoveriesView(props: Parameters<SkinComponentSet['Discoverie
               props.filtered.length
                 ? { paddingBottom: bottomPadding }
                 : { flex: 1, paddingBottom: bottomPadding }
+            }
+            refreshControl={
+              <RefreshControl
+                refreshing={props.retrying}
+                onRefresh={props.onRetry}
+                tintColor={editorialColors.ink}
+                colors={[editorialColors.ink]}
+              />
             }
             data={props.filtered}
             keyExtractor={(item) => item.aotd_id}
@@ -864,11 +906,23 @@ function EditorialProfileView(props: Parameters<SkinComponentSet['ProfileView']>
       }}
       style={{ backgroundColor: editorialColors.paper }}
       showsVerticalScrollIndicator={false}
+      refreshControl={
+        <RefreshControl
+          refreshing={props.refreshing}
+          onRefresh={props.onRefresh}
+          tintColor={editorialColors.ink}
+          colors={[editorialColors.ink]}
+          progressViewOffset={insets.top}
+        />
+      }
     >
       <View className="gap-3">
         <Text
           className="font-display text-[54px] uppercase leading-[52px]"
           style={{ color: editorialColors.ink, letterSpacing: 0 }}
+          maxFontSizeMultiplier={1.3}
+          adjustsFontSizeToFit
+          numberOfLines={1}
         >
           Colophon
         </Text>
@@ -891,6 +945,7 @@ function EditorialProfileView(props: Parameters<SkinComponentSet['ProfileView']>
                 label={props.profile?.display_name}
                 size={84}
                 uri={props.profile?.avatar_url}
+                rounded={false}
               />
             )}
           </View>
@@ -912,6 +967,7 @@ function EditorialProfileView(props: Parameters<SkinComponentSet['ProfileView']>
                   className="mt-1 font-display text-3xl leading-8"
                   style={{ color: editorialColors.ink, letterSpacing: 0 }}
                   numberOfLines={3}
+                  maxFontSizeMultiplier={1.4}
                 >
                   {props.profile?.display_name ?? 'Spotify listener'}
                 </Text>
@@ -1013,7 +1069,7 @@ function EditorialProfileView(props: Parameters<SkinComponentSet['ProfileView']>
                       <View
                         className="h-full"
                         style={{
-                          width: `${maxDecade ? Math.max(10, (decade.count / maxDecade) * 100) : 0}%`,
+                          width: `${maxDecade ? Math.max(4, (decade.count / maxDecade) * 100) : 0}%`,
                           backgroundColor: editorialColors.ink,
                         }}
                       />
@@ -1096,7 +1152,7 @@ function EditorialProfileView(props: Parameters<SkinComponentSet['ProfileView']>
         <Text className="font-prose text-base leading-6" style={{ color: editorialColors.ink }}>
           {props.connection
             ? `Spotify connected${props.profile?.display_name ? ` as ${props.profile.display_name}` : ''}`
-            : 'Spotify connection is syncing'}
+            : 'No Spotify connection yet'}
         </Text>
         {props.connection?.connected_at ? (
           <Text
@@ -1121,10 +1177,15 @@ function EditorialProfileView(props: Parameters<SkinComponentSet['ProfileView']>
 }
 
 function EditorialSignInView({ loading, onSignIn }: Parameters<SkinComponentSet['SignInView']>[0]) {
+  const insets = useSafeAreaInsets();
   return (
     <View
-      className="flex-1 justify-between px-5 py-10"
-      style={{ backgroundColor: editorialColors.paper }}
+      className="flex-1 justify-between px-5"
+      style={{
+        backgroundColor: editorialColors.paper,
+        paddingTop: insets.top + 28,
+        paddingBottom: insets.bottom + 28,
+      }}
     >
       <View className="gap-4">
         <Text
@@ -1378,7 +1439,7 @@ export const editorialSkin: SkinComponentSet = {
   SyncBanner: EditorialSyncBanner,
   States: {
     AlbumDetailSkeleton: () => (
-      <View className="gap-4 p-5" style={{ backgroundColor: editorialColors.paper }}>
+      <View className="gap-4" style={{ backgroundColor: editorialColors.paper }}>
         <Skeleton className="aspect-square w-full rounded-none" />
         <Skeleton className="h-14 w-4/5 rounded-none" />
         <Skeleton className="h-4 w-full rounded-none" />

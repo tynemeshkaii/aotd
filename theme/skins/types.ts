@@ -48,6 +48,9 @@ export type AlbumDetailViewProps = {
   onOpen: () => void;
   onShare: () => void;
   isFreeSpotify: boolean;
+  /** Pull-to-refresh: only wired for today's Home pick. */
+  refreshing?: boolean;
+  onRefresh?: () => void;
 };
 
 export type DiscoveriesViewProps = {
@@ -83,6 +86,8 @@ export type ProfileViewProps = {
   onOpenRatedDiscoveries: () => void;
   product: string | null;
   heroSubtitle: string;
+  refreshing: boolean;
+  onRefresh: () => void;
 };
 
 export type SignInViewProps = {

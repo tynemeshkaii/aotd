@@ -164,6 +164,8 @@ function profileFixtureProps(
     onSyncNow: () => undefined,
     onSignOut: () => undefined,
     onOpenRatedDiscoveries: () => undefined,
+    refreshing: false,
+    onRefresh: () => undefined,
     product: 'Premium',
     heroSubtitle: overview
       ? `${overview.streak}-day streak / ${overview.total_discovered} albums discovered`
