@@ -22,6 +22,8 @@ type SyncStartResult = {
 const SPOTIFY_PAGE_SIZE = 50;
 const SYNC_LOG_EVERY_PAGES = 10;
 const DEFAULT_BOUNDED_SYNC_PAGES = 3;
+const SYNC_PROGRESS_MIN_INTERVAL_MS = 5_000;
+const SYNC_PROGRESS_MIN_PAGE_DELTA = 5;
 
 type SyncMode = 'initial' | 'bounded' | 'full_reconcile';
 
@@ -89,6 +91,7 @@ Deno.serve(async (req) => {
 async function runSync(admin: SupabaseClient, userId: string, startedAt: string, mode: SyncMode) {
   try {
     await patchSyncStatus(admin, userId, { status: 'syncing', processed_count: 0 }, startedAt);
+    const patchProgress = createSyncProgressPatcher(admin, userId, startedAt);
 
     const token = await getValidSpotifyToken(admin, userId);
     const trackLimit = getSyncTrackLimit();
@@ -105,16 +108,11 @@ async function runSync(admin: SupabaseClient, userId: string, startedAt: string,
       token,
       async (page) => {
         savedAlbums.push(...page.items);
-        await patchSyncStatus(
-          admin,
-          userId,
-          {
-            total_estimate: page.total,
-            processed_count: savedAlbums.length,
-            saved_albums_count: savedAlbums.length,
-          },
-          startedAt,
-        );
+        await patchProgress({
+          total_estimate: page.total,
+          processed_count: savedAlbums.length,
+          saved_albums_count: savedAlbums.length,
+        });
       },
       () => getValidSpotifyToken(admin, userId),
       {
@@ -137,16 +135,11 @@ async function runSync(admin: SupabaseClient, userId: string, startedAt: string,
           : page.items.length;
         savedTracks.push(...page.items.slice(0, remainingTracks));
         const estimatedTracks = trackLimit ? Math.min(page.total, trackLimit) : page.total;
-        await patchSyncStatus(
-          admin,
-          userId,
-          {
-            total_estimate: savedAlbums.length + estimatedTracks,
-            processed_count: savedAlbums.length + savedTracks.length,
-            saved_tracks_count: savedTracks.length,
-          },
-          startedAt,
-        );
+        await patchProgress({
+          total_estimate: savedAlbums.length + estimatedTracks,
+          processed_count: savedAlbums.length + savedTracks.length,
+          saved_tracks_count: savedTracks.length,
+        });
       },
       () => getValidSpotifyToken(admin, userId),
       {
@@ -161,13 +154,11 @@ async function runSync(admin: SupabaseClient, userId: string, startedAt: string,
     );
 
     const aggregated = aggregateLibrary(savedAlbums, savedTracks);
-    await patchSyncStatus(
-      admin,
-      userId,
+    await patchProgress(
       {
         processed_count: savedAlbums.length + savedTracks.length,
       },
-      startedAt,
+      { force: true },
     );
 
     // Stamp synced_at with startedAt so post-sync reconciliation can identify
@@ -330,6 +321,33 @@ async function tryStartLibrarySync(
   }
 
   return row;
+}
+
+function createSyncProgressPatcher(
+  admin: SupabaseClient,
+  userId: string,
+  startedAt: string,
+): (patch: Record<string, unknown>, options?: { force?: boolean }) => Promise<void> {
+  let lastPatchedAt = 0;
+  let lastProcessedCount = 0;
+
+  return async (patch, options = {}) => {
+    const processedCount =
+      typeof patch.processed_count === 'number' ? patch.processed_count : lastProcessedCount;
+    const pageDelta = Math.floor((processedCount - lastProcessedCount) / SPOTIFY_PAGE_SIZE);
+    const elapsedMs = Date.now() - lastPatchedAt;
+    const shouldPatch =
+      options.force ||
+      lastPatchedAt === 0 ||
+      pageDelta >= SYNC_PROGRESS_MIN_PAGE_DELTA ||
+      elapsedMs >= SYNC_PROGRESS_MIN_INTERVAL_MS;
+
+    if (!shouldPatch) return;
+
+    await patchSyncStatus(admin, userId, patch, startedAt);
+    lastPatchedAt = Date.now();
+    lastProcessedCount = processedCount;
+  };
 }
 
 /**

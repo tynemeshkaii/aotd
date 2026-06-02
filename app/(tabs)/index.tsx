@@ -5,8 +5,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AlbumDetail } from '@/components/album/AlbumDetail';
 import { Text } from '@/components/ui/Text';
-import { useDiscoveries } from '@/lib/hooks/useDiscoveries';
 import { useTodayPick } from '@/lib/hooks/useTodayPick';
+import { useUnratedPastPickCount } from '@/lib/hooks/useUnratedPastPickCount';
 import { useTabContentBottomPadding } from '@/lib/navigationChrome';
 import { useSkinComponents } from '@/theme/skins/registry';
 
@@ -31,10 +31,7 @@ export default function HomeScreen() {
   const components = useSkinComponents();
   const { chrome } = components;
   const { data: pick, isError, isLoading, isRefetching, refetch } = useTodayPick();
-  const { data: discoveries } = useDiscoveries();
-  const oldPendingCount =
-    discoveries?.filter((row) => row.status !== 'rated' && row.aotd_id !== pick?.aotd_id).length ??
-    0;
+  const { data: oldPendingCount = 0 } = useUnratedPastPickCount(pick?.aotd_id);
 
   // Loading: pick skeleton (not a blank screen).
   if (isLoading) {

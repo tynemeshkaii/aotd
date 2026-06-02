@@ -5,21 +5,37 @@ import { useSession } from '@/components/auth/AuthProvider';
 import { type AlbumDiscovery, parseAlbumDiscoveries } from '@/lib/recommendation';
 import { supabase } from '@/lib/supabase';
 
-export const DISCOVERIES_KEY = (userId?: string) => ['discoveries', userId];
+const DEFAULT_DISCOVERIES_LIMIT = 120;
 
-export function useDiscoveries() {
+type UseDiscoveriesOptions = {
+  limit?: number;
+  offset?: number;
+};
+
+export const DISCOVERIES_KEY = (userId?: string, limit?: number, offset?: number) => [
+  'discoveries',
+  userId,
+  limit,
+  offset,
+];
+
+export function useDiscoveries(options: UseDiscoveriesOptions = {}) {
   const { session } = useSession();
   const userId = session?.user.id;
   const qc = useQueryClient();
   const instanceId = useId();
+  const limit = options.limit ?? DEFAULT_DISCOVERIES_LIMIT;
+  const offset = options.offset ?? 0;
 
   const query = useQuery({
-    queryKey: DISCOVERIES_KEY(userId),
+    queryKey: DISCOVERIES_KEY(userId, limit, offset),
     enabled: !!userId,
     queryFn: async (): Promise<AlbumDiscovery[]> => {
       if (!userId) throw new Error('missing_user_id');
       const { data, error } = await supabase.rpc('get_discoveries', {
         p_user_id: userId,
+        p_limit: limit,
+        p_offset: offset,
       });
       if (error) throw error;
       return parseAlbumDiscoveries(data ?? []);

@@ -5,7 +5,6 @@ import { Alert } from 'react-native';
 import { useSession } from '@/components/auth/AuthProvider';
 import { signOut } from '@/lib/auth';
 import { copy } from '@/lib/copy';
-import { useLibraryStats } from '@/lib/hooks/useLibraryStats';
 import { useLibrarySyncStatus } from '@/lib/hooks/useLibrarySyncStatus';
 import { useProfileOverview } from '@/lib/hooks/useProfileOverview';
 import { useTriggerLibrarySync } from '@/lib/hooks/useTriggerLibrarySync';
@@ -68,11 +67,6 @@ export function ProfileController() {
     isRefetching: overviewRefetching,
     refetch: refetchOverview,
   } = useProfileOverview();
-  const {
-    data: libraryStats,
-    isLoading: libraryStatsLoading,
-    refetch: refetchLibraryStats,
-  } = useLibraryStats();
   const triggerSync = useTriggerLibrarySync();
   const { status: syncStatus } = useLibrarySyncStatus();
   const isSyncing =
@@ -82,7 +76,6 @@ export function ProfileController() {
     void refetchProfile();
     void refetchConnection();
     void refetchOverview();
-    void refetchLibraryStats();
   };
 
   const handleSyncNow = () => {
@@ -116,8 +109,11 @@ export function ProfileController() {
       connection={connection}
       overview={overview}
       overviewLoading={overviewLoading}
-      libraryStats={libraryStats}
-      libraryStatsLoading={libraryStatsLoading}
+      libraryStats={{
+        albumsTracked: overview?.library_stats.albums_tracked ?? null,
+        lastSyncedAt: overview?.library_stats.last_synced_at ?? null,
+      }}
+      libraryStatsLoading={overviewLoading}
       syncStatus={syncStatus}
       isSyncing={isSyncing}
       onSyncNow={handleSyncNow}

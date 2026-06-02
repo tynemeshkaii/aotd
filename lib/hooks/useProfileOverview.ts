@@ -21,6 +21,10 @@ export type ProfileOverview = {
     avg_score: number | null;
     total_rated: number;
   };
+  library_stats: {
+    albums_tracked: number | null;
+    last_synced_at: string | null;
+  };
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -37,6 +41,10 @@ function isDecadeBucket(value: unknown): value is DecadeBucket {
 
 function isNullableNumber(value: unknown): value is number | null {
   return value === null || typeof value === 'number';
+}
+
+function isNullableString(value: unknown): value is string | null {
+  return value === null || typeof value === 'string';
 }
 
 function parseProfileOverview(value: unknown): ProfileOverview {
@@ -64,7 +72,21 @@ function parseProfileOverview(value: unknown): ProfileOverview {
     throw new Error('invalid_profile_overview_shape');
   }
 
-  return value as ProfileOverview;
+  const libraryStats = isRecord(value.library_stats)
+    ? {
+        albums_tracked: isNullableNumber(value.library_stats.albums_tracked)
+          ? value.library_stats.albums_tracked
+          : null,
+        last_synced_at: isNullableString(value.library_stats.last_synced_at)
+          ? value.library_stats.last_synced_at
+          : null,
+      }
+    : { albums_tracked: null, last_synced_at: null };
+
+  return {
+    ...value,
+    library_stats: libraryStats,
+  } as ProfileOverview;
 }
 
 export function useProfileOverview() {

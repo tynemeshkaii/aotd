@@ -98,6 +98,10 @@ const richOverview: ProfileOverview = {
     avg_score: 4.4,
     total_rated: 121,
   },
+  library_stats: {
+    albums_tracked: 142,
+    last_synced_at: now,
+  },
 };
 
 const emptyOverview: ProfileOverview = {
@@ -114,6 +118,10 @@ const emptyOverview: ProfileOverview = {
     loved_count: 0,
     avg_score: null,
     total_rated: 0,
+  },
+  library_stats: {
+    albums_tracked: null,
+    last_synced_at: null,
   },
 };
 
