@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { recordExternalApiCall, safeRetryAfterSeconds } from './external-api-log.ts';
 import { reserveExternalApiSlot } from './external-api-rate-limit.ts';
+import { logInfo } from './logger.ts';
 
 type SpotifyImage = {
   url: string;
@@ -174,7 +175,7 @@ export async function fetchAllSpotifyPaged<T>(
 
   while (url) {
     if (pagesFetched >= maxPages) {
-      console.log(
+      logInfo(
         `[spotify] stopped ${options.label ?? endpoint} after ${pagesFetched} pages (${totalFetched} items)`,
       );
       break;
@@ -249,7 +250,7 @@ export async function fetchAllSpotifyPaged<T>(
     retriedAuth = false;
 
     if (options.logEveryPages && pagesFetched % options.logEveryPages === 0) {
-      console.log(
+      logInfo(
         `[spotify] fetched ${totalFetched}/${page.total} ${options.label ?? endpoint} items (${pagesFetched} pages)`,
       );
     }

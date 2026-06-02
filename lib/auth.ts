@@ -97,9 +97,6 @@ export async function completeSpotifyOAuthFromUrl(url: string) {
 
 export async function signInWithSpotify() {
   const redirectTo = getSpotifyRedirectTo();
-  if (__DEV__) {
-    console.info('[auth] Spotify redirectTo:', redirectTo);
-  }
 
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: 'spotify',
@@ -116,12 +113,6 @@ export async function signInWithSpotify() {
 
   if (!data.url) {
     throw new Error('missing_oauth_url');
-  }
-
-  if (__DEV__) {
-    const oauthUrl = new URL(data.url);
-    console.info('[auth] Supabase OAuth redirect_to:', oauthUrl.searchParams.get('redirect_to'));
-    console.info('[auth] Supabase OAuth provider URL:', oauthUrl.origin + oauthUrl.pathname);
   }
 
   const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo, {

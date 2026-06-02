@@ -2,7 +2,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useId } from 'react';
 
 import { useSession } from '@/components/auth/AuthProvider';
-import type { AlbumDiscovery } from '@/lib/recommendation';
+import { type AlbumDiscovery, parseAlbumDiscovery } from '@/lib/recommendation';
 import { supabase } from '@/lib/supabase';
 
 export const DISCOVERY_DETAIL_KEY = (userId?: string, aotdId?: string) => [
@@ -28,7 +28,7 @@ export function useDiscoveryDetail(aotdId?: string) {
       });
       if (error) throw error;
       const row = Array.isArray(data) ? data[0] : data;
-      return (row ?? null) as unknown as AlbumDiscovery | null;
+      return row ? parseAlbumDiscovery(row) : null;
     },
   });
 

@@ -149,7 +149,9 @@ export async function fetchAudioFeaturesBatchOptional(
       for (const f of data.audio_features ?? []) {
         if (f?.id) out[f.id] = f;
       }
-    } catch {}
+    } catch {
+      // Optional enrichment: missing audio features should not block recommendation flow.
+    }
   }
   return out;
 }

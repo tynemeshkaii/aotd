@@ -23,6 +23,50 @@ export type ProfileOverview = {
   };
 };
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isTopArtist(value: unknown): value is TopArtist {
+  return isRecord(value) && typeof value.name === 'string' && typeof value.count === 'number';
+}
+
+function isDecadeBucket(value: unknown): value is DecadeBucket {
+  return isRecord(value) && typeof value.decade === 'number' && typeof value.count === 'number';
+}
+
+function isNullableNumber(value: unknown): value is number | null {
+  return value === null || typeof value === 'number';
+}
+
+function parseProfileOverview(value: unknown): ProfileOverview {
+  if (!isRecord(value) || !isRecord(value.taste) || !isRecord(value.listening)) {
+    throw new Error('invalid_profile_overview_shape');
+  }
+
+  const topArtists = value.taste.top_artists;
+  const decades = value.taste.decades;
+
+  if (
+    typeof value.streak !== 'number' ||
+    typeof value.total_discovered !== 'number' ||
+    !Array.isArray(topArtists) ||
+    !topArtists.every(isTopArtist) ||
+    !Array.isArray(decades) ||
+    !decades.every(isDecadeBucket) ||
+    !isNullableNumber(value.taste.span_min) ||
+    !isNullableNumber(value.taste.span_max) ||
+    typeof value.listening.rated_this_month !== 'number' ||
+    typeof value.listening.loved_count !== 'number' ||
+    !isNullableNumber(value.listening.avg_score) ||
+    typeof value.listening.total_rated !== 'number'
+  ) {
+    throw new Error('invalid_profile_overview_shape');
+  }
+
+  return value as ProfileOverview;
+}
+
 export function useProfileOverview() {
   const { session } = useSession();
   const userId = session?.user.id;
@@ -45,7 +89,7 @@ export function useProfileOverview() {
         throw error;
       }
 
-      return data as unknown as ProfileOverview;
+      return parseProfileOverview(data);
     },
   });
 }
