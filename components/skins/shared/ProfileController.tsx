@@ -1,15 +1,14 @@
-import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { Alert } from 'react-native';
 
-import { useSession } from '@/components/auth/AuthProvider';
 import { signOut } from '@/lib/auth';
 import { copy } from '@/lib/copy';
 import { useLibrarySyncStatus } from '@/lib/hooks/useLibrarySyncStatus';
+import { useProfileIdentity } from '@/lib/hooks/useProfileIdentity';
 import { useProfileOverview } from '@/lib/hooks/useProfileOverview';
+import { useSpotifyConnection } from '@/lib/hooks/useSpotifyConnection';
 import { useTriggerLibrarySync } from '@/lib/hooks/useTriggerLibrarySync';
 import { isActiveLibrarySync, isStaleLibrarySync } from '@/lib/library';
-import { supabase } from '@/lib/supabase';
 import { useAccentFlowFocus } from '@/theme/skins/AccentFlowProvider';
 import { useSkinComponents } from '@/theme/skins/registry';
 
@@ -23,43 +22,14 @@ function productLabel(product?: string | null): string | null {
 export function ProfileController() {
   const components = useSkinComponents();
   useAccentFlowFocus();
-  const { session } = useSession();
-  const userId = session?.user.id;
 
   const {
     data: profile,
     isLoading: profileLoading,
     refetch: refetchProfile,
-  } = useQuery({
-    queryKey: ['profile', userId],
-    enabled: !!userId,
-    queryFn: async () => {
-      if (!userId) throw new Error('missing_user_id');
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('display_name, avatar_url')
-        .eq('id', userId)
-        .single();
-      if (error) throw error;
-      return data;
-    },
-  });
+  } = useProfileIdentity();
 
-  const { data: connection, refetch: refetchConnection } = useQuery({
-    queryKey: ['streaming-connection', userId],
-    enabled: !!userId,
-    queryFn: async () => {
-      if (!userId) throw new Error('missing_user_id');
-      const { data, error } = await supabase
-        .from('streaming_connections_safe')
-        .select('provider, connected_at, spotify_product')
-        .eq('user_id', userId)
-        .eq('provider', 'spotify')
-        .maybeSingle();
-      if (error) throw error;
-      return data;
-    },
-  });
+  const { data: connection, refetch: refetchConnection } = useSpotifyConnection();
 
   const {
     data: overview,

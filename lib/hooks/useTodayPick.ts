@@ -1,13 +1,15 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useId, useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { useEffect, useMemo, useState } from 'react';
 import { AppState } from 'react-native';
 
 import { useSession } from '@/components/auth/AuthProvider';
-import type { TodayPick } from '@/lib/recommendation';
+import { useUserRealtimeInvalidation } from '@/lib/hooks/useUserRealtimeInvalidation';
+import { parseAlbumDiscovery, type TodayPick } from '@/lib/recommendation';
 import { supabase } from '@/lib/supabase';
 
 const TODAY_KEY = (userId?: string, localDate?: string) =>
   localDate ? ['today-pick', userId, localDate] : ['today-pick', userId];
+const TODAY_PICK_REALTIME_TABLES = ['albums_of_the_day'];
 
 function localDateKey(date = new Date()) {
   const year = date.getFullYear();
@@ -26,10 +28,9 @@ function msUntilNextLocalMidnight() {
 export function useTodayPick() {
   const { session } = useSession();
   const userId = session?.user.id;
-  const qc = useQueryClient();
-  const instanceId = useId();
   const [localDate, setLocalDate] = useState(() => localDateKey());
   const todayKey = useMemo(() => TODAY_KEY(userId, localDate), [userId, localDate]);
+  const realtimeKey = useMemo(() => TODAY_KEY(userId), [userId]);
 
   const query = useQuery({
     queryKey: todayKey,
@@ -44,10 +45,7 @@ export function useTodayPick() {
       });
       if (error) throw error;
       const row = Array.isArray(data) ? data[0] : data;
-      // The generated RPC return type is looser than TodayPick (nullable
-      // columns appear as non-null, status is a free string, selection_reason
-      // is Json). Narrow at the boundary.
-      return (row ?? null) as TodayPick | null;
+      return row ? parseAlbumDiscovery(row) : null;
     },
   });
 
@@ -79,27 +77,12 @@ export function useTodayPick() {
     };
   }, []);
 
-  useEffect(() => {
-    if (!userId) return;
-    const channel = supabase
-      .channel(`today-pick-${userId}-${instanceId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'albums_of_the_day',
-          filter: `user_id=eq.${userId}`,
-        },
-        () => {
-          qc.invalidateQueries({ queryKey: TODAY_KEY(userId) });
-        },
-      )
-      .subscribe();
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [userId, qc, instanceId]);
+  useUserRealtimeInvalidation({
+    channelPrefix: 'today-pick',
+    userId,
+    tables: TODAY_PICK_REALTIME_TABLES,
+    queryKey: realtimeKey,
+  });
 
   return query;
 }

@@ -1,7 +1,8 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useId } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { useMemo } from 'react';
 
 import { useSession } from '@/components/auth/AuthProvider';
+import { useUserRealtimeInvalidation } from '@/lib/hooks/useUserRealtimeInvalidation';
 import { supabase } from '@/lib/supabase';
 
 export const UNRATED_PAST_PICK_COUNT_KEY = (userId?: string, excludeAotdId?: string) => [
@@ -9,15 +10,18 @@ export const UNRATED_PAST_PICK_COUNT_KEY = (userId?: string, excludeAotdId?: str
   userId,
   excludeAotdId,
 ];
+const UNRATED_PAST_PICK_COUNT_REALTIME_TABLES = ['albums_of_the_day'];
 
 export function useUnratedPastPickCount(excludeAotdId?: string) {
   const { session } = useSession();
   const userId = session?.user.id;
-  const qc = useQueryClient();
-  const instanceId = useId();
+  const queryKey = useMemo(
+    () => UNRATED_PAST_PICK_COUNT_KEY(userId, excludeAotdId),
+    [userId, excludeAotdId],
+  );
 
   const query = useQuery({
-    queryKey: UNRATED_PAST_PICK_COUNT_KEY(userId, excludeAotdId),
+    queryKey,
     enabled: !!userId,
     queryFn: async (): Promise<number> => {
       if (!userId) throw new Error('missing_user_id');
@@ -35,30 +39,12 @@ export function useUnratedPastPickCount(excludeAotdId?: string) {
     },
   });
 
-  useEffect(() => {
-    if (!userId) return;
-
-    const channel = supabase
-      .channel(`unrated-past-pick-count-${userId}-${instanceId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'albums_of_the_day',
-          filter: `user_id=eq.${userId}`,
-        },
-        () =>
-          qc.invalidateQueries({
-            queryKey: UNRATED_PAST_PICK_COUNT_KEY(userId, excludeAotdId),
-          }),
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [userId, excludeAotdId, qc, instanceId]);
+  useUserRealtimeInvalidation({
+    channelPrefix: 'unrated-past-pick-count',
+    userId,
+    tables: UNRATED_PAST_PICK_COUNT_REALTIME_TABLES,
+    queryKey,
+  });
 
   return query;
 }

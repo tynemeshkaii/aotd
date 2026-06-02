@@ -1,7 +1,8 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useId } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { useMemo } from 'react';
 
 import { useSession } from '@/components/auth/AuthProvider';
+import { useUserRealtimeInvalidation } from '@/lib/hooks/useUserRealtimeInvalidation';
 import { type AlbumDiscovery, parseAlbumDiscovery } from '@/lib/recommendation';
 import { supabase } from '@/lib/supabase';
 
@@ -10,15 +11,15 @@ export const DISCOVERY_DETAIL_KEY = (userId?: string, aotdId?: string) => [
   userId,
   aotdId,
 ];
+const DISCOVERY_DETAIL_REALTIME_TABLES = ['albums_of_the_day', 'ratings'];
 
 export function useDiscoveryDetail(aotdId?: string) {
   const { session } = useSession();
   const userId = session?.user.id;
-  const qc = useQueryClient();
-  const instanceId = useId();
+  const queryKey = useMemo(() => DISCOVERY_DETAIL_KEY(userId, aotdId), [userId, aotdId]);
 
   const query = useQuery({
-    queryKey: DISCOVERY_DETAIL_KEY(userId, aotdId),
+    queryKey,
     enabled: !!userId && !!aotdId,
     queryFn: async (): Promise<AlbumDiscovery | null> => {
       if (!userId || !aotdId) throw new Error('missing_discovery_detail_args');
@@ -32,41 +33,12 @@ export function useDiscoveryDetail(aotdId?: string) {
     },
   });
 
-  useEffect(() => {
-    if (!userId || !aotdId) return;
-
-    const invalidate = () => {
-      qc.invalidateQueries({ queryKey: DISCOVERY_DETAIL_KEY(userId, aotdId) });
-    };
-
-    const channel = supabase
-      .channel(`discovery-detail-${userId}-${aotdId}-${instanceId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'albums_of_the_day',
-          filter: `user_id=eq.${userId}`,
-        },
-        invalidate,
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'ratings',
-          filter: `user_id=eq.${userId}`,
-        },
-        invalidate,
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [userId, aotdId, qc, instanceId]);
+  useUserRealtimeInvalidation({
+    channelPrefix: `discovery-detail-${aotdId ?? 'missing'}`,
+    userId: aotdId ? userId : undefined,
+    tables: DISCOVERY_DETAIL_REALTIME_TABLES,
+    queryKey,
+  });
 
   return query;
 }
