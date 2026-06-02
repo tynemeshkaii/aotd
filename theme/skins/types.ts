@@ -4,6 +4,7 @@ import type { StyleProp, View, ViewStyle } from 'react-native';
 import type { SharedValue } from 'react-native-reanimated';
 
 import type { DiscoveryFilter } from '@/components/album/StatusTabs';
+import type { LibrarySyncStatus } from '@/lib/hooks/useLibrarySyncStatus';
 import type { ProfileOverview } from '@/lib/hooks/useProfileOverview';
 import type { AlbumDiscovery } from '@/lib/recommendation';
 
@@ -70,6 +71,7 @@ export type ProfileViewProps = {
   overviewLoading: boolean;
   libraryStats?: { albumsTracked: number | null; lastSyncedAt: string | null } | null;
   libraryStatsLoading: boolean;
+  syncStatus?: LibrarySyncStatus | null;
   isSyncing: boolean;
   onSyncNow: () => void;
   onSignOut: () => void;
@@ -102,6 +104,7 @@ export type ShareCardProps = {
 
 export type SyncBannerProps = {
   style?: StyleProp<ViewStyle>;
+  status?: LibrarySyncStatus | null;
 };
 
 export type StatesComponentSet = {

@@ -37,5 +37,5 @@ export function Text({ variant, className, ...rest }: Props) {
     ? `${variantClasses[variant]} ${className ?? ''}`
     : (className ?? variantClasses.body);
 
-  return <RNText allowFontScaling={false} className={resolvedClassName} {...rest} />;
+  return <RNText className={resolvedClassName} {...rest} />;
 }

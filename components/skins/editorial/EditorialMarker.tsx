@@ -5,14 +5,13 @@ import { Text } from '@/components/ui/Text';
 
 type Props = ViewProps & {
   label: string;
-  tone?: 'ink' | 'paper' | 'red' | 'spotify';
+  tone?: 'ink' | 'paper' | 'red';
   className?: string;
 };
 
 export function EditorialMarker({ label, tone = 'ink', className, style, ...rest }: Props) {
   const isInk = tone === 'ink';
-  const borderColor =
-    tone === 'red' ? editorialColors.red : tone === 'spotify' ? '#1db954' : editorialColors.ink;
+  const borderColor = tone === 'red' ? editorialColors.red : editorialColors.ink;
   const backgroundColor = isInk ? editorialColors.ink : 'transparent';
   const color = isInk ? editorialColors.paper : borderColor;
 

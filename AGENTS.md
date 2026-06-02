@@ -32,6 +32,7 @@ When sources conflict, use this order:
    - `plans/safe-discovery-observability-plan.md`
    - `plans/api-request-optimization-plan.md`
    - `plans/discoveries-pivot.md`
+   - `plans/profile-screen-design-remediation-plan.md`
 4. Older phase plans as historical context only.
 5. `README.md` as onboarding prose only, not implementation truth.
 
@@ -125,6 +126,13 @@ Editorial design contracts:
 - Do not reintroduce the old glass/rounded/dark SaaS look as the default.
 - The album cover is the dominant visual surface. Avoid generic decorative blobs/orbs.
 - Tags/chips are static ink/paper markers, not flowing accent.
+- Editorial Profile is a listening identity page first, not a settings ledger. Keep identity, Taste map, and Listening visually strongest; Production notes, Connections, and Log out should stay quieter.
+- Profile loading must be honest: do not render placeholder zero metrics while `overviewLoading` is true. Use skeleton/loading treatments and only show empty states after overview data has finished loading.
+- Profile uses safe-area-aware top and bottom padding via `useSafeAreaInsets()`, accounting for notched iPhones, the tab bar, and the home indicator.
+- Profile Spotify Free/Premium markers use ink/paper editorial styling. Do not use Spotify green for Profile badges; reserve Spotify green for Spotify-branded sign-in/opening UI.
+- Taste map artist names should wrap cleanly, generally up to two lines, with stable rank/count alignment. Decade data should keep visible text counts and an editorial ruled/shelf feel, not a bare utility progress bar.
+- Listening summary should use the five emotional rating labels when summarizing mood. Avoid overemphasizing numeric averages.
+- `EditorialActionButton` preserves its provided `title` while loading, so callers should pass specific loading copy such as `Syncing...`, `Retrying...`, or `Saving...`.
 - Country chip renders only when `album_artist_country` is present; `GB` displays as `UK`. Hide the chip when country is null.
 - The spec line should not add genres. The product does not explain picks by genre.
 - Flowing accent is scarce: masthead `day`, hairline rules, and CTA arrow. Do not animate album titles, metadata, rows, body copy, skeletons, errors, or lists.
@@ -140,6 +148,7 @@ Motion/accessibility contracts:
 
 - `AccentFlowProvider` owns one shared Reanimated progress value, gated by focused screen, app active state, and Reduce Motion.
 - `lib/motion.ts`, `useReduceMotion`, and `lib/haptics.ts` must keep parallax, shimmer, entrance animations, and haptics respectful of Reduce Motion.
+- `components/ui/Text` allows system font scaling by default. Only opt out for specialized animated/masked text where scaling would break rendering; do not disable scaling for ordinary Profile/body text.
 - Haptics are best-effort and must never throw into a user action.
 - FlatList entrance animations should run once per item key per app session; see `DiscoveryListItem`.
 - iOS shadows need two layers when clipping rounded content: outer shadow view, inner `overflow-hidden` clip view.
@@ -182,7 +191,7 @@ Core files:
 - `sync-spotify-library` Edge Function.
 - `lib/library.ts`.
 - `useLibrarySyncStatus`, `useTriggerLibrarySync`, `useLibraryStats`.
-- `components/library/SyncBanner.tsx`, shown only in Profile through the skin component set.
+- `components/library/SyncBanner.tsx` and the editorial `SyncBanner`, shown only in Profile through the skin component set.
 
 Modes:
 
@@ -198,6 +207,8 @@ Guards:
 - Avoid cascades in Spotify Development Mode. A bad auto-sync loop can 429 all Spotify API calls, including OAuth `/me`.
 - `RouterGuard` shows `InitialSyncingScreen` only for the first-time missing-library state after sync status has loaded.
 - Realtime channel names must be unique per hook instance. Use `useId()` in channel names.
+- `ProfileController` passes the current `syncStatus` into `ProfileView`. The editorial `SyncBanner` accepts an optional `status` override so `app/skin-fixtures.tsx` can render syncing/failed states without starting a live subscription; when no override is provided it reads live status itself.
+- Sync failure UI should use concise user-facing copy and keep raw backend `error_message` details out of the primary Profile surface.
 
 Critical DB write rule:
 
@@ -342,7 +353,10 @@ Profile:
 
 - `ProfileController` owns profile, connection, overview, library stats, sync-now, sign-out, and product label.
 - `get_profile_overview` aggregates stats server-side because user libraries can be large.
-- Profile shows library status and manual sync. `SyncBanner` should stay Profile-only.
+- Profile renders as an editorial listening identity surface: hero identity, honest ledger loading, Taste map, Listening summary, then quieter operational sections.
+- Profile shows library status and manual sync. `SyncBanner` should stay Profile-only and visually subordinate unless sync has failed or gone stale.
+- The Taste map restores library span copy when `span_min` and `span_max` are available, wraps long artist names, and keeps decade counts readable in text.
+- Listening summary should distinguish loading, empty, and rated states. Rated states summarize journal mood with emotional rating language derived from `avg_score`.
 - Push time and delete account are future work unless explicitly requested.
 
 ## Environment And Secrets
@@ -361,6 +375,7 @@ For app/client changes:
 - `npm run lint`
 - If NativeWind/font config changed, run/ask the user to run `npx expo start -c`.
 - For visual changes, verify on device or with local fixture screens such as `app/skin-fixtures.tsx` when appropriate.
+- `app/skin-fixtures.tsx` includes Profile fixture scenarios for rich identity, empty/low data, syncing, and failed/free-account states. Keep these fixtures updated when changing Profile layout, copy, or sync presentation.
 
 For Supabase migrations:
 
@@ -402,6 +417,7 @@ Use plans as scoped context, not automatic instructions. Relevant current plans:
 - `plans/safe-discovery-observability-plan.md` - service-role-only recommendation observability.
 - `plans/api-request-optimization-plan.md` - external API caching, breakers, limiters, bounded sync.
 - `plans/discoveries-pivot.md` - why Library/Friends/Stats tabs are gone from v1.
+- `plans/profile-screen-design-remediation-plan.md` - Profile editorial identity, safe-area/loading/accessibility, taste/listening hierarchy, badges, sync copy, and fixture requirements.
 - `plans/v2-social.md` - deferred social scope.
 
 Older phase plans can be useful for intent, but the current code and this guide win when they conflict.

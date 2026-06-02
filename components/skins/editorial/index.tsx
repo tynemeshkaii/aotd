@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { MotiView } from 'moti';
 import * as React from 'react';
 import {
@@ -28,9 +29,10 @@ import { CoverImage } from '@/components/ui/CoverImage';
 import { ProgressBar } from '@/components/ui/ProgressBar';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { Text } from '@/components/ui/Text';
+import { copy } from '@/lib/copy';
 import { relativeTime } from '@/lib/format';
 import { haptics } from '@/lib/haptics';
-import { useLibrarySyncStatus } from '@/lib/hooks/useLibrarySyncStatus';
+import { type LibrarySyncStatus, useLibrarySyncStatus } from '@/lib/hooks/useLibrarySyncStatus';
 import { useReduceMotion } from '@/lib/hooks/useReduceMotion';
 import { useSaveRating } from '@/lib/hooks/useSaveRating';
 import { isStaleLibrarySync } from '@/lib/library';
@@ -157,9 +159,17 @@ function EditorialActionButton({
   onPress: () => void;
   loading?: boolean;
   disabled?: boolean;
-  tone?: 'ink' | 'red';
+  tone?: 'ink' | 'paper' | 'red';
 }) {
   const isDisabled = disabled || loading;
+  const borderColor = tone === 'red' ? editorialColors.red : editorialColors.ink;
+  const backgroundColor = tone === 'ink' ? editorialColors.ink : 'transparent';
+  const foregroundColor =
+    tone === 'ink'
+      ? editorialColors.paper
+      : tone === 'red'
+        ? editorialColors.red
+        : editorialColors.ink;
   return (
     <Pressable
       accessibilityRole="button"
@@ -169,28 +179,23 @@ function EditorialActionButton({
         haptics.impactLight();
         onPress();
       }}
-      className={`min-h-12 flex-row items-center justify-center border-2 px-4 py-3 active:opacity-70 ${
+      className={`min-h-12 flex-row items-center justify-center gap-2 border-2 px-4 py-3 active:opacity-70 ${
         isDisabled ? 'opacity-60' : ''
       }`}
       style={{
-        borderColor: tone === 'red' ? editorialColors.red : editorialColors.ink,
-        backgroundColor: tone === 'ink' ? editorialColors.ink : 'transparent',
+        borderColor,
+        backgroundColor,
       }}
     >
-      {loading ? (
-        <ActivityIndicator
-          color={tone === 'ink' ? editorialColors.paper : editorialColors.red}
-          size="small"
-        />
-      ) : null}
+      {loading ? <ActivityIndicator color={foregroundColor} size="small" /> : null}
       <Text
         className="font-mono-bold text-xs uppercase leading-4"
         style={{
-          color: tone === 'ink' ? editorialColors.paper : editorialColors.red,
+          color: foregroundColor,
           letterSpacing: 0.8,
         }}
       >
-        {loading ? 'Working...' : title}
+        {title}
       </Text>
     </Pressable>
   );
@@ -281,7 +286,6 @@ function EditorialRatingEditor({ album }: { album: AlbumDiscovery }) {
       </View>
       <TextInput
         accessibilityLabel="Private rating note"
-        allowFontScaling={false}
         multiline
         value={comment}
         onChangeText={setComment}
@@ -752,18 +756,30 @@ function EditorialDiscoveryRow({
   );
 }
 
-function LedgerStat({ value, label }: { value: string; label: string }) {
+function LedgerStat({
+  value,
+  label,
+  loading,
+}: {
+  value: string;
+  label: string;
+  loading?: boolean;
+}) {
   return (
     <View className="flex-1 border-t-2 pt-3" style={{ borderColor: editorialColors.ink }}>
-      <Text
-        className="font-display text-[42px] uppercase leading-[42px]"
-        style={{ color: editorialColors.ink, letterSpacing: -1 }}
-        numberOfLines={1}
-        adjustsFontSizeToFit
-        minimumFontScale={0.72}
-      >
-        {value}
-      </Text>
+      {loading ? (
+        <Skeleton className="h-[42px] w-4/5 rounded-none" />
+      ) : (
+        <Text
+          className="font-display text-[42px] uppercase leading-[42px]"
+          style={{ color: editorialColors.ink, letterSpacing: 0 }}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.72}
+        >
+          {value}
+        </Text>
+      )}
       <Text
         className="mt-1 font-mono text-[10px] uppercase leading-4"
         style={{ color: editorialColors.muted, letterSpacing: 0.8 }}
@@ -774,25 +790,79 @@ function LedgerStat({ value, label }: { value: string; label: string }) {
   );
 }
 
+function listeningMoodLabel(avgScore: number | null | undefined) {
+  if (avgScore == null) return 'No mood yet';
+  if (avgScore >= 4.5) return 'Loved it';
+  if (avgScore >= 3.5) return 'Liked it';
+  if (avgScore >= 2.5) return 'It was alright';
+  if (avgScore >= 1.5) return 'Not for me';
+  return 'Bad';
+}
+
+function LibrarySpanLine({ min, max }: { min: number | null; max: number | null }) {
+  if (min == null || max == null) return null;
+
+  return (
+    <Text
+      className="font-mono text-[11px] uppercase leading-5"
+      style={{ color: editorialColors.muted, letterSpacing: 0.8 }}
+    >
+      {copy.profile.librarySpan(min, max)}
+    </Text>
+  );
+}
+
+function EditorialArchiveLink({ onPress }: { onPress: () => void }) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      onPress={() => {
+        haptics.impactLight();
+        onPress();
+      }}
+      className="min-h-12 flex-row items-center justify-between border-2 px-3 py-3 active:opacity-70"
+      style={{ borderColor: editorialColors.ink }}
+    >
+      <Text
+        className="font-mono-bold text-xs uppercase leading-4"
+        style={{ color: editorialColors.ink, letterSpacing: 0.8 }}
+      >
+        Open rated archive
+      </Text>
+      <Ionicons name="arrow-forward" size={18} color={editorialColors.ink} />
+    </Pressable>
+  );
+}
+
 function EditorialProfileView(props: Parameters<SkinComponentSet['ProfileView']>[0]) {
+  const insets = useSafeAreaInsets();
   const streak = props.overview?.streak ?? 0;
   const discovered = props.overview?.total_discovered ?? 0;
   const rated = props.overview?.listening.total_rated ?? 0;
   const artists = props.overview?.taste.top_artists ?? [];
   const decades = props.overview?.taste.decades ?? [];
   const maxDecade = decades.reduce((max, item) => Math.max(max, item.count), 0);
+  const heroSubtitle = props.overviewLoading
+    ? 'Reading your private listening record'
+    : props.heroSubtitle;
+  const listening = props.overview?.listening;
 
   return (
     <ScrollView
       className="flex-1"
-      contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 16, paddingBottom: 108, gap: 24 }}
+      contentContainerStyle={{
+        paddingHorizontal: 20,
+        paddingTop: Math.max(16, insets.top + 8),
+        paddingBottom: Math.max(108, insets.bottom + 104),
+        gap: 24,
+      }}
       style={{ backgroundColor: editorialColors.paper }}
       showsVerticalScrollIndicator={false}
     >
       <View className="gap-3">
         <Text
           className="font-display text-[54px] uppercase leading-[52px]"
-          style={{ color: editorialColors.ink, letterSpacing: -1.2 }}
+          style={{ color: editorialColors.ink, letterSpacing: 0 }}
         >
           Colophon
         </Text>
@@ -805,71 +875,118 @@ function EditorialProfileView(props: Parameters<SkinComponentSet['ProfileView']>
         </Text>
       </View>
 
-      <View className="flex-row items-center gap-4">
-        {props.profileLoading ? (
-          <Skeleton className="h-[84px] w-[84px] rounded-none" />
-        ) : (
-          <Avatar label={props.profile?.display_name} size={84} uri={props.profile?.avatar_url} />
-        )}
-        <View className="min-w-0 flex-1">
-          <Text
-            className="font-display text-3xl leading-8"
-            style={{ color: editorialColors.ink }}
-            numberOfLines={2}
-          >
-            {props.profile?.display_name ?? 'Spotify listener'}
-          </Text>
-          <Text
-            className="mt-2 font-prose text-sm leading-5"
-            style={{ color: editorialColors.muted }}
-          >
-            {props.heroSubtitle}
-          </Text>
+      <View className="border-y-2 py-4" style={{ borderColor: editorialColors.ink }}>
+        <View className="flex-row gap-4">
+          <View className="pt-1">
+            {props.profileLoading ? (
+              <Skeleton className="h-[84px] w-[84px] rounded-none" />
+            ) : (
+              <Avatar
+                label={props.profile?.display_name}
+                size={84}
+                uri={props.profile?.avatar_url}
+              />
+            )}
+          </View>
+          <View className="min-w-0 flex-1">
+            <Text
+              className="font-mono-bold text-[10px] uppercase leading-4"
+              style={{ color: editorialColors.muted, letterSpacing: 0.8 }}
+            >
+              PRIVATE LISTENING IDENTITY
+            </Text>
+            {props.profileLoading ? (
+              <View className="mt-2 gap-2">
+                <Skeleton className="h-8 w-full rounded-none" />
+                <Skeleton className="h-5 w-4/5 rounded-none" />
+              </View>
+            ) : (
+              <>
+                <Text
+                  className="mt-1 font-display text-3xl leading-8"
+                  style={{ color: editorialColors.ink, letterSpacing: 0 }}
+                  numberOfLines={3}
+                >
+                  {props.profile?.display_name ?? 'Spotify listener'}
+                </Text>
+                <Text
+                  className="mt-2 font-prose text-sm leading-5"
+                  style={{ color: editorialColors.muted }}
+                >
+                  {heroSubtitle}
+                </Text>
+              </>
+            )}
+          </View>
         </View>
       </View>
 
       <View className="flex-row gap-3">
-        <LedgerStat value={String(streak)} label="day streak" />
-        <LedgerStat value={String(discovered)} label="issues" />
-        <LedgerStat value={String(rated)} label="rated" />
+        <LedgerStat value={String(streak)} label="day streak" loading={props.overviewLoading} />
+        <LedgerStat value={String(discovered)} label="issues" loading={props.overviewLoading} />
+        <LedgerStat value={String(rated)} label="rated" loading={props.overviewLoading} />
       </View>
 
       <View className="gap-4">
         <EditorialSectionRule title="Taste map" aside="source material" major />
         {props.overviewLoading ? (
-          <Skeleton className="h-32 w-full rounded-none" />
+          <View className="gap-3">
+            <Skeleton className="h-16 w-full rounded-none" />
+            <Skeleton className="h-16 w-full rounded-none" />
+            <Skeleton className="h-24 w-full rounded-none" />
+          </View>
         ) : props.overview && (artists.length > 0 || decades.length > 0) ? (
-          <>
+          <View className="gap-5">
+            <LibrarySpanLine
+              min={props.overview.taste.span_min}
+              max={props.overview.taste.span_max}
+            />
             {artists.length > 0 ? (
-              <View className="gap-2">
+              <View className="gap-3">
                 {artists.slice(0, 6).map((artist, index) => (
                   <View
                     key={artist.name}
-                    className="flex-row items-center border-b py-2"
+                    className="border-2 px-3 py-3"
                     style={{ borderColor: editorialColors.ink }}
                   >
-                    <Text
-                      className="w-10 font-mono-bold text-[11px] uppercase"
-                      style={{ color: editorialColors.muted, letterSpacing: 0.8 }}
-                    >
-                      {String(index + 1).padStart(2, '0')}
-                    </Text>
-                    <Text
-                      className="flex-1 font-prose-medium text-base"
-                      style={{ color: editorialColors.ink }}
-                      numberOfLines={1}
-                    >
-                      {artist.name}
-                    </Text>
+                    <View className="flex-row items-start gap-3">
+                      <Text
+                        className="w-9 font-mono-bold text-[11px] uppercase leading-5"
+                        style={{ color: editorialColors.muted, letterSpacing: 0.8 }}
+                      >
+                        {String(index + 1).padStart(2, '0')}
+                      </Text>
+                      <Text
+                        className="min-w-0 flex-1 font-prose-bold text-lg leading-6"
+                        style={{ color: editorialColors.ink }}
+                        numberOfLines={2}
+                      >
+                        {artist.name}
+                      </Text>
+                      <View className="min-w-[54px] items-end">
+                        <Text
+                          className="font-mono-bold text-[11px] uppercase leading-5"
+                          style={{ color: editorialColors.ink, letterSpacing: 0.8 }}
+                        >
+                          {artist.count}
+                        </Text>
+                        <Text
+                          className="font-mono text-[10px] uppercase leading-4"
+                          style={{ color: editorialColors.muted, letterSpacing: 0.8 }}
+                        >
+                          saves
+                        </Text>
+                      </View>
+                    </View>
                   </View>
                 ))}
               </View>
             ) : null}
             {decades.length > 0 ? (
-              <View className="gap-2">
+              <View className="gap-3">
                 {decades.map((decade) => (
-                  <View key={decade.decade} className="gap-1">
-                    <View className="flex-row justify-between">
+                  <View key={decade.decade} className="gap-2">
+                    <View className="flex-row items-end justify-between gap-3">
                       <Text
                         className="font-mono-bold text-[11px] uppercase"
                         style={{ color: editorialColors.ink, letterSpacing: 0.8 }}
@@ -883,11 +1000,14 @@ function EditorialProfileView(props: Parameters<SkinComponentSet['ProfileView']>
                         {decade.count} albums
                       </Text>
                     </View>
-                    <View className="h-2 border" style={{ borderColor: editorialColors.ink }}>
+                    <View
+                      className="h-5 border-2 p-[2px]"
+                      style={{ borderColor: editorialColors.ink }}
+                    >
                       <View
                         className="h-full"
                         style={{
-                          width: `${maxDecade ? (decade.count / maxDecade) * 100 : 0}%`,
+                          width: `${maxDecade ? Math.max(10, (decade.count / maxDecade) * 100) : 0}%`,
                           backgroundColor: editorialColors.ink,
                         }}
                       />
@@ -896,7 +1016,7 @@ function EditorialProfileView(props: Parameters<SkinComponentSet['ProfileView']>
                 ))}
               </View>
             ) : null}
-          </>
+          </View>
         ) : (
           <Text className="font-prose text-sm leading-5" style={{ color: editorialColors.muted }}>
             As soon as your library finishes importing, your top artists and eras show up here.
@@ -906,19 +1026,32 @@ function EditorialProfileView(props: Parameters<SkinComponentSet['ProfileView']>
 
       <View className="gap-4">
         <EditorialSectionRule title="Listening" aside="private journal" major />
-        {props.overview?.listening.total_rated ? (
+        {props.overviewLoading ? (
           <View className="gap-3">
-            <View className="flex-row gap-3">
-              <LedgerStat
-                value={String(props.overview.listening.rated_this_month)}
-                label="rated this month"
-              />
-              <LedgerStat value={String(props.overview.listening.loved_count)} label="loved" />
+            <Skeleton className="h-16 w-full rounded-none" />
+            <Skeleton className="h-12 w-full rounded-none" />
+          </View>
+        ) : listening?.total_rated ? (
+          <View className="gap-3">
+            <View className="border-2 p-3" style={{ borderColor: editorialColors.ink }}>
+              <Text
+                className="font-mono-bold text-[11px] uppercase leading-4"
+                style={{ color: editorialColors.muted, letterSpacing: 0.8 }}
+              >
+                Current journal mood
+              </Text>
+              <Text
+                className="mt-2 font-display text-3xl uppercase leading-8"
+                style={{ color: editorialColors.ink, letterSpacing: 0 }}
+              >
+                {listeningMoodLabel(listening.avg_score)}
+              </Text>
             </View>
-            <EditorialActionButton
-              title="View rated archive ↗"
-              onPress={props.onOpenRatedDiscoveries}
-            />
+            <View className="flex-row gap-3">
+              <LedgerStat value={String(listening.rated_this_month)} label="rated this month" />
+              <LedgerStat value={String(listening.loved_count)} label="loved" />
+            </View>
+            <EditorialArchiveLink onPress={props.onOpenRatedDiscoveries} />
           </View>
         ) : (
           <Text className="font-prose text-sm leading-5" style={{ color: editorialColors.muted }}>
@@ -927,7 +1060,7 @@ function EditorialProfileView(props: Parameters<SkinComponentSet['ProfileView']>
         )}
       </View>
 
-      <View className="gap-4">
+      <View className="gap-4 pt-2">
         <EditorialSectionRule title="Production notes" aside="library" major />
         <Text
           className="font-mono text-[11px] uppercase leading-5"
@@ -942,12 +1075,13 @@ function EditorialProfileView(props: Parameters<SkinComponentSet['ProfileView']>
             ? ` / synced ${relativeTime(props.libraryStats.lastSyncedAt)}`
             : ''}
         </Text>
-        <EditorialSyncBanner />
+        <EditorialSyncBanner status={props.syncStatus} />
         <EditorialActionButton
           disabled={props.isSyncing}
           loading={props.isSyncing}
           onPress={props.onSyncNow}
           title={props.isSyncing ? 'Syncing...' : 'Sync library now'}
+          tone="paper"
         />
       </View>
 
@@ -968,15 +1102,14 @@ function EditorialProfileView(props: Parameters<SkinComponentSet['ProfileView']>
         ) : null}
         {props.product ? (
           <View className="self-start">
-            <EditorialMarker
-              label={props.product}
-              tone={props.product === 'Premium' ? 'ink' : 'spotify'}
-            />
+            <EditorialMarker label={`Spotify ${props.product}`} tone="paper" />
           </View>
         ) : null}
       </View>
 
-      <EditorialActionButton title="Log out" tone="red" onPress={props.onSignOut} />
+      <View className="mt-3 border-t-2 pt-6" style={{ borderColor: editorialColors.ink }}>
+        <EditorialActionButton title="Log out" tone="red" onPress={props.onSignOut} />
+      </View>
     </ScrollView>
   );
 }
@@ -1259,8 +1392,31 @@ export const editorialSkin: SkinComponentSet = {
   },
 };
 
-function EditorialSyncBanner() {
+function syncFailureCopy(status: LibrarySyncStatus) {
+  if (status.error_code === 'spotify_rate_limited') {
+    return 'Spotify asked us to slow down. Try syncing again in a little while.';
+  }
+
+  return 'Library sync could not finish. Try again from Profile.';
+}
+
+function EditorialSyncBanner({
+  status: statusOverride,
+}: Parameters<SkinComponentSet['SyncBanner']>[0] = {}) {
+  if (statusOverride !== undefined) {
+    return <EditorialSyncBannerContent status={statusOverride} />;
+  }
+
+  return <EditorialLiveSyncBanner />;
+}
+
+function EditorialLiveSyncBanner() {
   const { status } = useLibrarySyncStatus();
+
+  return <EditorialSyncBannerContent status={status} />;
+}
+
+function EditorialSyncBannerContent({ status }: { status: LibrarySyncStatus | null }) {
   if (!status || status.status === 'idle' || status.status === 'completed') return null;
   const isStale = isStaleLibrarySync(status);
 
@@ -1270,7 +1426,7 @@ function EditorialSyncBanner() {
         <Text className="font-prose text-sm leading-5" style={{ color: editorialColors.ink }}>
           {isStale
             ? 'Sync is taking longer than expected. You can try again now.'
-            : `Sync failed: ${status.error_message ?? 'unknown error'}. Try again from Profile.`}
+            : syncFailureCopy(status)}
         </Text>
       </View>
     );
@@ -1281,7 +1437,10 @@ function EditorialSyncBanner() {
   const ratio = total > 0 ? processed / total : 0;
 
   return (
-    <View className="border-2 px-4 py-3" style={{ borderColor: editorialColors.ink }}>
+    <View
+      className="border-2 px-4 py-3"
+      style={{ borderColor: editorialColors.ink, backgroundColor: editorialColors.paperAlt }}
+    >
       <Text
         className="mb-2 font-mono text-[11px] uppercase leading-4"
         style={{ color: editorialColors.ink, letterSpacing: 0.8 }}

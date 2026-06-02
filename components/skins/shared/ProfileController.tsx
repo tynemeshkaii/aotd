@@ -98,6 +98,7 @@ export function ProfileController() {
       overviewLoading={overviewLoading}
       libraryStats={libraryStats}
       libraryStatsLoading={libraryStatsLoading}
+      syncStatus={syncStatus}
       isSyncing={isSyncing}
       onSyncNow={handleSyncNow}
       onSignOut={handleSignOut}

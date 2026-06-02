@@ -5,9 +5,9 @@ import { useSession } from '@/components/auth/AuthProvider';
 import { supabase } from '@/lib/supabase';
 import type { Database } from '@/types/database';
 
-type SyncStatus = Database['public']['Tables']['library_sync_status']['Row'];
+export type LibrarySyncStatus = Database['public']['Tables']['library_sync_status']['Row'];
 
-export function useLibrarySyncStatus(): { status: SyncStatus | null; loading: boolean } {
+export function useLibrarySyncStatus(): { status: LibrarySyncStatus | null; loading: boolean } {
   const { session } = useSession();
   const userId = session?.user.id;
   const qc = useQueryClient();
@@ -29,12 +29,12 @@ export function useLibrarySyncStatus(): { status: SyncStatus | null; loading: bo
         .eq('user_id', userId)
         .maybeSingle();
       if (error) throw error;
-      return (data ?? null) as SyncStatus | null;
+      return (data ?? null) as LibrarySyncStatus | null;
     },
     // Polling fallback if Realtime can't connect (Expo Go firewall / websocket).
     // Only active while a sync is actually running.
     refetchInterval: (query) => {
-      const s = query.state.data as SyncStatus | null;
+      const s = query.state.data as LibrarySyncStatus | null;
       return s && (s.status === 'queued' || s.status === 'syncing') ? 2000 : false;
     },
   });
@@ -53,7 +53,7 @@ export function useLibrarySyncStatus(): { status: SyncStatus | null; loading: bo
           filter: `user_id=eq.${userId}`,
         },
         (payload) => {
-          const next = payload.new as SyncStatus | null;
+          const next = payload.new as LibrarySyncStatus | null;
           if (next) {
             qc.setQueryData(queryKey, next);
             qc.invalidateQueries({ queryKey: ['library-stats', userId] });
