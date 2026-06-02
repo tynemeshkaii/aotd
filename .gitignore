@@ -46,3 +46,6 @@ supabase/.temp/
 
 # Superpowers brainstorm scratch (visual mockups, session state)
 .superpowers/
+
+# Local preview scratch
+.preview-tabbar/

@@ -29,15 +29,30 @@ type EditorialTabIconProps = {
 function EditorialTabIcon({ focused, color, label, icon, focusedIcon }: EditorialTabIconProps) {
   const { chrome } = useSkinComponents();
   const tabBar = chrome.tabBar;
+  const itemHeight = getTabBarItemHeight();
 
   return (
-    <View className="h-[54px] min-w-[88px] items-center justify-start pt-1">
-      <View
-        className="mb-2 h-[3px] w-8"
-        style={{
-          backgroundColor: focused ? tabBar.activeIndicatorColor : 'transparent',
-        }}
-      />
+    <View
+      className="items-center"
+      style={{
+        height: itemHeight,
+        minWidth: 96,
+        paddingTop: 10,
+        paddingBottom: 4,
+      }}
+    >
+      {focused ? (
+        <View
+          style={{
+            position: 'absolute',
+            top: 0,
+            alignSelf: 'center',
+            width: 48,
+            height: 3,
+            backgroundColor: tabBar.activeIndicatorColor,
+          }}
+        />
+      ) : null}
       <Ionicons
         name={focused ? focusedIcon : icon}
         color={color}
@@ -50,7 +65,7 @@ function EditorialTabIcon({ focused, color, label, icon, focusedIcon }: Editoria
         maxFontSizeMultiplier={1.2}
         numberOfLines={1}
         adjustsFontSizeToFit
-        className="mt-[3px] text-center uppercase"
+        className="mt-1 text-center lowercase"
         style={{
           color,
           fontFamily: tabBar.labelFontFamily,

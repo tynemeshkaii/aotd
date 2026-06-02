@@ -177,7 +177,7 @@ Important contracts:
 
 Bottom navigation contracts:
 
-- `app/(tabs)/_layout.tsx` owns the bottom tab chrome. Keep visible tab labels exactly Home / Discoveries / Profile.
+- `app/(tabs)/_layout.tsx` owns the bottom tab chrome. Keep visible tab labels exactly Home / Discoveries / Profile (rendered lowercase via the `lowercase` class — preserve the lowercase transform).
 - The tab bar is safe-area-aware. Use `lib/navigationChrome.ts` helpers for tab bar height, top/bottom padding, item height, and tab-screen bottom content padding instead of hardcoded `pb-24`, `height: 76`, or hand-rolled `insets.bottom + ...` values.
 - `SkinChrome.tabBar` carries tab-bar visual tokens including background, border, active/inactive tint, active indicator, label font/size, and icon size. Keep new tab-bar visual changes flowing through these tokens where practical.
 - The editorial tab bar uses a printed-rule active indicator, static ink/paper styling, and best-effort haptics through `lib/haptics.ts`. Do not replace it with glass, pill/card, floating, or old dark SaaS navigation treatments.
