@@ -16,6 +16,7 @@ export type AotdStatus = 'pending' | 'opened' | 'rated';
 
 export type AlbumDiscovery = {
   aotd_id: string;
+  issue_number: number;
   pick_date: string;
   status: AotdStatus;
   is_fallback: boolean;
@@ -127,6 +128,7 @@ export function isAlbumDiscovery(value: unknown): value is AlbumDiscovery {
 
   return (
     typeof value.aotd_id === 'string' &&
+    typeof value.issue_number === 'number' &&
     typeof value.pick_date === 'string' &&
     isAotdStatus(value.status) &&
     typeof value.is_fallback === 'boolean' &&

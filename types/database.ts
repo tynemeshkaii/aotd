@@ -991,6 +991,7 @@ export type Database = {
           aotd_id: string
           fallback_reason: string
           is_fallback: boolean
+          issue_number: number
           opened_at: string
           pick_date: string
           rating_comment: string
@@ -1042,6 +1043,7 @@ export type Database = {
           aotd_id: string
           fallback_reason: string
           is_fallback: boolean
+          issue_number: number
           opened_at: string
           pick_date: string
           rating_comment: string
@@ -1068,6 +1070,7 @@ export type Database = {
           aotd_id: string
           fallback_reason: string
           is_fallback: boolean
+          issue_number: number
           opened_at: string
           pick_date: string
           rating_comment: string
@@ -1094,6 +1097,7 @@ export type Database = {
           aotd_id: string
           fallback_reason: string
           is_fallback: boolean
+          issue_number: number
           opened_at: string
           pick_date: string
           rating_comment: string
@@ -1114,6 +1118,10 @@ export type Database = {
         }[]
       }
       get_profile_overview: { Args: { p_user_id: string }; Returns: Json }
+      get_unrated_past_pick_count: {
+        Args: { p_exclude_aotd_id?: string; p_user_id: string }
+        Returns: number
+      }
       prune_external_api_request_log: { Args: never; Returns: undefined }
       record_external_api_circuit_failure: {
         Args: {

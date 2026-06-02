@@ -21,6 +21,7 @@ function fixture(
 ): AlbumDiscovery {
   return {
     aotd_id: `fixture-${id}`,
+    issue_number: id.length + 1,
     pick_date: '2026-05-31',
     status: rating ? 'rated' : id.includes('opened') ? 'opened' : 'pending',
     is_fallback: false,

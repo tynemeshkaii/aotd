@@ -129,9 +129,7 @@ function formatIssueDate(date: string) {
 }
 
 function issueNo(album: AlbumDiscovery) {
-  const pick = new Date(`${album.pick_date}T12:00:00`).getTime();
-  const start = new Date('2026-01-01T12:00:00').getTime();
-  return Math.max(1, Math.floor((pick - start) / 86_400_000) + 1);
+  return Math.max(1, album.issue_number);
 }
 
 function albumSpec(album: AlbumDiscovery) {

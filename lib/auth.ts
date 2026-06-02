@@ -9,7 +9,12 @@ import { supabase } from './supabase';
 
 WebBrowser.maybeCompleteAuthSession();
 
-export const SPOTIFY_SCOPES = ['user-library-read', 'user-top-read', 'user-read-private'] as const;
+export const SPOTIFY_SCOPES = [
+  'user-library-read',
+  'user-top-read',
+  'user-read-private',
+  'user-read-email',
+] as const;
 
 // Spotify access tokens always expire after 3600s. The Edge Function derives
 // `token_expires_at` from this value; keep it in sync if Spotify ever changes.

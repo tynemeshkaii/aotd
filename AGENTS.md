@@ -247,7 +247,9 @@ Spotify OAuth:
 - Keep the explicit `albumoftheday://auth/callback` route and `app/auth/callback.tsx`.
 - `bootstrapSpotifySession(session)` must dedupe per user for the JS-context lifetime. Both sign-in and callback can resolve the same OAuth session; without dedupe the app can double-hit Spotify `/me` and trigger Development Mode 429 cascades.
 - A failed bootstrap clears its dedupe entry so a retry is possible. `signOut()` clears all bootstrap dedupe state.
-- Spotify scopes currently include `user-library-read`, `user-top-read`, and `user-read-private`.
+- Spotify scopes currently include `user-library-read`, `user-top-read`, `user-read-private`, and
+  `user-read-email`. If Spotify returns `Unverified email with spotify`, verify the Spotify account
+  email or test with a verified account.
 - Spotify refresh tokens are not guaranteed on every OAuth login. Preserve the existing DB refresh token when `provider_refresh_token` is absent.
 - `refresh-spotify-token` must tolerate an empty request body for authenticated user refreshes and derive `user_id` from JWT. Invalid JSON should return `400 invalid_json_body`.
 - `upsert-streaming-connection` and `refresh-spotify-token` both use `verify_jwt=false`; keep their explicit CORS and Authorization/JWT validation if changing them.
