@@ -1,6 +1,7 @@
+import { Ionicons } from '@expo/vector-icons';
 import { MotiView } from 'moti';
 import { Pressable, View } from 'react-native';
-
+import { Badge } from '@/components/ui/Badge';
 import { CoverImage } from '@/components/ui/CoverImage';
 import { Text } from '@/components/ui/Text';
 import { useReduceMotion } from '@/lib/hooks/useReduceMotion';
@@ -58,27 +59,36 @@ export function DiscoveryListItem({ album, index = 0, onPress }: Props) {
     >
       <Pressable
         accessibilityRole="button"
+        accessibilityLabel={`${album.album_title} by ${album.album_primary_artist_name}, ${date}, ${label}`}
         onPress={onPress}
-        className="flex-row gap-3 rounded-2xl bg-surface p-3 active:opacity-80"
+        className="min-h-[96px] flex-row gap-3 rounded-xl border border-text/5 bg-surface p-3 active:opacity-80"
       >
-        <View className="h-16 w-16 overflow-hidden rounded-xl bg-surface-2">
+        <View className="h-[72px] w-[72px] overflow-hidden rounded-lg bg-surface-2">
           {album.album_cover_url ? (
             <CoverImage uri={album.album_cover_url} className="h-full w-full" />
           ) : null}
         </View>
         <View className="min-w-0 flex-1 justify-center">
-          <Text numberOfLines={1} className="font-semibold">
+          <Text numberOfLines={2} className="font-semibold leading-5">
             {album.album_title}
           </Text>
           <Text variant="caption" numberOfLines={1}>
             {album.album_primary_artist_name}
           </Text>
-          <View className="mt-1.5 flex-row items-center gap-1.5">
-            <View className="h-2 w-2 rounded-full" style={{ backgroundColor: tint }} />
-            <Text variant="subtle">
-              {date} · {label}
-            </Text>
+          <View className="mt-2 flex-row flex-wrap items-center gap-1.5">
+            <Badge label={date} variant="muted" className="min-h-6 px-2" />
+            <Badge
+              label={label}
+              variant={
+                album.rating_score ? 'rating' : album.status === 'opened' ? 'accent' : 'muted'
+              }
+              className="min-h-6 px-2"
+              style={{ borderColor: tint }}
+            />
           </View>
+        </View>
+        <View className="justify-center">
+          <Ionicons name="chevron-forward" size={18} color={colors.muted} />
         </View>
       </Pressable>
     </MotiView>

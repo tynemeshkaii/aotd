@@ -243,6 +243,31 @@ function buildTopPool(
   return capped;
 }
 
+function classifyCandidateOrigin(chosen: ScoredCandidate): string {
+  if (chosen.candidate.source_paths.length === 0) return 'unknown';
+
+  const sortedPaths = chosen.candidate.source_paths
+    .slice()
+    .sort((a, b) => b.source_artist.frequency - a.source_artist.frequency);
+  const primaryPath = sortedPaths[0];
+
+  const sourceSpotifyId = primaryPath.source_artist.spotify_id;
+  const candidateSpotifyId = chosen.candidate.primary_artist_spotify_id;
+
+  if (sourceSpotifyId && candidateSpotifyId && sourceSpotifyId === candidateSpotifyId) {
+    return 'familiar_catalog';
+  }
+
+  if (
+    normalizeArtistName(primaryPath.source_artist.name) ===
+    normalizeArtistName(chosen.candidate.primary_artist_name)
+  ) {
+    return 'familiar_catalog';
+  }
+
+  return 'similar_artist';
+}
+
 export function buildSelectionReason(
   chosen: ScoredCandidate,
   _taste: TasteSignal,
@@ -254,6 +279,7 @@ export function buildSelectionReason(
     return {
       is_fallback: true,
       fallback_reason: fallbackReason,
+      candidate_origin: 'fallback',
       message: "Today's a special pick — your usual flow returns tomorrow.",
     };
   }
@@ -278,5 +304,6 @@ export function buildSelectionReason(
     popularity_bucket: chosen.popularity_bucket ?? null,
     source_artist_count: chosen.candidate.source_paths.length,
     track_b_multipliers: chosen.track_b_multipliers ?? null,
+    candidate_origin: classifyCandidateOrigin(chosen),
   };
 }

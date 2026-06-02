@@ -131,6 +131,7 @@ export function makeCandidate(
     spotify_id: opts.spotify_id,
     title: opts.title ?? `Album ${opts.spotify_id}`,
     primary_artist_name: opts.primary_artist_name,
+    primary_artist_spotify_id: opts.primary_artist_spotify_id,
     total_tracks: opts.total_tracks ?? 10,
     best_similarity_match: opts.best_similarity_match,
     source_paths: opts.source_paths ?? [

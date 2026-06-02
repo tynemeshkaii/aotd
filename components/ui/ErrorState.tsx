@@ -31,7 +31,7 @@ export function ErrorState({
 }: Props) {
   return (
     <View className="flex-1 items-center justify-center px-8 py-12">
-      <View className="mb-5 h-16 w-16 items-center justify-center rounded-full bg-surface">
+      <View className="mb-5 h-16 w-16 items-center justify-center rounded-2xl bg-surface">
         <Ionicons name="cloud-offline-outline" size={28} color={colors.muted} />
       </View>
       <Text variant="h2" className="text-center">

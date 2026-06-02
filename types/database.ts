@@ -42,6 +42,7 @@ export type Database = {
       albums: {
         Row: {
           album_type: string | null
+          artist_country: string | null
           audio_features: Json | null
           cover_url: string | null
           duration_ms: number | null
@@ -61,6 +62,7 @@ export type Database = {
         }
         Insert: {
           album_type?: string | null
+          artist_country?: string | null
           audio_features?: Json | null
           cover_url?: string | null
           duration_ms?: number | null
@@ -80,6 +82,7 @@ export type Database = {
         }
         Update: {
           album_type?: string | null
+          artist_country?: string | null
           audio_features?: Json | null
           cover_url?: string | null
           duration_ms?: number | null
@@ -416,11 +419,38 @@ export type Database = {
         }
         Relationships: []
       }
+      mb_artist_cache: {
+        Row: {
+          country: string | null
+          fetched_at: string
+          mb_artist_id: string
+          name: string | null
+          resolved: boolean
+        }
+        Insert: {
+          country?: string | null
+          fetched_at?: string
+          mb_artist_id: string
+          name?: string | null
+          resolved?: boolean
+        }
+        Update: {
+          country?: string | null
+          fetched_at?: string
+          mb_artist_id?: string
+          name?: string | null
+          resolved?: boolean
+        }
+        Relationships: []
+      }
       musicbrainz_release_group_cache: {
         Row: {
+          artist_credit_resolved: boolean
           fetched_at: string
           first_release_date: string | null
           id: string
+          mb_artist_id: string | null
+          mb_artist_name: string | null
           normalized_album: string
           normalized_artist: string
           primary_type: string | null
@@ -428,9 +458,12 @@ export type Database = {
           secondary_types: string[]
         }
         Insert: {
+          artist_credit_resolved?: boolean
           fetched_at?: string
           first_release_date?: string | null
           id?: string
+          mb_artist_id?: string | null
+          mb_artist_name?: string | null
           normalized_album: string
           normalized_artist: string
           primary_type?: string | null
@@ -438,9 +471,12 @@ export type Database = {
           secondary_types?: string[]
         }
         Update: {
+          artist_credit_resolved?: boolean
           fetched_at?: string
           first_release_date?: string | null
           id?: string
+          mb_artist_id?: string | null
+          mb_artist_name?: string | null
           normalized_album?: string
           normalized_artist?: string
           primary_type?: string | null
@@ -527,6 +563,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "albums_of_the_day"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ratings_album_of_the_day_id_fkey"
+            columns: ["album_of_the_day_id"]
+            isOneToOne: false
+            referencedRelation: "v_discovery_pick_observability"
+            referencedColumns: ["aotd_id"]
           },
         ]
       }
@@ -864,6 +907,51 @@ export type Database = {
         }
         Relationships: []
       }
+      v_discovery_pick_observability: {
+        Row: {
+          aotd_id: string | null
+          created_at: string | null
+          date: string | null
+          live_album_id: string | null
+          live_candidate_origin: string | null
+          live_candidate_tier: string | null
+          live_fallback_reason: string | null
+          live_is_fallback: boolean | null
+          live_popularity_bucket: string | null
+          live_primary_artist_name: string | null
+          live_primary_source_artist: string | null
+          live_source_artist_count: number | null
+          live_spotify_id: string | null
+          live_title: string | null
+          shadow_album_id: string | null
+          shadow_algorithm_version: number | null
+          shadow_candidate_origin: string | null
+          shadow_candidate_tier: string | null
+          shadow_popularity_bucket: string | null
+          shadow_primary_artist_name: string | null
+          shadow_primary_source_artist: string | null
+          shadow_same_as_live: boolean | null
+          shadow_spotify_id: string | null
+          shadow_title: string | null
+          user_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "albums_of_the_day_album_id_fkey"
+            columns: ["live_album_id"]
+            isOneToOne: false
+            referencedRelation: "albums"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "aotd_shadow_picks_shadow_album_id_fkey"
+            columns: ["shadow_album_id"]
+            isOneToOne: false
+            referencedRelation: "albums"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       v1_external_api_health: {
         Row: {
           avg_duration_ms: number | null
@@ -891,6 +979,7 @@ export type Database = {
       discovery_album_rows: {
         Args: { p_user_id: string }
         Returns: {
+          album_artist_country: string
           album_cover_url: string
           album_duration_ms: number
           album_id: string
@@ -941,6 +1030,7 @@ export type Database = {
       get_current_pick: {
         Args: { p_user_id: string }
         Returns: {
+          album_artist_country: string
           album_cover_url: string
           album_duration_ms: number
           album_id: string
@@ -966,6 +1056,7 @@ export type Database = {
       get_discoveries: {
         Args: { p_limit?: number; p_offset?: number; p_user_id: string }
         Returns: {
+          album_artist_country: string
           album_cover_url: string
           album_duration_ms: number
           album_id: string
@@ -991,6 +1082,7 @@ export type Database = {
       get_discovery_detail: {
         Args: { p_aotd_id: string; p_user_id: string }
         Returns: {
+          album_artist_country: string
           album_cover_url: string
           album_duration_ms: number
           album_id: string

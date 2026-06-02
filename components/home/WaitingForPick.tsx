@@ -5,7 +5,7 @@ export function WaitingForPick() {
     <EmptyState
       icon="hourglass-outline"
       title="Your pick is brewing..."
-      subtitle="Should be ready by your usual push time. Check back soon."
+      subtitle="We are catching up for today. Check back in a few minutes."
     />
   );
 }

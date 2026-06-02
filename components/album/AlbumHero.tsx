@@ -1,10 +1,10 @@
 import { View } from 'react-native';
 import Animated, { type SharedValue, useAnimatedStyle } from 'react-native-reanimated';
-
+import { Badge } from '@/components/ui/Badge';
 import { CoverImage } from '@/components/ui/CoverImage';
 import { Text } from '@/components/ui/Text';
 import type { AlbumDiscovery } from '@/lib/recommendation';
-import { formatAlbumDuration } from '@/lib/recommendation';
+import { formatAlbumDuration, formatArtistCountry } from '@/lib/recommendation';
 import colors from '@/theme/colors';
 
 type Props = {
@@ -15,11 +15,13 @@ type Props = {
 
 export function AlbumHero({ album, scrollY, reduceMotion }: Props) {
   const duration = formatAlbumDuration(album.album_duration_ms);
+  const country = formatArtistCountry(album.album_artist_country);
   const meta = [
     album.album_release_year?.toString(),
+    country,
     album.album_total_tracks ? `${album.album_total_tracks} tracks` : null,
     duration,
-  ].filter(Boolean);
+  ].filter((item): item is string => Boolean(item));
 
   // Gentle zoom on overscroll for a tactile "stretchy" hero.
   const coverStyle = useAnimatedStyle(() => {
@@ -59,14 +61,18 @@ export function AlbumHero({ album, scrollY, reduceMotion }: Props) {
       </View>
 
       <View className="gap-1">
-        <Text variant="title">{album.album_title}</Text>
-        <Text variant="body" className="text-muted">
+        <Text variant="title" numberOfLines={3} adjustsFontSizeToFit minimumFontScale={0.84}>
+          {album.album_title}
+        </Text>
+        <Text variant="body" numberOfLines={2} className="text-muted">
           {album.album_primary_artist_name}
         </Text>
         {meta.length > 0 && (
-          <Text variant="caption" className="mt-1">
-            {meta.join(' · ')}
-          </Text>
+          <View className="mt-2 flex-row flex-wrap gap-2">
+            {meta.map((item) => (
+              <Badge key={item} label={item} variant="muted" />
+            ))}
+          </View>
         )}
       </View>
     </View>

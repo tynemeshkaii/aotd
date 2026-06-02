@@ -1,0 +1,170 @@
+<!doctype html>
+<meta charset="utf-8">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;800&family=Space+Mono:wght@400;700&family=Space+Grotesk:wght@400;500;700&display=swap');
+
+:root{
+  --bg:#f4ebe0;
+  --ink:#1d1511;
+  --muted:#6f5d52;
+  --alt:#eadcc9;
+  --orange:#ff4a2e;
+  --pink:#ff2e8b;
+  --violet:#7b3ff2;
+  --gold:#d9a441;
+}
+*{box-sizing:border-box}
+body{margin:0;background:#2a2622;color:var(--ink);font-family:'Space Grotesk',sans-serif;padding:16px}
+.intro{max-width:1050px;margin:0 auto 18px;color:#f4ebe0}
+.intro h1{font:800 28px/.95 Archivo,sans-serif;text-transform:uppercase;letter-spacing:-.03em;margin:0 0 8px}
+.intro p{font:400 14px/1.45 'Space Grotesk',sans-serif;color:#cdbfb0;margin:0}
+.wrap{max-width:1420px;margin:0 auto;display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start}
+.col{flex:0 0 auto}
+.sl{font:700 9px/1.5 'Space Mono',monospace;letter-spacing:.06em;text-transform:uppercase;color:#cdbfb0;margin:0 2px 10px;text-align:center}
+.ph{width:330px;border-radius:30px;overflow:hidden;background:var(--bg);color:var(--ink);box-shadow:0 22px 60px #000a;border:1px solid #00000022}
+.pad{padding:20px 20px 24px}
+@keyframes flow{0%{background-position:0% 50%}100%{background-position:300% 50%}}
+@keyframes cyc{0%{color:var(--orange)}25%{color:var(--pink)}50%{color:var(--violet)}75%{color:var(--gold)}100%{color:var(--orange)}}
+.flowbg{background:linear-gradient(90deg,var(--orange),var(--pink),var(--violet),var(--gold),var(--orange));background-size:300% 100%;animation:flow 6s linear infinite}
+.flowtx{background:linear-gradient(90deg,var(--orange),var(--pink),var(--violet),var(--gold),var(--orange));background-size:300% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:flow 6s linear infinite}
+.cyc{animation:cyc 6s ease-in-out infinite}
+.status{font:600 11px/1 sans-serif;color:var(--ink);display:flex;justify-content:space-between;opacity:.85;margin-bottom:14px}
+.kick{font:400 11px/1.4 'Space Mono',monospace;letter-spacing:.13em;text-transform:uppercase;color:var(--muted)}
+.mast{font:800 34px/.94 Archivo,sans-serif;text-transform:lowercase;letter-spacing:-.03em;color:var(--ink);margin-top:7px}
+.rule3{height:3px;border-radius:2px;margin:12px 0}
+.rule2{height:2px;background:var(--ink)}
+.ruleHair{height:1px;background:var(--ink);opacity:.5}
+.hero{position:relative}
+.title{font:800 34px/.94 Archivo,sans-serif;text-transform:uppercase;letter-spacing:-.03em;color:var(--ink);position:relative;z-index:2}
+.cov{aspect-ratio:1;background:linear-gradient(150deg,#9fc1e8,#6f93c4);margin-top:-12px;position:relative;z-index:1;overflow:hidden}
+.cov::before{content:"";position:absolute;inset:-20%;background:radial-gradient(circle at 70% 25%,#f8e6a0 0 8%,transparent 9%),linear-gradient(135deg,transparent 0 30%,#26375566 31% 48%,transparent 49%);mix-blend-mode:multiply}
+.covart{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font:800 70px/.8 Archivo,sans-serif;color:#1d1511;opacity:.16;text-align:center;letter-spacing:-.04em}
+.chips{position:absolute;right:9px;bottom:9px;display:flex;gap:6px;z-index:3}
+.marker{font:600 11px/1 Archivo,sans-serif;background:var(--ink);color:var(--bg);padding:4px 7px}
+.spec{font:700 11px/1.5 'Space Mono',monospace;letter-spacing:.06em;text-transform:uppercase;color:var(--ink);padding:9px 0}
+.secrow{display:flex;align-items:center;gap:10px;margin-top:18px}
+.seclbl{font:700 11px/1 'Space Mono',monospace;letter-spacing:.12em;text-transform:uppercase;color:var(--ink)}
+.secaside{font:400 11px/1 'Space Mono',monospace;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.whyRule{display:flex;align-items:center;gap:10px;margin-top:18px}
+.whyRule span{font:700 11px/1 'Space Mono',monospace;letter-spacing:.12em;text-transform:uppercase;color:var(--ink)}
+.whyRule i{display:block;flex:1;height:3px;background:var(--ink)}
+.whyPlain{font:700 11px/1 'Space Mono',monospace;letter-spacing:.12em;text-transform:uppercase;color:var(--ink);margin-top:18px}
+.why{font:400 17px/1.45 'Space Grotesk',sans-serif;color:var(--ink);margin-top:12px}
+.paren{font:400 11px/1.4 'Space Mono',monospace;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-top:10px}
+.cta{margin-top:22px}
+.listen{display:flex;align-items:flex-end;justify-content:space-between;margin-top:12px}
+.listenT{font:800 46px/.9 Archivo,sans-serif;text-transform:uppercase;letter-spacing:-.04em;color:var(--ink)}
+.listenA{font:800 40px/.9 Archivo,sans-serif}
+.ctasub{font:400 11px/1 'Space Mono',monospace;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-top:7px}
+.share{font:700 13px/1 'Space Mono',monospace;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-top:18px}
+.ballotlbl{display:flex;align-items:center;gap:10px;margin-top:26px}
+.ballot{border:2px solid var(--ink);margin-top:12px}
+.brow{display:flex;align-items:center;gap:12px;padding:11px 12px}
+.brow+.brow{border-top:1px solid var(--ink)}
+.bnum{font:700 11px/1 'Space Mono',monospace;color:var(--muted);width:26px}
+.blabel{font:700 16px/1 'Space Grotesk',sans-serif;color:var(--ink)}
+.brow.sel{background:var(--ink)}
+.brow.sel .blabel{color:var(--bg)}
+.brow.sel .bnum{color:var(--gold)}
+
+.playSlab{margin-top:22px;border:2px solid var(--ink);background:var(--ink);color:var(--bg);position:relative;overflow:hidden;padding:11px}
+.playSlab::before{content:"";position:absolute;left:0;right:0;top:0;height:3px;background:var(--gold)}
+.playSlabIn{display:grid;grid-template-columns:62px 1fr;gap:13px;align-items:stretch;padding-top:3px}
+.playWord{font:800 31px/.9 Archivo,sans-serif;text-transform:uppercase;letter-spacing:-.035em;color:var(--bg);align-self:center}
+.playGlyph{min-height:62px;border:2px solid var(--bg);display:grid;place-items:center;background:var(--bg);position:relative}
+.playGlyph span{display:block;width:0;height:0;border-top:14px solid transparent;border-bottom:14px solid transparent;border-left:22px solid var(--ink);margin-left:5px}
+
+.transport{margin-top:22px;border-top:3px solid var(--ink);border-bottom:2px solid var(--ink);padding:11px 0 12px}
+.transportIn{display:grid;grid-template-columns:64px 1fr;gap:12px;align-items:center}
+.transportPlay{height:64px;border:2px solid var(--ink);display:grid;place-items:center;background:var(--bg);position:relative}
+.transportPlay::after{content:"";width:0;height:0;border-top:14px solid transparent;border-bottom:14px solid transparent;border-left:22px solid var(--ink);margin-left:5px}
+.transportTitle{font:800 30px/.92 Archivo,sans-serif;text-transform:uppercase;letter-spacing:-.035em}
+.transportMark{height:3px;margin-top:10px}
+
+.sealCta{margin-top:22px;display:grid;grid-template-columns:1fr 86px;gap:12px;align-items:stretch}
+.sealText{border-top:3px solid var(--ink);border-bottom:2px solid var(--ink);padding:11px 0}
+.sealWord{font:800 34px/.9 Archivo,sans-serif;text-transform:uppercase;letter-spacing:-.035em;color:var(--ink)}
+.seal{border:2px solid var(--ink);border-radius:999px;display:grid;place-items:center;position:relative;min-height:86px;background:var(--ink)}
+.seal::after{content:"";width:0;height:0;border-top:15px solid transparent;border-bottom:15px solid transparent;border-left:24px solid var(--bg);margin-left:6px}
+
+.improve{margin-top:12px;border:1px solid #0003;background:#eadcc980;padding:10px 11px;color:var(--ink)}
+.improve b{font:700 10px/1.4 'Space Mono',monospace;letter-spacing:.08em;text-transform:uppercase;display:block;margin-bottom:4px}
+.improve span{font:400 12px/1.35 'Space Grotesk',sans-serif;color:#382d27}
+</style>
+
+<div class="intro">
+  <h1>Home CTA / PRESS Refinement Variants</h1>
+  <p>Source target plus three improved Play-button directions. All keep the locked editorial grid: paper, ink, hard rules, Archivo display, Space Mono detail, Space Grotesk prose, scarce flowing accent.</p>
+</div>
+
+<div class="wrap">
+  <div class="col">
+    <div class="sl">00 locked target — selected final</div>
+    <div class="ph"><div class="pad">
+      <div class="status"><span>13:53</span><span>● ▮▮ ⌁ ▰</span></div>
+      <div class="kick">№152 · Jun 1, 2026</div>
+      <div class="mast">your album of the <span class="cyc">day</span></div>
+      <div class="rule3 flowbg"></div>
+      <div class="hero"><div class="title">Modern Bliss</div><div class="cov"><div class="covart">◆◆◆</div><div class="chips"><span class="marker">2020</span><span class="marker">AU</span></div></div></div>
+      <div class="rule2" style="margin-top:14px"></div><div class="spec">Roza Terenzi · 9 tracks · 56 min</div><div class="ruleHair"></div>
+      <div class="whyRule"><span>Why this one?</span><i></i></div>
+      <div class="why">Picked because you've been saving stuff by Maara and similar artists.</div>
+      <div class="playSlab"><div class="playSlabIn"><span class="playGlyph"><span></span></span><span class="playWord">Listen<br>on Spotify</span></div></div>
+      <div class="share">share ↗</div>
+      <div class="ballotlbl"><span class="seclbl">Editorial ballot</span><span style="flex:1;height:2px;background:var(--ink)"></span></div>
+      <div class="ballot"><div class="brow"><span class="bnum">05</span><span class="blabel">Loved it</span></div><div class="brow sel"><span class="bnum">X</span><span class="blabel">Liked it</span></div><div class="brow"><span class="bnum">03</span><span class="blabel">It was alright</span></div><div class="brow"><span class="bnum">02</span><span class="blabel">Not for me</span></div><div class="brow"><span class="bnum">01</span><span class="blabel">Bad</span></div></div>
+    </div></div>
+    <div class="improve"><b>Locked</b><span>Selected final: truthful reason header, no parenthetical aside, and the refined ink-slab transport CTA.</span></div>
+  </div>
+
+  <div class="col">
+    <div class="sl">A refined — ink slab transport command</div>
+    <div class="ph"><div class="pad">
+      <div class="status"><span>13:53</span><span>● ▮▮ ⌁ ▰</span></div>
+      <div class="kick">№152 · Jun 1, 2026</div><div class="mast">your album of the <span class="cyc">day</span></div><div class="rule3 flowbg"></div>
+      <div class="hero"><div class="title">Modern Bliss</div><div class="cov"><div class="covart">◆◆◆</div><div class="chips"><span class="marker">2020</span><span class="marker">AU</span></div></div></div>
+      <div class="rule2" style="margin-top:14px"></div><div class="spec">Roza Terenzi · 9 tracks · 56 min</div><div class="ruleHair"></div>
+      <div class="whyRule"><span>Why this one?</span><i></i></div>
+      <div class="why">Picked because you've been saving stuff by Maara and similar artists.</div>
+      <div class="playSlab"><div class="playSlabIn"><span class="playGlyph"><span></span></span><span class="playWord">Listen<br>on Spotify</span></div></div>
+      <div class="share">share ↗</div>
+      <div class="ballotlbl"><span class="seclbl">Editorial ballot</span><span style="flex:1;height:2px;background:var(--ink)"></span></div>
+      <div class="ballot"><div class="brow"><span class="bnum">05</span><span class="blabel">Loved it</span></div><div class="brow sel"><span class="bnum">X</span><span class="blabel">Liked it</span></div><div class="brow"><span class="bnum">03</span><span class="blabel">It was alright</span></div><div class="brow"><span class="bnum">02</span><span class="blabel">Not for me</span></div><div class="brow"><span class="bnum">01</span><span class="blabel">Bad</span></div></div>
+    </div></div>
+    <div class="improve"><b>Header option 1</b><span>Question plus thick rule. Keeps the editorial grid and gives the reason block enough visual authority.</span></div>
+  </div>
+
+  <div class="col">
+    <div class="sl">B — record transport strip</div>
+    <div class="ph"><div class="pad">
+      <div class="status"><span>13:53</span><span>● ▮▮ ⌁ ▰</span></div>
+      <div class="kick">№152 · Jun 1, 2026</div><div class="mast">your album of the <span class="cyc">day</span></div><div class="rule3 flowbg"></div>
+      <div class="hero"><div class="title">Modern Bliss</div><div class="cov"><div class="covart">◆◆◆</div><div class="chips"><span class="marker">2020</span><span class="marker">AU</span></div></div></div>
+      <div class="rule2" style="margin-top:14px"></div><div class="spec">Roza Terenzi · 9 tracks · 56 min</div><div class="ruleHair"></div>
+      <div class="whyPlain">Why this one?</div>
+      <div class="why">Picked because you've been saving stuff by Maara and similar artists.</div>
+      <div class="transport"><div class="transportIn"><div class="transportPlay"></div><div><div class="transportTitle">Listen<br>on Spotify</div></div></div><div class="transportMark flowbg"></div></div>
+      <div class="share">share ↗</div>
+      <div class="ballotlbl"><span class="seclbl">Editorial ballot</span><span style="flex:1;height:2px;background:var(--ink)"></span></div>
+      <div class="ballot"><div class="brow"><span class="bnum">05</span><span class="blabel">Loved it</span></div><div class="brow sel"><span class="bnum">X</span><span class="blabel">Liked it</span></div><div class="brow"><span class="bnum">03</span><span class="blabel">It was alright</span></div><div class="brow"><span class="bnum">02</span><span class="blabel">Not for me</span></div><div class="brow"><span class="bnum">01</span><span class="blabel">Bad</span></div></div>
+    </div></div>
+    <div class="improve"><b>Header option 2</b><span>Question only. Cleaner and more direct, but the section has less structure and can feel slightly loose.</span></div>
+  </div>
+
+  <div class="col">
+    <div class="sl">C — circular press seal play</div>
+    <div class="ph"><div class="pad">
+      <div class="status"><span>13:53</span><span>● ▮▮ ⌁ ▰</span></div>
+      <div class="kick">№152 · Jun 1, 2026</div><div class="mast">your album of the <span class="cyc">day</span></div><div class="rule3 flowbg"></div>
+      <div class="hero"><div class="title">Modern Bliss</div><div class="cov"><div class="covart">◆◆◆</div><div class="chips"><span class="marker">2020</span><span class="marker">AU</span></div></div></div>
+      <div class="rule2" style="margin-top:14px"></div><div class="spec">Roza Terenzi · 9 tracks · 56 min</div><div class="ruleHair"></div>
+      <div class="whyRule"><span>Why this one?</span><i></i></div>
+      <div class="why">Picked because you've been saving stuff by Maara and similar artists.</div>
+      <div class="sealCta"><div class="sealText"><div class="sealWord">Listen<br>on Spotify</div></div><div class="seal"></div></div>
+      <div class="share">share ↗</div>
+      <div class="ballotlbl"><span class="seclbl">Editorial ballot</span><span style="flex:1;height:2px;background:var(--ink)"></span></div>
+      <div class="ballot"><div class="brow"><span class="bnum">05</span><span class="blabel">Loved it</span></div><div class="brow sel"><span class="bnum">X</span><span class="blabel">Liked it</span></div><div class="brow"><span class="bnum">03</span><span class="blabel">It was alright</span></div><div class="brow"><span class="bnum">02</span><span class="blabel">Not for me</span></div><div class="brow"><span class="bnum">01</span><span class="blabel">Bad</span></div></div>
+    </div></div>
+    <div class="improve"><b>Expressive</b><span>Most distinctive and poster-like. The circular seal is now icon-only, so it adds character without extra copy.</span></div>
+  </div>
+</div>

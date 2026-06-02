@@ -1,0 +1,90 @@
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Archivo:wght@600;800&family=Space+Mono:wght@400;700&family=Space+Grotesk:wght@400;500;700&family=Syne:wght@400;500;600;700;800&family=Martian+Mono:wght@300;400;500&family=Unbounded:wght@400;500;700&display=swap');
+  :root{--bg:#f4ebe0;--ink:#1d1511;--muted:#6f5d52}
+  .rail{display:flex;gap:20px;overflow-x:auto;padding:6px 2px 18px;flex-wrap:wrap}
+  .unit{flex:0 0 auto;width:250px}
+  .unit>.sl{font:700 9px/1.45 'Space Mono',monospace;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:10px 2px 0;text-align:center}
+  .unit>.sl b{color:var(--ink)}
+  .ph{width:250px;aspect-ratio:9/18.8;border-radius:24px;overflow:hidden;position:relative;box-shadow:0 18px 44px #0009;background:var(--bg);color:var(--ink);cursor:pointer;border:2px solid transparent;transition:border-color .15s}
+  .ph.selected{border-color:#ff4a2e}
+  .pad{position:relative;height:100%;display:flex;flex-direction:column;padding:15px 15px 0}
+  .kick{font:700 8px/1.4 'Space Mono',monospace;letter-spacing:.13em;text-transform:uppercase;color:var(--muted)}
+  .mast{font:800 25px/.92 Archivo,sans-serif;letter-spacing:-.02em;text-transform:uppercase;color:var(--ink);margin-top:8px}
+  .cover{position:relative;margin-top:9px;aspect-ratio:1.16;width:100%;background:linear-gradient(155deg,#d6438f,#8e2a6e 55%,#3a1740);overflow:hidden}
+  .overlap{position:absolute;top:-15px;left:9px;font:800 28px/.9 Archivo,sans-serif;letter-spacing:-.02em;text-transform:uppercase;background:linear-gradient(90deg,#ff4a2e,#ff2e8b,#7b3ff2,#d9a441,#ff4a2e);background-size:300% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:flow 6s linear infinite}
+  .tags{position:absolute;left:9px;bottom:9px;display:flex;gap:6px}
+  .tags span{font:600 10px/1 Archivo,sans-serif;background:var(--ink);color:var(--bg);padding:3px 6px}
+  .date{font:700 9px/1.5 'Space Mono',monospace;letter-spacing:.07em;text-transform:uppercase;color:var(--ink);margin-top:11px}
+  .whlab{font:700 7.5px/1.4 'Space Mono',monospace;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-top:11px}
+  .why{margin-top:4px;color:var(--ink)}
+  .nudge{margin-top:9px;color:var(--ink);opacity:.92}
+  .link{font:700 10px/1 'Space Mono',monospace;letter-spacing:.1em;text-transform:uppercase;margin-top:auto;padding:12px 0;display:flex;justify-content:space-between;align-items:center;color:var(--ink);border-top:3px solid;border-image:linear-gradient(90deg,#ff4a2e,#ff2e8b,#7b3ff2,#d9a441,#ff4a2e) 1}
+  .link .arr{font-size:15px;background:linear-gradient(90deg,#ff4a2e,#ff2e8b,#7b3ff2,#d9a441,#ff4a2e);background-size:300% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:flow 6s linear infinite}
+  @keyframes flow{0%{background-position:0% 50%}100%{background-position:300% 50%}}
+
+  /* electronic / experimental / brutal candidates */
+  .f-grot .why{font:500 13.5px/1.4 'Space Grotesk',sans-serif}
+  .f-grot .nudge{font:400 12.5px/1.4 'Space Grotesk',sans-serif}
+
+  .f-syne .why{font:600 14px/1.32 Syne,sans-serif;letter-spacing:-.01em}
+  .f-syne .nudge{font:500 12.5px/1.36 Syne,sans-serif}
+
+  .f-mars .why{font:400 11px/1.55 'Martian Mono',monospace;letter-spacing:-.02em}
+  .f-mars .nudge{font:300 10.5px/1.55 'Martian Mono',monospace;letter-spacing:-.02em}
+
+  .f-unb .why{font:500 11.5px/1.45 Unbounded,sans-serif}
+  .f-unb .nudge{font:400 10.5px/1.45 Unbounded,sans-serif}
+</style>
+
+<h2>Body voice — electronic / experimental / brutal</h2>
+<p class="subtitle">Raw, techno, art-world. Display stays Archivo · captions stay Space Mono. This is the prose voice (&ldquo;why this album&rdquo; roman + nudge). 4 candidates, all Google-Fonts / Expo-Go safe.</p>
+
+<div class="rail">
+
+  <div class="unit"><div class="ph f-grot" data-choice="space-grotesk" onclick="toggleSelect(this)"><div class="pad">
+    <div class="kick">Album of the Day · No.142 · Sat 31 May</div>
+    <div class="mast">today's<br>record</div>
+    <div class="cover"><div class="overlap">SOUVLAKI</div><div class="tags"><span>shoegaze</span><span>1993</span></div></div>
+    <div class="date">Slowdive — 39 min</div>
+    <div class="whlab">Why this album</div>
+    <div class="why">Picked from the edges of your saved music — woozy guitars you keep coming back to.</div>
+    <div class="nudge">Worst case, tomorrow's pick is on us.</div>
+    <div class="link"><span>Open in Spotify</span><span class="arr">↗</span></div>
+  </div></div><div class="sl"><b>A · Space Grotesk</b><br>geometric electronic grotesque · superfamily w/ Space Mono · clean-brutal</div></div>
+
+  <div class="unit"><div class="ph f-syne" data-choice="syne" onclick="toggleSelect(this)"><div class="pad">
+    <div class="kick">Album of the Day · No.142 · Sat 31 May</div>
+    <div class="mast">today's<br>record</div>
+    <div class="cover"><div class="overlap">SOUVLAKI</div><div class="tags"><span>shoegaze</span><span>1993</span></div></div>
+    <div class="date">Slowdive — 39 min</div>
+    <div class="whlab">Why this album</div>
+    <div class="why">Picked from the edges of your saved music — woozy guitars you keep coming back to.</div>
+    <div class="nudge">Worst case, tomorrow's pick is on us.</div>
+    <div class="link"><span>Open in Spotify</span><span class="arr">↗</span></div>
+  </div></div><div class="sl"><b>B · Syne</b><br>art-world experimental · weird, gallery-grade · most &ldquo;different&rdquo;</div></div>
+
+  <div class="unit"><div class="ph f-mars" data-choice="martian-mono" onclick="toggleSelect(this)"><div class="pad">
+    <div class="kick">Album of the Day · No.142 · Sat 31 May</div>
+    <div class="mast">today's<br>record</div>
+    <div class="cover"><div class="overlap">SOUVLAKI</div><div class="tags"><span>shoegaze</span><span>1993</span></div></div>
+    <div class="date">Slowdive — 39 min</div>
+    <div class="whlab">Why this album</div>
+    <div class="why">Picked from the edges of your saved music — woozy guitars you keep coming back to.</div>
+    <div class="nudge">Worst case, tomorrow's pick is on us.</div>
+    <div class="link"><span>Open in Spotify</span><span class="arr">↗</span></div>
+  </div></div><div class="sl"><b>C · Martian Mono</b><br>wide brutalist technical mono · maximum terminal / electronic</div></div>
+
+  <div class="unit"><div class="ph f-unb" data-choice="unbounded" onclick="toggleSelect(this)"><div class="pad">
+    <div class="kick">Album of the Day · No.142 · Sat 31 May</div>
+    <div class="mast">today's<br>record</div>
+    <div class="cover"><div class="overlap">SOUVLAKI</div><div class="tags"><span>shoegaze</span><span>1993</span></div></div>
+    <div class="date">Slowdive — 39 min</div>
+    <div class="whlab">Why this album</div>
+    <div class="why">Picked from the edges of your saved music — woozy guitars you keep coming back to.</div>
+    <div class="nudge">Worst case, tomorrow's pick is on us.</div>
+    <div class="link"><span>Open in Spotify</span><span class="arr">↗</span></div>
+  </div></div><div class="sl"><b>D · Unbounded</b><br>geometric brutal display · bold, futuristic, loud</div></div>
+
+</div>
+
+<p class="subtitle" style="margin-top:14px">My read: <b>A · Space Grotesk</b> = safest electronic match (sibling of Space Mono, stays readable). <b>B · Syne</b> = boldest experimental statement if you want max weird. C/D get heavy at paragraph length. Tap your pick → lock the type system + write the plan.</p>

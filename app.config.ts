@@ -6,7 +6,7 @@ const config: ExpoConfig = {
   scheme: 'albumoftheday',
   version: '0.1.0',
   orientation: 'portrait',
-  userInterfaceStyle: 'dark',
+  userInterfaceStyle: 'light',
   icon: './assets/icon.png',
   ios: {
     bundleIdentifier: 'com.pesnya.albumoftheday',
@@ -18,7 +18,7 @@ const config: ExpoConfig = {
   android: {
     package: 'com.pesnya.albumoftheday',
     adaptiveIcon: {
-      backgroundColor: '#0a0a0a',
+      backgroundColor: '#f4ebe0',
       foregroundImage: './assets/android-icon-foreground.png',
       backgroundImage: './assets/android-icon-background.png',
       monochromeImage: './assets/android-icon-monochrome.png',
@@ -32,12 +32,13 @@ const config: ExpoConfig = {
     'expo-router',
     'expo-secure-store',
     'expo-web-browser',
+    'expo-font',
     [
       'expo-splash-screen',
       {
         image: './assets/splash-icon.png',
         resizeMode: 'contain',
-        backgroundColor: '#0a0a0a',
+        backgroundColor: '#f4ebe0',
       },
     ],
   ],

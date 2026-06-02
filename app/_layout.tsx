@@ -14,6 +14,9 @@ import { useLibrarySyncStatus } from '@/lib/hooks/useLibrarySyncStatus';
 import { hasCompletedLibrarySync } from '@/lib/library';
 import { queryClient } from '@/lib/queryClient';
 import { initSentry } from '@/lib/sentry';
+import { AccentFlowProvider } from '@/theme/skins/AccentFlowProvider';
+import { useSkinFonts } from '@/theme/skins/fonts';
+import { useSkinComponents } from '@/theme/skins/registry';
 
 initSentry();
 
@@ -22,15 +25,40 @@ export default function RootLayout() {
     <AuthProvider>
       <QueryClientProvider client={queryClient}>
         <SafeAreaProvider>
-          <StatusBar style="light" />
-          <RouterGuard />
+          <AccentFlowProvider>
+            <SkinGate />
+          </AccentFlowProvider>
         </SafeAreaProvider>
       </QueryClientProvider>
     </AuthProvider>
   );
 }
 
+function SkinGate() {
+  const [fontsLoaded] = useSkinFonts();
+  const components = useSkinComponents();
+
+  if (!fontsLoaded) {
+    return (
+      <View
+        className="flex-1 items-center justify-center px-5"
+        style={{ backgroundColor: components.chrome.rootBackground }}
+      >
+        <Text variant="caption">Loading...</Text>
+      </View>
+    );
+  }
+
+  return (
+    <>
+      <StatusBar style={components.chrome.statusBarStyle} />
+      <RouterGuard />
+    </>
+  );
+}
+
 function RouterGuard() {
+  const components = useSkinComponents();
   const { session, loading } = useSession();
   const { status: syncStatus, loading: syncStatusLoading } = useLibrarySyncStatus();
   const segments = useSegments();
@@ -55,7 +83,10 @@ function RouterGuard() {
 
   if (loading) {
     return (
-      <View className="flex-1 items-center justify-center bg-bg px-5">
+      <View
+        className="flex-1 items-center justify-center px-5"
+        style={{ backgroundColor: components.chrome.rootBackground }}
+      >
         <Text variant="caption">Loading session...</Text>
       </View>
     );
@@ -63,7 +94,10 @@ function RouterGuard() {
 
   if (session && syncStatusLoading) {
     return (
-      <View className="flex-1 items-center justify-center bg-bg px-5">
+      <View
+        className="flex-1 items-center justify-center px-5"
+        style={{ backgroundColor: components.chrome.rootBackground }}
+      >
         <Text variant="caption">Loading music profile...</Text>
       </View>
     );

@@ -4,21 +4,21 @@
 // default import in `theme/colors.d.ts`) read from here, so there is exactly
 // one place to change colors.
 //
-// Phase 6 brand palette: deep burgundy / cream / accent gold. `accent` is now
-// gold (highlights, active states), `primary` is burgundy (main CTAs). The only
-// place that intentionally stays Spotify-green is the Spotify sign-in button.
+// PRESS editorial palette. These tokens are intentionally aligned with the
+// shipping editorial skin so generic fallback UI cannot drift back into the old
+// dark/rounded brand treatment.
 const colors = {
-  // Core surfaces (dark, warm "album-cover-y" base)
-  bg: '#120a0c', // deep wine-black
-  surface: '#1d1014', // raised surface
-  'surface-2': '#2a181d', // higher surface / borders
+  // Core surfaces
+  bg: '#f4ebe0', // warm paper
+  surface: '#f4ebe0',
+  'surface-2': '#eadcc9', // paper alternate / skeleton base
   // Content
-  text: '#f4ebe0', // cream (primary text / on-dark)
-  muted: '#9c8b86', // warm taupe (secondary text)
+  text: '#1d1511',
+  muted: '#6f5d52',
   // Brand
-  accent: '#d9a441', // gold — highlights, active states, eyebrows, active tab
-  primary: '#87263b', // burgundy — main CTAs ("Open in Spotify")
-  'on-primary': '#f4ebe0', // cream text on burgundy
+  accent: '#ff4a2e',
+  primary: '#87263b',
+  'on-primary': '#fff6e8',
   // Spotify brand green — for the Spotify-branded sign-in button ONLY.
   spotify: '#1db954',
   // Rating semantic tints (subtle accents, not the primary visual)

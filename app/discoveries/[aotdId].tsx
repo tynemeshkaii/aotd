@@ -3,27 +3,41 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { Pressable, View } from 'react-native';
 
 import { AlbumDetail } from '@/components/album/AlbumDetail';
-import { AlbumDetailSkeleton } from '@/components/album/AlbumDetailSkeleton';
-import { EmptyState } from '@/components/ui/EmptyState';
-import { ErrorState } from '@/components/ui/ErrorState';
 import { Screen } from '@/components/ui/Screen';
 import { useDiscoveryDetail } from '@/lib/hooks/useDiscoveryDetail';
-import colors from '@/theme/colors';
+import { useSkinComponents } from '@/theme/skins/registry';
 
-function BackButton() {
+function BackButton({
+  color,
+  borderColor,
+  backgroundColor,
+}: {
+  color: string;
+  borderColor: string;
+  backgroundColor: string;
+}) {
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel="Back to Discoveries"
       onPress={() => router.replace('/(tabs)/discoveries')}
-      className="h-10 w-10 items-center justify-center rounded-full bg-surface/80 active:opacity-80"
+      className="h-11 w-11 items-center justify-center border-2 active:opacity-80"
+      style={{ borderColor, backgroundColor }}
     >
-      <Ionicons name="chevron-back" size={22} color={colors.text} />
+      <Ionicons name="chevron-back" size={22} color={color} />
     </Pressable>
   );
 }
 
 export default function DiscoveryDetailScreen() {
+  const components = useSkinComponents();
+  const backButton = (
+    <BackButton
+      color={components.chrome.text}
+      borderColor={components.chrome.muted}
+      backgroundColor={components.chrome.surface}
+    />
+  );
   const { aotdId } = useLocalSearchParams<{ aotdId?: string }>();
   const { data: album, isError, isLoading, isRefetching, refetch } = useDiscoveryDetail(aotdId);
 
@@ -32,10 +46,8 @@ export default function DiscoveryDetailScreen() {
   if (isLoading) {
     return (
       <Screen>
-        <View className="mb-5">
-          <BackButton />
-        </View>
-        <AlbumDetailSkeleton />
+        <View className="mb-5">{backButton}</View>
+        {components.States.AlbumDetailSkeleton()}
       </Screen>
     );
   }
@@ -44,16 +56,14 @@ export default function DiscoveryDetailScreen() {
   if (isError) {
     return (
       <Screen scroll={false}>
-        <View className="mb-5">
-          <BackButton />
-        </View>
-        <ErrorState
-          title="Could not load this discovery."
-          retrying={isRefetching}
-          onRetry={() => void refetch()}
-          secondaryTitle="Back to Discoveries"
-          onSecondary={goBack}
-        />
+        <View className="mb-5">{backButton}</View>
+        {components.States.ErrorState({
+          title: 'Could not load this discovery.',
+          retrying: isRefetching,
+          onRetry: () => void refetch(),
+          secondaryTitle: 'Back to Discoveries',
+          onSecondary: goBack,
+        })}
       </Screen>
     );
   }
@@ -61,19 +71,17 @@ export default function DiscoveryDetailScreen() {
   if (!album) {
     return (
       <Screen scroll={false}>
-        <View className="mb-5">
-          <BackButton />
-        </View>
-        <EmptyState
-          icon="disc-outline"
-          title="Discovery not found"
-          subtitle="It may have been removed. Head back to your discoveries."
-          actionTitle="Back to Discoveries"
-          onAction={goBack}
-        />
+        <View className="mb-5">{backButton}</View>
+        {components.States.EmptyState({
+          icon: 'disc-outline',
+          title: 'Discovery not found',
+          subtitle: 'It may have been removed. Head back to your discoveries.',
+          actionTitle: 'Back to Discoveries',
+          onAction: goBack,
+        })}
       </Screen>
     );
   }
 
-  return <AlbumDetail album={album} header={<BackButton />} />;
+  return <AlbumDetail album={album} header={backButton} />;
 }

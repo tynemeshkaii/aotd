@@ -27,7 +27,7 @@ export function Avatar({ uri, size = 96, label }: Props) {
       className="items-center justify-center rounded-full bg-surface-2"
       style={{ width: size, height: size, borderRadius: size / 2 }}
     >
-      <Text className="text-3xl font-bold text-text">{fallback}</Text>
+      <Text className="font-display text-3xl text-text">{fallback}</Text>
     </View>
   );
 }

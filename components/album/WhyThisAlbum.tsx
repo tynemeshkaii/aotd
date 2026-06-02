@@ -9,11 +9,13 @@ type Props = {
 
 export function WhyThisAlbum({ album }: Props) {
   return (
-    <Card glass>
+    <Card variant="glass">
       <Text variant="label" className="mb-2">
         Why this album
       </Text>
-      <Text variant="body">{formatSelectionReason(album.selection_reason)}</Text>
+      <Text variant="body" className="leading-6">
+        {formatSelectionReason(album.selection_reason)}
+      </Text>
     </Card>
   );
 }

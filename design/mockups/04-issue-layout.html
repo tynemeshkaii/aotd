@@ -1,0 +1,95 @@
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;700;800&family=Space+Mono:wght@400;700&family=Space+Grotesk:wght@400;500;700&display=swap');
+  :root{--bg:#f4ebe0;--ink:#1d1511;--muted:#6f5d52}
+  .rail{display:flex;gap:22px;overflow-x:auto;padding:6px 2px 18px;flex-wrap:wrap}
+  .unit{flex:0 0 auto;width:262px}
+  .unit>.sl{font:700 9px/1.5 'Space Mono',monospace;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);margin:10px 2px 0;text-align:center}
+  .unit>.sl b{color:var(--ink)}
+  .ph{width:262px;aspect-ratio:9/19;border-radius:26px;overflow:hidden;position:relative;box-shadow:0 18px 44px #0009;background:var(--bg);color:var(--ink);cursor:pointer;border:2px solid transparent;transition:border-color .15s}
+  .ph.selected{border-color:#ff4a2e}
+  .pad{position:relative;height:100%;display:flex;flex-direction:column;padding:16px 16px 0;overflow:hidden}
+  @keyframes flow{0%{background-position:0% 50%}100%{background-position:300% 50%}}
+  .flowbg{background:linear-gradient(90deg,#ff4a2e,#ff2e8b,#7b3ff2,#d9a441,#ff4a2e);background-size:300% 100%;animation:flow 6s linear infinite}
+  .flowtx{background:linear-gradient(90deg,#ff4a2e,#ff2e8b,#7b3ff2,#d9a441,#ff4a2e);background-size:300% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:flow 6s linear infinite}
+  .rule3{height:3px;border-radius:2px;margin:10px 0}
+
+  .kick{font:400 8.5px/1.4 'Space Mono',monospace;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
+  .meta{font:400 9px/1.5 'Space Mono',monospace;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+  .num{font:800 36px/.82 Archivo,sans-serif;letter-spacing:-.03em;color:var(--ink)}
+  .num.sm{font-size:30px}
+  .today{font:700 8.5px/1 'Space Mono',monospace;letter-spacing:.12em;text-transform:uppercase}
+
+  .hero{position:relative;margin-top:12px}
+  .title{font:800 30px/.9 Archivo,sans-serif;text-transform:uppercase;letter-spacing:-.024em;position:relative;z-index:2}
+  .cov{aspect-ratio:1;background:linear-gradient(155deg,#d6438f,#8e2a6e 55%,#3a1740);margin-top:-12px;position:relative;z-index:1}
+  .chips{position:absolute;right:8px;bottom:8px;display:flex;gap:5px;z-index:3}
+  .marker{font:600 9px/1 Archivo,sans-serif;background:var(--ink);color:var(--bg);padding:3px 5px}
+  .spec{font:700 8.5px/1.5 'Space Mono',monospace;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-top:9px}
+  .cta{font:700 9.5px/1 'Space Mono',monospace;letter-spacing:.1em;text-transform:uppercase;display:flex;justify-content:space-between;align-items:center;padding:11px 0;margin-top:auto;border-top:3px solid;border-image:linear-gradient(90deg,#ff4a2e,#ff2e8b,#7b3ff2,#d9a441,#ff4a2e) 1;color:var(--ink)}
+</style>
+
+<h2>Issue-led — block arrangement</h2>
+<p class="subtitle">№142 is the typographic anchor; ● Today is the color anchor — kept on separate channels. Four ways to place the blocks. Hero below identical.</p>
+
+<div class="rail">
+
+  <!-- A · STACKED LEFT -->
+  <div class="unit"><div class="ph" data-choice="stacked" onclick="toggleSelect(this)"><div class="pad">
+    <div class="kick">Album of the Day</div>
+    <div class="num" style="margin-top:2px">№142</div>
+    <div class="meta" style="margin-top:4px">Sat 31 May 2026 · <span class="today flowtx">● Today</span></div>
+    <div class="rule3 flowbg"></div>
+    <div class="hero"><div class="title"><span class="flowtx">Souvlaki</span></div><div class="cov"><div class="chips"><span class="marker">1993</span><span class="marker">unrated</span></div></div></div>
+    <div class="spec">Slowdive · 10 tracks · 39 min</div>
+    <div class="cta"><span>Open in Spotify</span><span class="flowtx">↗</span></div>
+  </div></div><div class="sl"><b>A · Stacked left</b><br>one flush-left column · date+Today inline · cleanest Swiss</div></div>
+
+  <!-- B · STATUS TOP-RIGHT -->
+  <div class="unit"><div class="ph" data-choice="topright" onclick="toggleSelect(this)"><div class="pad">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <div class="kick">Album of the Day</div>
+      <div class="today flowtx">● Today</div>
+    </div>
+    <div class="num" style="margin-top:4px">№142</div>
+    <div class="meta" style="margin-top:4px">Saturday 31 May 2026</div>
+    <div class="rule3 flowbg"></div>
+    <div class="hero"><div class="title"><span class="flowtx">Souvlaki</span></div><div class="cov"><div class="chips"><span class="marker">1993</span><span class="marker">unrated</span></div></div></div>
+    <div class="spec">Slowdive · 10 tracks · 39 min</div>
+    <div class="cta"><span>Open in Spotify</span><span class="flowtx">↗</span></div>
+  </div></div><div class="sl"><b>B · Status top-right</b><br>Today pinned top-right · №142 leads left · date under</div></div>
+
+  <!-- C · DROP NUMBER + RIGHT META -->
+  <div class="unit"><div class="ph" data-choice="dropnum" onclick="toggleSelect(this)"><div class="pad">
+    <div style="display:flex;align-items:center;gap:12px">
+      <div class="num">№142</div>
+      <div style="flex:1;border-left:2px solid var(--ink);padding-left:10px">
+        <div class="kick">Album of the Day</div>
+        <div class="meta" style="margin-top:2px">Sat 31 May 2026</div>
+        <div class="today flowtx" style="margin-top:3px">● Today's pick</div>
+      </div>
+    </div>
+    <div class="rule3 flowbg"></div>
+    <div class="hero"><div class="title"><span class="flowtx">Souvlaki</span></div><div class="cov"><div class="chips"><span class="marker">1993</span><span class="marker">unrated</span></div></div></div>
+    <div class="spec">Slowdive · 10 tracks · 39 min</div>
+    <div class="cta"><span>Open in Spotify</span><span class="flowtx">↗</span></div>
+  </div></div><div class="sl"><b>C · Drop number</b><br>big №142 + ruled meta column right · most editorial</div></div>
+
+  <!-- D · NUMBER RIGHT-ANCHORED -->
+  <div class="unit"><div class="ph" data-choice="numright" onclick="toggleSelect(this)"><div class="pad">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start">
+      <div>
+        <div class="kick">Album of the Day</div>
+        <div class="meta" style="margin-top:3px">Sat 31 May 2026</div>
+        <div class="today flowtx" style="margin-top:3px">● Today</div>
+      </div>
+      <div class="num sm">№142</div>
+    </div>
+    <div class="rule3 flowbg"></div>
+    <div class="hero"><div class="title"><span class="flowtx">Souvlaki</span></div><div class="cov"><div class="chips"><span class="marker">1993</span><span class="marker">unrated</span></div></div></div>
+    <div class="spec">Slowdive · 10 tracks · 39 min</div>
+    <div class="cta"><span>Open in Spotify</span><span class="flowtx">↗</span></div>
+  </div></div><div class="sl"><b>D · Number right</b><br>meta column left · №142 anchored top-right</div></div>
+
+</div>
+
+<p class="subtitle" style="margin-top:14px">My pick: <b>A · Stacked left</b> for clean Swiss rhythm, or <b>C · Drop number</b> if you want the №142 to feel like a true edition stamp. Tap one (or say tweaks) → I lock the header and write the final plan.</p>

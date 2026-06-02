@@ -1,0 +1,126 @@
+<h2>4 artsy directions for Album of the Day</h2>
+<p class="subtitle">Each is a full visual language — not a tweak of the current burgundy/cream/gold. Tap the one(s) that pull you. Real phone-scale mockups of today's pick.</p>
+
+<style>
+  .dir-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:22px;margin-top:8px}
+  @media(max-width:720px){.dir-grid{grid-template-columns:1fr}}
+  .dir{border-radius:18px;overflow:hidden;cursor:pointer;border:2px solid transparent;transition:transform .15s,border-color .15s;background:#15110f}
+  .dir:hover{transform:translateY(-4px)}
+  .dir.selected{border-color:#d9a441}
+  .phone{aspect-ratio:9/16;width:100%;position:relative;overflow:hidden}
+  .dir-cap{padding:14px 16px}
+  .dir-cap h3{margin:0 0 4px;font-size:17px}
+  .dir-cap p{margin:0;font-size:13px;opacity:.7;line-height:1.45}
+  .tag{display:inline-block;font-size:10px;letter-spacing:.12em;text-transform:uppercase;opacity:.55;margin-top:8px}
+
+  /* A — EDITORIAL / SWISS BRUTALIST */
+  .a{background:#f2ece1;color:#111}
+  .a .top{display:flex;justify-content:space-between;font:600 8px/1 ui-monospace,monospace;letter-spacing:.1em;padding:14px 12px 0;text-transform:uppercase}
+  .a .huge{font:800 30px/.86 'Arial Narrow',sans-serif;letter-spacing:-.02em;padding:18px 12px 6px;transform:scaleY(1.15);transform-origin:left}
+  .a .rule{height:2px;background:#111;margin:6px 12px}
+  .a .cover{margin:10px 12px;aspect-ratio:1;background:linear-gradient(135deg,#3a2f5e,#b14a3c);border:2px solid #111}
+  .a .meta{padding:0 12px;font:600 9px/1.4 ui-monospace,monospace;text-transform:uppercase}
+  .a .cta{margin:12px;background:#111;color:#f2ece1;font:700 9px/1 ui-monospace,monospace;text-align:center;padding:10px;letter-spacing:.12em}
+
+  /* B — RISOGRAPH / PRINT COLLAGE */
+  .b{background:#e8e0cf;color:#3a1224;position:relative}
+  .b:before{content:"";position:absolute;inset:0;opacity:.18;mix-blend-mode:multiply;background-image:radial-gradient(#3a1224 .6px,transparent .6px);background-size:4px 4px}
+  .b .lab{position:relative;font:700 9px/1 ui-monospace,monospace;letter-spacing:.1em;text-transform:uppercase;padding:14px 12px 0;color:#87263b}
+  .b .cover{position:relative;margin:14px;aspect-ratio:1;background:linear-gradient(135deg,#87263b,#d9a441);mix-blend-mode:multiply;border-radius:3px}
+  .b .cover:after{content:"";position:absolute;inset:0;background-image:radial-gradient(#3a1224 1px,transparent 1px);background-size:6px 6px;opacity:.3}
+  .b .sticker{position:relative;display:inline-block;background:#d9a441;color:#3a1224;font:800 11px/1 sans-serif;padding:6px 9px;transform:rotate(-4deg);margin:0 12px 6px;border-radius:4px}
+  .b .ttl{position:relative;font:800 19px/1.05 Georgia,serif;padding:0 12px;color:#3a1224}
+  .b .cta{position:relative;margin:14px 12px;background:#87263b;color:#e8e0cf;text-align:center;font:700 10px/1 sans-serif;padding:11px;border-radius:30px;transform:rotate(-1deg)}
+
+  /* C — GENERATIVE ABSTRACT (cover -> art) */
+  .c{background:#0b0a12;color:#f4f1ea;position:relative}
+  .c .mesh{position:absolute;inset:0;background:
+     radial-gradient(120px 140px at 25% 20%,#e0567a88,transparent 70%),
+     radial-gradient(160px 160px at 80% 35%,#5a4cff88,transparent 70%),
+     radial-gradient(180px 180px at 50% 90%,#f0b35988,transparent 70%);filter:blur(6px)}
+  .c .blob{position:absolute;width:120px;height:120px;left:30%;top:32%;background:linear-gradient(135deg,#ff8a5c,#7b5cff);border-radius:46% 54% 38% 62%/52% 38% 62% 48%;filter:blur(.3px);box-shadow:0 20px 60px #0008}
+  .c .glass{position:absolute;left:10px;right:10px;bottom:10px;background:#ffffff14;backdrop-filter:blur(8px);border:1px solid #ffffff22;border-radius:14px;padding:12px}
+  .c .glass .t{font:700 15px/1.1 'Helvetica Neue',sans-serif}
+  .c .glass .s{font:500 10px/1 sans-serif;opacity:.7;margin-top:4px}
+  .c .glass .cta{margin-top:10px;background:#fff;color:#111;text-align:center;font:700 9px/1 sans-serif;padding:9px;border-radius:30px}
+  .c .eyebrow{position:absolute;top:14px;left:12px;font:600 8px/1 ui-monospace,monospace;letter-spacing:.2em;text-transform:uppercase;opacity:.6}
+
+  /* D — NEO-BRUTALISM */
+  .d{background:#ffe14d;color:#111}
+  .d .bar{background:#111;color:#ffe14d;font:800 9px/1 sans-serif;letter-spacing:.1em;text-transform:uppercase;padding:10px 12px;display:flex;justify-content:space-between}
+  .d .cover{margin:14px;aspect-ratio:1;background:linear-gradient(135deg,#19c3ff,#ff4d8d);border:3px solid #111;box-shadow:7px 7px 0 #111}
+  .d .ttl{font:900 20px/1 sans-serif;padding:0 12px;text-transform:uppercase}
+  .d .pill{display:inline-block;background:#19c3ff;border:3px solid #111;font:800 9px/1 sans-serif;padding:6px 8px;margin:8px 0 0 12px;box-shadow:3px 3px 0 #111}
+  .d .cta{margin:14px 12px;background:#ff4d8d;border:3px solid #111;box-shadow:5px 5px 0 #111;text-align:center;font:900 11px/1 sans-serif;padding:12px;text-transform:uppercase}
+</style>
+
+<div class="dir-grid">
+
+  <div class="dir selected" data-choice="editorial" onclick="toggleSelect(this)">
+    <div class="phone a">
+      <div class="top"><span>Mon 31 May</span><span>No. 142</span></div>
+      <div class="huge">ALBUM<br>OF THE<br>DAY</div>
+      <div class="rule"></div>
+      <div class="cover"></div>
+      <div class="meta">Slowdive — Souvlaki<br>Shoegaze · 1993 · 39 min</div>
+      <div class="cta">OPEN IN SPOTIFY →</div>
+    </div>
+    <div class="dir-cap">
+      <h3>A · Editorial / Swiss</h3>
+      <p>Every pick is a printed poster. Huge condensed type, hard rules, mono labels, lots of cream space. Gallery-wall, intellectual, timeless.</p>
+      <span class="tag">brutalist · print · type-driven</span>
+    </div>
+  </div>
+
+  <div class="dir" data-choice="riso" onclick="toggleSelect(this)">
+    <div class="phone b">
+      <div class="lab">// today's discovery</div>
+      <div class="cover"></div>
+      <div class="sticker">SHOEGAZE ★ 1993</div>
+      <div class="ttl">Slowdive<br>Souvlaki</div>
+      <div class="cta">▶ Play the record</div>
+    </div>
+    <div class="dir-cap">
+      <h3>B · Risograph / Collage</h3>
+      <p>Zine energy. Paper grain, halftone dots, duotone overprint covers, rotated stickers, warm ink. Handmade, tactile, indie-record-shop.</p>
+      <span class="tag">grain · halftone · analog</span>
+    </div>
+  </div>
+
+  <div class="dir" data-choice="generative" onclick="toggleSelect(this)">
+    <div class="phone c">
+      <div class="mesh"></div>
+      <div class="blob"></div>
+      <div class="eyebrow">brewed for you</div>
+      <div class="glass">
+        <div class="t">Souvlaki</div>
+        <div class="s">Slowdive · cover became this</div>
+        <div class="cta">OPEN ALBUM</div>
+      </div>
+    </div>
+    <div class="dir-cap">
+      <h3>C · Generative Abstract</h3>
+      <p>The cover explodes into living abstract art — fluid blobs, gradient mesh, motion drawn from its colors. Glass UI floats on top. Dreamy, premium, alive.</p>
+      <span class="tag">fluid · generative · motion</span>
+    </div>
+  </div>
+
+  <div class="dir" data-choice="neo" onclick="toggleSelect(this)">
+    <div class="phone d">
+      <div class="bar"><span>ALBUM/DAY</span><span>31.05</span></div>
+      <div class="cover"></div>
+      <div class="ttl">Souvlaki</div>
+      <span class="pill">SLOWDIVE · '93</span>
+      <div class="cta">OPEN ▶</div>
+    </div>
+    <div class="dir-cap">
+      <h3>D · Neo-Brutalism</h3>
+      <p>Loud and playful. Thick black borders, hard offset shadows, clashing bright blocks, chunky buttons. Matches the humorous, low-pressure voice.</p>
+      <span class="tag">bold · playful · high-contrast</span>
+    </div>
+  </div>
+
+</div>
+
+<p class="subtitle" style="margin-top:22px">Multi-select on — pick one favorite, or two you'd want to blend. I'll go deeper on the winner next.</p>
+<script>document.querySelector('.dir-grid').setAttribute('data-multiselect','')</script>

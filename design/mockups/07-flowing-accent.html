@@ -1,0 +1,105 @@
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;800&family=Space+Mono:wght@400;700&display=swap');
+
+  :root{--bg:#f4ebe0;--ink:#1d1511;--muted:#6f5d52}
+  .rail{display:flex;gap:20px;overflow-x:auto;padding:6px 2px 18px;flex-wrap:wrap}
+  .unit{flex:0 0 auto;width:240px}
+  .unit>.sl{font:700 9px/1.4 'Space Mono',monospace;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:10px 2px 0;text-align:center}
+  .unit>.sl b{color:var(--ink)}
+
+  .ph{width:240px;aspect-ratio:9/18.6;border-radius:24px;overflow:hidden;position:relative;
+      box-shadow:0 18px 44px #0009;background:var(--bg);color:var(--ink);
+      cursor:pointer;border:2px solid transparent;transition:border-color .15s}
+  .ph.selected{border-color:#ff4a2e}
+  .pad{position:relative;height:100%;display:flex;flex-direction:column;padding:15px 15px 0}
+
+  .kick{font:700 8px/1.4 'Space Mono',monospace;letter-spacing:.13em;text-transform:uppercase;color:var(--muted)}
+  .mast{font:800 26px/.92 Archivo,sans-serif;letter-spacing:-.02em;text-transform:uppercase;color:var(--ink);margin-top:9px}
+  .cover{position:relative;margin-top:9px;aspect-ratio:1.1;width:100%;
+         background:linear-gradient(155deg,#d6438f,#8e2a6e 55%,#3a1740);overflow:hidden}
+  .overlap{position:absolute;top:-16px;left:9px;font:800 30px/.9 Archivo,sans-serif;letter-spacing:-.02em;text-transform:uppercase}
+  .tags{position:absolute;left:9px;bottom:9px;display:flex;gap:6px}
+  .tags span{font:600 10px/1 Archivo,sans-serif;color:#fff;padding:3px 6px}
+  .date{font:700 9px/1.5 'Space Mono',monospace;letter-spacing:.07em;text-transform:uppercase;color:var(--ink);margin-top:12px}
+  .paren{font:400 9px/1.4 'Space Mono',monospace;color:var(--muted);margin-top:3px}
+  .body{font:400 10.5px/1.45 Archivo,sans-serif;color:var(--ink);opacity:.82;margin-top:10px}
+  .link{font:700 10px/1 'Space Mono',monospace;letter-spacing:.1em;text-transform:uppercase;
+        margin-top:auto;padding:12px 0;display:flex;justify-content:space-between;align-items:center}
+
+  /* ===== iridescent palette (no green) ===== */
+  @keyframes flow{0%{background-position:0% 50%}100%{background-position:300% 50%}}
+  @keyframes cyc{
+    0%{color:#ff4a2e}25%{color:#ff2e8b}50%{color:#7b3ff2}75%{color:#d9a441}100%{color:#ff4a2e}}
+  @keyframes cycbg{
+    0%{background-color:#ff4a2e}25%{background-color:#ff2e8b}50%{background-color:#7b3ff2}75%{background-color:#d9a441}100%{background-color:#ff4a2e}}
+
+  /* A · FLOWING GRADIENT (background-clip text + moving gradient rule/tags) */
+  .flow .arule{height:3px;margin:9px 0;border-radius:2px;
+    background:linear-gradient(90deg,#ff4a2e,#ff2e8b,#7b3ff2,#d9a441,#ff4a2e);
+    background-size:300% 100%;animation:flow 6s linear infinite}
+  .flow .overlap{background:linear-gradient(90deg,#ff4a2e,#ff2e8b,#7b3ff2,#d9a441,#ff4a2e);
+    background-size:300% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;
+    animation:flow 6s linear infinite}
+  .flow .tags span{background:linear-gradient(90deg,#ff4a2e,#ff2e8b,#7b3ff2,#d9a441,#ff4a2e);
+    background-size:300% 100%;animation:flow 6s linear infinite}
+  .flow .link .arr{background:linear-gradient(90deg,#ff4a2e,#ff2e8b,#7b3ff2,#d9a441,#ff4a2e);
+    background-size:300% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;
+    animation:flow 6s linear infinite;font-size:15px}
+  .flow .link{border-top:3px solid;border-image:linear-gradient(90deg,#ff4a2e,#ff2e8b,#7b3ff2,#d9a441,#ff4a2e) 1;color:var(--ink)}
+
+  /* B · SOLID COLOR-CYCLE (whole accent shifts as one solid color) */
+  .cyc .arule{height:3px;margin:9px 0;border-radius:2px;animation:cycbg 9s ease-in-out infinite}
+  .cyc .overlap{animation:cyc 9s ease-in-out infinite}
+  .cyc .tags span{animation:cycbg 9s ease-in-out infinite}
+  .cyc .link .arr{animation:cyc 9s ease-in-out infinite;font-size:15px}
+  .cyc .link{border-top:3px solid var(--ink);color:var(--ink)}
+
+  /* C · STATIC (reduce-motion fallback) */
+  .stat .arule{height:3px;margin:9px 0;border-radius:2px;background:#ff4a2e}
+  .stat .overlap{color:#ff4a2e}
+  .stat .tags span{background:#ff4a2e}
+  .stat .link .arr{color:#ff4a2e;font-size:15px}
+  .stat .link{border-top:3px solid var(--ink);color:var(--ink)}
+</style>
+
+<h2>Animated iridescent accent — preview</h2>
+<p class="subtitle">Locked base: warm paper + Archivo grotesque. Now the single accent thread (rule, overlapping word, marker tags, arrow) <b>flows / shifts color</b> — the only thing that moves on an otherwise strict static page. Slow (6–9s), no green. Tap the flavor you want.</p>
+
+<div class="rail">
+
+  <div class="unit"><div class="ph flow" data-choice="flow" onclick="toggleSelect(this)"><div class="pad">
+    <div class="kick">Album of the Day · No.142 · Sat 31 May</div>
+    <div class="arule"></div>
+    <div class="mast">today's<br>record</div>
+    <div class="cover"><div class="overlap">SOUVLAKI</div><div class="tags"><span>shoegaze</span><span>1993</span></div></div>
+    <div class="date">Slowdive — 39 min</div>
+    <div class="paren">( from artists you keep saving )</div>
+    <div class="body">Picked from the edges of your saved music.</div>
+    <div class="link"><span>Open in Spotify</span><span class="arr">↗</span></div>
+  </div></div><div class="sl"><b>A · Flowing gradient</b><br>iridescent sweep through the accent · most &ldquo;wow&rdquo;</div></div>
+
+  <div class="unit"><div class="ph cyc" data-choice="cycle" onclick="toggleSelect(this)"><div class="pad">
+    <div class="kick">Album of the Day · No.142 · Sat 31 May</div>
+    <div class="arule"></div>
+    <div class="mast">today's<br>record</div>
+    <div class="cover"><div class="overlap">SOUVLAKI</div><div class="tags"><span>shoegaze</span><span>1993</span></div></div>
+    <div class="date">Slowdive — 39 min</div>
+    <div class="paren">( from artists you keep saving )</div>
+    <div class="body">Picked from the edges of your saved music.</div>
+    <div class="link"><span>Open in Spotify</span><span class="arr">↗</span></div>
+  </div></div><div class="sl"><b>B · Solid color-cycle</b><br>whole accent shifts as one color · calmer, more editorial</div></div>
+
+  <div class="unit"><div class="ph stat" data-choice="static" onclick="toggleSelect(this)"><div class="pad">
+    <div class="kick">Album of the Day · No.142 · Sat 31 May</div>
+    <div class="arule"></div>
+    <div class="mast">today's<br>record</div>
+    <div class="cover"><div class="overlap">SOUVLAKI</div><div class="tags"><span>shoegaze</span><span>1993</span></div></div>
+    <div class="date">Slowdive — 39 min</div>
+    <div class="paren">( from artists you keep saving )</div>
+    <div class="body">Picked from the edges of your saved music.</div>
+    <div class="link"><span>Open in Spotify</span><span class="arr">↗</span></div>
+  </div></div><div class="sl"><b>C · Static fallback</b><br>what Reduce-Motion users see (single coral)</div></div>
+
+</div>
+
+<p class="subtitle" style="margin-top:14px">A and B are real Reanimated-doable in Expo Go (one shared value, `interpolateColor` / animated gradient). C is the mandatory Reduce-Motion + off-screen fallback. Pick A or B — then I lock the full spec + write the implementation plan.</p>

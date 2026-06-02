@@ -30,7 +30,7 @@ export function AlbumActions({ opening, sharing, onOpen, onShare }: Props) {
         accessibilityLabel="Open in Spotify"
         disabled={opening}
         onPress={handleOpen}
-        className="h-12 flex-1 flex-row items-center justify-center gap-2 rounded-2xl bg-primary px-4 active:opacity-80 disabled:opacity-60"
+        className="h-14 flex-1 flex-row items-center justify-center gap-2 rounded-xl bg-primary px-4 active:opacity-80 disabled:opacity-60"
       >
         {opening ? (
           <ActivityIndicator size="small" color={colors['on-primary']} />
@@ -47,7 +47,7 @@ export function AlbumActions({ opening, sharing, onOpen, onShare }: Props) {
         accessibilityLabel="Share album card"
         disabled={sharing}
         onPress={handleShare}
-        className="h-12 w-12 items-center justify-center rounded-2xl border border-text/10 bg-surface-2/70 active:opacity-70 disabled:opacity-60"
+        className="h-14 w-14 items-center justify-center rounded-xl border border-text/10 bg-surface-2/70 active:opacity-70 disabled:opacity-60"
       >
         {sharing ? (
           <ActivityIndicator size="small" color={colors.text} />

@@ -1,6 +1,7 @@
 import { View } from 'react-native';
-
+import { Badge } from '@/components/ui/Badge';
 import { Card } from '@/components/ui/Card';
+import { SectionHeader } from '@/components/ui/SectionHeader';
 import { Text } from '@/components/ui/Text';
 import { copy } from '@/lib/copy';
 import type { ProfileOverview } from '@/lib/hooks/useProfileOverview';
@@ -18,7 +19,7 @@ export function TasteSection({ taste }: Props) {
   if (topArtists.length === 0 && decades.length === 0) {
     return (
       <Card>
-        <Text variant="h3">{copy.profile.tasteTitle}</Text>
+        <SectionHeader title={copy.profile.tasteTitle} />
         <Text variant="caption" className="mt-2 leading-5">
           As soon as your library finishes importing, your top artists and the eras you love show up
           here.
@@ -29,7 +30,10 @@ export function TasteSection({ taste }: Props) {
 
   return (
     <Card>
-      <Text variant="h3">{copy.profile.tasteTitle}</Text>
+      <SectionHeader
+        title={copy.profile.tasteTitle}
+        subtitle="A small map of what you keep close"
+      />
 
       {topArtists.length > 0 && (
         <>
@@ -38,11 +42,7 @@ export function TasteSection({ taste }: Props) {
           </Text>
           <View className="flex-row flex-wrap gap-2">
             {topArtists.map((artist) => (
-              <View key={artist.name} className="rounded-full bg-surface-2 px-3 py-1.5">
-                <Text variant="caption" className="text-text">
-                  {artist.name}
-                </Text>
-              </View>
+              <Badge key={artist.name} label={artist.name} variant="muted" />
             ))}
           </View>
         </>
@@ -55,19 +55,19 @@ export function TasteSection({ taste }: Props) {
           </Text>
           <View className="gap-2">
             {decades.map((d) => (
-              <View key={d.decade} className="flex-row items-center gap-3">
-                <Text variant="subtle" className="w-12">
-                  {d.decade}s
-                </Text>
-                <View className="h-2.5 flex-1 overflow-hidden rounded-full bg-surface-2">
+              <View key={d.decade} className="gap-1.5">
+                <View className="flex-row items-center justify-between">
+                  <Text variant="subtle" className="font-semibold text-text">
+                    {d.decade}s
+                  </Text>
+                  <Text variant="subtle">{d.count} albums</Text>
+                </View>
+                <View className="h-3 overflow-hidden rounded-full bg-surface-2">
                   <View
-                    className="h-full rounded-full bg-accent"
+                    className="h-full rounded-full bg-accent/90"
                     style={{ width: `${maxDecade > 0 ? (d.count / maxDecade) * 100 : 0}%` }}
                   />
                 </View>
-                <Text variant="subtle" className="w-8 text-right">
-                  {d.count}
-                </Text>
               </View>
             ))}
           </View>

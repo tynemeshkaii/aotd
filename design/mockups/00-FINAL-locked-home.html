@@ -1,0 +1,98 @@
+<!doctype html>
+<meta charset="utf-8">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;800&family=Space+Mono:wght@400;700&family=Space+Grotesk:wght@400;500;700&display=swap');
+  body{background:#2a2622}
+  :root{--bg:#f4ebe0;--ink:#1d1511;--muted:#6f5d52;--alt:#eadcc9}
+  .wrap{display:flex;gap:26px;flex-wrap:wrap;align-items:flex-start;padding:6px 2px 20px}
+  .col{flex:0 0 auto}
+  .col>.sl{font:700 9px/1.5 'Space Mono',monospace;letter-spacing:.06em;text-transform:uppercase;color:#cdbfb0;margin:0 2px 10px;text-align:center}
+  .ph{width:330px;border-radius:30px;overflow:hidden;background:var(--bg);color:var(--ink);box-shadow:0 22px 60px #000a;border:1px solid #00000022}
+  .pad{padding:20px 20px 24px}
+  @keyframes flow{0%{background-position:0% 50%}100%{background-position:300% 50%}}
+  .flowbg{background:linear-gradient(90deg,#ff4a2e,#ff2e8b,#7b3ff2,#d9a441,#ff4a2e);background-size:300% 100%;animation:flow 6s linear infinite}
+  .flowtx{background:linear-gradient(90deg,#ff4a2e,#ff2e8b,#7b3ff2,#d9a441,#ff4a2e);background-size:300% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:flow 6s linear infinite}
+  @keyframes cyc{0%{color:#ff4a2e}25%{color:#ff2e8b}50%{color:#7b3ff2}75%{color:#d9a441}100%{color:#ff4a2e}}
+  .cyc{animation:cyc 6s ease-in-out infinite}
+
+  .status{font:600 11px/1 sans-serif;color:var(--ink);display:flex;justify-content:space-between;opacity:.85;margin-bottom:14px}
+  .kick{font:400 11px/1.4 'Space Mono',monospace;letter-spacing:.13em;text-transform:uppercase;color:var(--muted)}
+  .mast{font:800 34px/.94 Archivo,sans-serif;text-transform:lowercase;letter-spacing:-.03em;color:var(--ink);margin-top:7px}
+  .rule3{height:3px;border-radius:2px;margin:12px 0}
+  .rule2{height:2px;background:var(--ink)}
+  .ruleHair{height:1px;background:var(--ink);opacity:.5}
+
+  .hero{position:relative}
+  .title{font:800 34px/.94 Archivo,sans-serif;text-transform:uppercase;letter-spacing:-.03em;color:var(--ink);position:relative;z-index:2}
+  .cov{aspect-ratio:1;background:linear-gradient(150deg,#9fc1e8,#6f93c4);margin-top:-12px;position:relative;z-index:1;overflow:hidden}
+  .covart{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font:800 70px/.8 Archivo,sans-serif;color:#1d1511;opacity:.16;text-align:center;letter-spacing:-.04em}
+  .chips{position:absolute;right:9px;bottom:9px;display:flex;gap:6px;z-index:3}
+  .marker{font:600 11px/1 Archivo,sans-serif;background:var(--ink);color:var(--bg);padding:4px 7px}
+
+  .spec{font:700 11px/1.5 'Space Mono',monospace;letter-spacing:.06em;text-transform:uppercase;color:var(--ink);padding:9px 0}
+  .secrow{display:flex;align-items:center;gap:10px;margin-top:18px}
+  .seclbl{font:700 11px/1 'Space Mono',monospace;letter-spacing:.12em;text-transform:uppercase;color:var(--ink)}
+  .secaside{font:400 11px/1 'Space Mono',monospace;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+  .whyRule{display:flex;align-items:center;gap:10px;margin-top:18px}
+  .whyRule span{font:700 11px/1 'Space Mono',monospace;letter-spacing:.12em;text-transform:uppercase;color:var(--ink)}
+  .whyRule i{display:block;flex:1;height:3px;background:var(--ink)}
+  .why{font:400 17px/1.45 'Space Grotesk',sans-serif;color:var(--ink);margin-top:12px}
+
+  .playSlab{margin-top:22px;border:2px solid var(--ink);background:var(--ink);color:var(--bg);position:relative;overflow:hidden;padding:11px}
+  .playSlab::before{content:"";position:absolute;left:0;right:0;top:0;height:3px;background:#d9a441}
+  .playSlabIn{display:grid;grid-template-columns:62px 1fr;gap:13px;align-items:stretch;padding-top:3px}
+  .playWord{font:800 31px/.9 Archivo,sans-serif;text-transform:uppercase;letter-spacing:-.035em;color:var(--bg);align-self:center}
+  .playGlyph{min-height:62px;border:2px solid var(--bg);display:grid;place-items:center;background:var(--bg);position:relative}
+  .playGlyph span{display:block;width:0;height:0;border-top:14px solid transparent;border-bottom:14px solid transparent;border-left:22px solid var(--ink);margin-left:5px}
+  .share{font:700 13px/1 'Space Mono',monospace;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-top:18px}
+
+  .ballotlbl{display:flex;align-items:center;gap:10px;margin-top:26px}
+  .ballot{border:2px solid var(--ink);margin-top:12px}
+  .brow{display:flex;align-items:center;gap:12px;padding:11px 12px}
+  .brow+.brow{border-top:1px solid var(--ink)}
+  .bnum{font:700 11px/1 'Space Mono',monospace;color:var(--muted);width:26px}
+  .blabel{font:700 16px/1 'Space Grotesk',sans-serif;color:var(--ink)}
+  .brow.sel{background:var(--ink)}
+  .brow.sel .blabel{color:var(--bg)}
+  .brow.sel .bnum{color:#d9a441}
+</style>
+
+<div class="wrap">
+  <div class="col">
+    <div class="sl">LOCKED HOME — full screen (what we approved)</div>
+    <div class="ph"><div class="pad">
+      <div class="status"><span>13:53</span><span>● ▮▮ ⌁ ▰</span></div>
+
+      <div class="kick">№152 · Jun 1, 2026</div>
+      <div class="mast">your album of the <span class="cyc">day</span></div>
+      <div class="rule3 flowbg"></div>
+
+      <div class="hero">
+        <div class="title">Modern Bliss</div>
+        <div class="cov"><div class="covart">◆◆◆</div><div class="chips"><span class="marker">2020</span><span class="marker">AU</span></div></div>
+      </div>
+
+      <div class="rule2" style="margin-top:14px"></div>
+      <div class="spec">Roza Terenzi · 9 tracks · 56 min</div>
+      <div class="ruleHair"></div>
+
+      <div class="whyRule"><span>Why this one?</span><i></i></div>
+      <div class="why">Picked because you've been saving stuff by Maara and similar artists.</div>
+
+      <div class="playSlab"><div class="playSlabIn"><span class="playGlyph"><span></span></span><span class="playWord">Listen<br>on Spotify</span></div></div>
+      <div class="share">share ↗</div>
+
+      <div class="ballotlbl"><span class="seclbl">Editorial ballot</span><span style="flex:1;height:2px;background:var(--ink)"></span></div>
+      <div class="ballot">
+        <div class="brow"><span class="bnum">05</span><span class="blabel">Loved it</span></div>
+        <div class="brow sel"><span class="bnum">X</span><span class="blabel">Liked it</span></div>
+        <div class="brow"><span class="bnum">03</span><span class="blabel">It was alright</span></div>
+        <div class="brow"><span class="bnum">02</span><span class="blabel">Not for me</span></div>
+        <div class="brow"><span class="bnum">01</span><span class="blabel">Bad</span></div>
+      </div>
+    </div></div>
+  </div>
+</div>
+
+<h2 style="color:#f4ebe0">Locked Home — the approved target</h2>
+<p class="subtitle" style="color:#cdbfb0">Full screen top→bottom. This is what we locked: kicker · masthead with flowing <b>day</b> · ink title over cover · year+country chips · genre-free spec · <b>WHY THIS ONE?</b> with a thick rule · ink slab transport CTA <b>Listen on Spotify</b> + share · editorial ballot. Compare with your device. Tell me where the real render diverges (sizes/spacing/weights) and I'll tune the code to match this.</p>

@@ -11,6 +11,7 @@ import {
 import { corsHeaders, jsonError, jsonResponse } from '../_shared/cors.ts';
 import { getCuratedFallback } from '../_shared/curated-fallback.ts';
 import { getExternalApiCircuitState } from '../_shared/external-api-breaker.ts';
+import { getArtistCountryCached } from '../_shared/musicbrainz.ts';
 import { computePoolRelativeProfile } from '../_shared/popularity-bucket.ts';
 import {
   ALGORITHM_VERSION,
@@ -69,7 +70,9 @@ type RecentPickRow = {
 };
 
 Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders });
+  }
   if (req.method !== 'POST') return jsonError(405, 'method_not_allowed');
 
   const cronSecret = Deno.env.get('CRON_SECRET');
@@ -95,7 +98,9 @@ Deno.serve(async (req) => {
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
   const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-  if (!supabaseUrl || !serviceRoleKey) return jsonError(500, 'missing_supabase_env');
+  if (!supabaseUrl || !serviceRoleKey) {
+    return jsonError(500, 'missing_supabase_env');
+  }
   const admin = createClient(supabaseUrl, serviceRoleKey);
 
   let targetDate = payload.target_date;
@@ -118,7 +123,11 @@ Deno.serve(async (req) => {
     .eq('date', targetDate)
     .maybeSingle();
   if (existing) {
-    return jsonResponse({ ok: true, status: 'already_exists', aotd_id: existing.id });
+    return jsonResponse({
+      ok: true,
+      status: 'already_exists',
+      aotd_id: existing.id,
+    });
   }
 
   let albumId: string | null = null;
@@ -148,7 +157,9 @@ Deno.serve(async (req) => {
     console.log(`[compute] spotify_token_ok user=${userId}`);
     recordDiag('spotify_token_ok');
     taste = await withTimeout(
-      extractTasteSignal(admin, userId, spotifyToken, { includeTasteVector: false }),
+      extractTasteSignal(admin, userId, spotifyToken, {
+        includeTasteVector: false,
+      }),
       TASTE_STAGE_TIMEOUT_MS,
       'taste_signal_timeout',
     );
@@ -201,9 +212,15 @@ Deno.serve(async (req) => {
       .order('date', { ascending: false })
       .limit(RECENT_SOURCE_WINDOW);
     const recentSourceArtists = new Set(
-      ((recentSourcePicks ?? []) as { selection_reason: Record<string, unknown> | null }[])
+      (
+        (recentSourcePicks ?? []) as {
+          selection_reason: Record<string, unknown> | null;
+        }[]
+      )
         .map((r) => {
-          const reason = r.selection_reason as { primary_source_artist?: unknown } | null;
+          const reason = r.selection_reason as {
+            primary_source_artist?: unknown;
+          } | null;
           return typeof reason?.primary_source_artist === 'string'
             ? reason.primary_source_artist
             : null;
@@ -340,6 +357,7 @@ Deno.serve(async (req) => {
     // ship the best non-validated candidate rather than falling back unnecessarily.
     const MAX_MB_RETRIES = 3;
     let mbAttempts = 0;
+    let artistCountry: string | null = null;
     const tried = new Set<string>();
     while (mbAttempts < MAX_MB_RETRIES && Date.now() < primaryDeadlineAtMs) {
       tried.add(chosen.candidate.spotify_id);
@@ -352,11 +370,31 @@ Deno.serve(async (req) => {
         if (validation.rg?.id) {
           chosen.candidate.mb_release_group_id = validation.rg.id;
         }
+        if (validation.rg?.artist && Date.now() < primaryDeadlineAtMs - 500) {
+          try {
+            artistCountry = await withTimeout(
+              getArtistCountryCached(admin, validation.rg.artist),
+              Math.max(500, Math.min(2_000, primaryDeadlineAtMs - Date.now())),
+              'artist_country_timeout',
+            );
+            if (artistCountry) {
+              recordDiag('artist_country_ok', { country: artistCountry });
+            }
+          } catch (countryError) {
+            const msg = countryError instanceof Error ? countryError.message : String(countryError);
+            console.warn(
+              `[compute] artist_country_failed user=${userId} album=${chosen.candidate.spotify_id} error=${msg}`,
+            );
+            recordDiag('artist_country_failed', { error: msg });
+          }
+        }
         break;
       }
       mbAttempts += 1;
       console.log(
-        `[compute] mb_rejected user=${userId} album=${chosen.candidate.spotify_id} reason=${validation.rg ? 'not_album_like_or_dup' : 'unknown'} attempt=${mbAttempts}`,
+        `[compute] mb_rejected user=${userId} album=${chosen.candidate.spotify_id} reason=${
+          validation.rg ? 'not_album_like_or_dup' : 'unknown'
+        } attempt=${mbAttempts}`,
       );
       const next = scored.find((s) => !tried.has(s.candidate.spotify_id));
       if (!next) break;
@@ -376,7 +414,9 @@ Deno.serve(async (req) => {
         );
         if (details?.duration_ms) {
           chosen.candidate.duration_ms = details.duration_ms;
-          recordDiag('post_selection_details_ok', { duration_ms: details.duration_ms });
+          recordDiag('post_selection_details_ok', {
+            duration_ms: details.duration_ms,
+          });
         }
       } catch (detailsError) {
         const msg = detailsError instanceof Error ? detailsError.message : String(detailsError);
@@ -394,6 +434,7 @@ Deno.serve(async (req) => {
           {
             spotify_id: chosen.candidate.spotify_id,
             mb_release_group_id: chosen.candidate.mb_release_group_id ?? null,
+            ...(artistCountry ? { artist_country: artistCountry } : {}),
             title: chosen.candidate.title,
             primary_artist_name: chosen.candidate.primary_artist_name,
             primary_artist_spotify_id: chosen.candidate.primary_artist_spotify_id ?? null,
@@ -501,7 +542,9 @@ Deno.serve(async (req) => {
           );
         }
         console.log(
-          `[compute] shadow_written user=${userId} same_as_live=${sameAsLive} took=${Date.now() - shadowWriteStart}ms`,
+          `[compute] shadow_written user=${userId} same_as_live=${sameAsLive} took=${
+            Date.now() - shadowWriteStart
+          }ms`,
         );
       } catch (shadowWriteErr) {
         const msg =
@@ -547,11 +590,22 @@ Deno.serve(async (req) => {
         source_paths: [],
       },
       score: 0,
-      breakdown: { similarity: 0, source_freq: 0, popularity: 0, balance: 0, temperature: 0 },
+      breakdown: {
+        similarity: 0,
+        source_freq: 0,
+        popularity: 0,
+        balance: 0,
+        temperature: 0,
+      },
     };
     selectionReason = buildSelectionReason(
       fallbackScored,
-      { topArtists: [], tasteVector: null, librarySize: 0, libraryDecadeFractions: {} },
+      {
+        topArtists: [],
+        tasteVector: null,
+        librarySize: 0,
+        libraryDecadeFractions: {},
+      },
       false,
       true,
       fallbackReason,
@@ -578,7 +632,10 @@ Deno.serve(async (req) => {
   if (ensureErr) return jsonError(500, 'aotd_insert_failed', ensureErr.message);
   const ensuredRow = Array.isArray(ensured) ? ensured[0] : ensured;
 
-  recordDiag('done', { is_fallback: isFallback, fallback_reason: fallbackReason });
+  recordDiag('done', {
+    is_fallback: isFallback,
+    fallback_reason: fallbackReason,
+  });
   return jsonResponse({
     ok: true,
     status: ensuredRow?.created ? 'created' : 'already_exists',
@@ -591,7 +648,9 @@ Deno.serve(async (req) => {
 
 function classifyFallbackReason(message: string): FallbackReason {
   if (message.includes('spotify_search')) return 'spotify_search_failed';
-  if (message.includes('lastfm') || message.includes('missing_lastfm')) return 'lastfm_unavailable';
+  if (message.includes('lastfm') || message.includes('missing_lastfm')) {
+    return 'lastfm_unavailable';
+  }
   if (message.includes('no_candidates') || message.includes('selection_empty')) {
     return 'no_candidates';
   }
@@ -630,16 +689,24 @@ function buildCandidateExclusions(
   const normalizedAlbumKeys = new Set<string>();
 
   for (const row of libRows) {
-    if (isNonEmptyString(row.provider_album_id)) spotifyAlbumIds.add(row.provider_album_id);
-    if (isNonEmptyString(row.mb_release_group_id)) releaseGroupIds.add(row.mb_release_group_id);
+    if (isNonEmptyString(row.provider_album_id)) {
+      spotifyAlbumIds.add(row.provider_album_id);
+    }
+    if (isNonEmptyString(row.mb_release_group_id)) {
+      releaseGroupIds.add(row.mb_release_group_id);
+    }
     addNormalizedKey(normalizedAlbumKeys, row.artist_name, row.album_name);
   }
 
   for (const row of historyRows) {
     const album = row.album;
     if (!album) continue;
-    if (isNonEmptyString(album.spotify_id)) spotifyAlbumIds.add(album.spotify_id);
-    if (isNonEmptyString(album.mb_release_group_id)) releaseGroupIds.add(album.mb_release_group_id);
+    if (isNonEmptyString(album.spotify_id)) {
+      spotifyAlbumIds.add(album.spotify_id);
+    }
+    if (isNonEmptyString(album.mb_release_group_id)) {
+      releaseGroupIds.add(album.mb_release_group_id);
+    }
     addNormalizedKey(normalizedAlbumKeys, album.primary_artist_name, album.title);
   }
 

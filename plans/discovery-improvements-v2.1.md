@@ -169,6 +169,28 @@ Cheap because: after Items 1–2, the cached candidate pool already contains fam
 
 ---
 
+## Promotion criteria (when shadow behavior may move to live)
+
+Shadow diagnostics are only valuable if they eventually inform a safe promotion decision. These criteria are intentionally conservative.
+
+### Required criteria
+
+- At least 14 days of shadow rows from representative test users.
+- Shadow write failure rate is low enough to trust the sample.
+- Divergence rate (`same_as_live = false`) is non-trivial but not chaotic.
+- Shadow does not materially increase fallback involvement.
+- Familiar-catalog share does not dominate the mix unless manual review confirms quality.
+- Manual review of divergent picks finds no obvious release-type, repeat, or "too random" pattern.
+- No regression in compute runtime, because shadow remains best-effort and bounded.
+
+### Explicit non-criteria
+
+- Do not promote only because one or two examples look better.
+- Do not use personal ratings as automatic proof of algorithm quality.
+- Do not promote if shadow rows are too sparse or mostly missing due to fallback.
+
+---
+
 ## Build sequence (dependency order)
 
 1. **Item 1 generator + mainstream-penalty exemption** (feeds the pool; the exemption is required for the feature to matter). Ship to `prewarm-user-candidates`. Verify cache fills with familiar candidates for a test user.

@@ -1,0 +1,69 @@
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;800&family=Space+Mono:wght@400;700&display=swap');
+  :root{--bg:#f4ebe0;--ink:#1d1511;--muted:#6f5d52}
+  .rail{display:flex;gap:20px;overflow-x:auto;padding:6px 2px 18px;flex-wrap:wrap}
+  .unit{flex:0 0 auto;width:240px}
+  .unit>.sl{font:700 9px/1.4 'Space Mono',monospace;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:10px 2px 0;text-align:center}
+  .unit>.sl b{color:var(--ink)}
+  .ph{width:240px;aspect-ratio:9/18.6;border-radius:24px;overflow:hidden;position:relative;
+      box-shadow:0 18px 44px #0009;background:var(--bg);color:var(--ink);cursor:pointer;border:2px solid transparent;transition:border-color .15s}
+  .ph.selected{border-color:#ff4a2e}
+  .pad{position:relative;height:100%;display:flex;flex-direction:column;padding:15px 15px 0}
+  .kick{font:700 8px/1.4 'Space Mono',monospace;letter-spacing:.13em;text-transform:uppercase;color:var(--muted)}
+  .mast{font:800 26px/.92 Archivo,sans-serif;letter-spacing:-.02em;text-transform:uppercase;color:var(--ink);margin-top:9px}
+  .cover{position:relative;margin-top:9px;aspect-ratio:1.1;width:100%;background:linear-gradient(155deg,#d6438f,#8e2a6e 55%,#3a1740);overflow:hidden}
+  .overlap{position:absolute;top:-16px;left:9px;font:800 30px/.9 Archivo,sans-serif;letter-spacing:-.02em;text-transform:uppercase;
+    background:linear-gradient(90deg,#ff4a2e,#ff2e8b,#7b3ff2,#d9a441,#ff4a2e);background-size:300% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:flow 6s linear infinite}
+  .tags{position:absolute;left:9px;bottom:9px;display:flex;gap:6px}
+  .date{font:700 9px/1.5 'Space Mono',monospace;letter-spacing:.07em;text-transform:uppercase;color:var(--ink);margin-top:12px}
+  .paren{font:400 9px/1.4 'Space Mono',monospace;color:var(--muted);margin-top:3px}
+  .body{font:400 10.5px/1.45 Archivo,sans-serif;color:var(--ink);opacity:.82;margin-top:10px}
+  .link{font:700 10px/1 'Space Mono',monospace;letter-spacing:.1em;text-transform:uppercase;margin-top:auto;padding:12px 0;display:flex;justify-content:space-between;align-items:center;color:var(--ink);
+    border-top:3px solid;border-image:linear-gradient(90deg,#ff4a2e,#ff2e8b,#7b3ff2,#d9a441,#ff4a2e) 1}
+  .link .arr{font-size:15px;background:linear-gradient(90deg,#ff4a2e,#ff2e8b,#7b3ff2,#d9a441,#ff4a2e);background-size:300% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:flow 6s linear infinite}
+  @keyframes flow{0%{background-position:0% 50%}100%{background-position:300% 50%}}
+
+  /* tag flavors (STATIC) */
+  .t-ink span{font:600 10px/1 Archivo,sans-serif;background:var(--ink);color:var(--bg);padding:3px 6px}
+  .t-out span{font:700 9px/1 'Space Mono',monospace;text-transform:uppercase;letter-spacing:.06em;color:var(--ink);border:1.5px solid var(--ink);padding:3px 6px;background:rgba(244,235,224,.7)}
+  .t-mono span{font:700 9px/1 'Space Mono',monospace;text-transform:uppercase;letter-spacing:.06em;color:var(--bg);background:var(--ink);padding:3px 6px}
+</style>
+
+<h2>Tags — static, calm. Pick the style.</h2>
+<p class="subtitle">Flow stays only on rule + overlapping word + arrow. Genre/year tags become static metadata. Which reads best over the cover?</p>
+
+<div class="rail">
+
+  <div class="unit"><div class="ph t-ink" data-choice="ink-marker" onclick="toggleSelect(this)"><div class="pad">
+    <div class="kick">Album of the Day · No.142 · Sat 31 May</div>
+    <div class="mast">today's<br>record</div>
+    <div class="cover"><div class="overlap">SOUVLAKI</div><div class="tags"><span>shoegaze</span><span>1993</span></div></div>
+    <div class="date">Slowdive — 39 min</div>
+    <div class="paren">( from artists you keep saving )</div>
+    <div class="body">Picked from the edges of your saved music.</div>
+    <div class="link"><span>Open in Spotify</span><span class="arr">↗</span></div>
+  </div></div><div class="sl"><b>A · Ink marker</b><br>solid ink fill, paper text · most editorial</div></div>
+
+  <div class="unit"><div class="ph t-out" data-choice="outline" onclick="toggleSelect(this)"><div class="pad">
+    <div class="kick">Album of the Day · No.142 · Sat 31 May</div>
+    <div class="mast">today's<br>record</div>
+    <div class="cover"><div class="overlap">SOUVLAKI</div><div class="tags"><span>shoegaze</span><span>1993</span></div></div>
+    <div class="date">Slowdive — 39 min</div>
+    <div class="paren">( from artists you keep saving )</div>
+    <div class="body">Picked from the edges of your saved music.</div>
+    <div class="link"><span>Open in Spotify</span><span class="arr">↗</span></div>
+  </div></div><div class="sl"><b>B · Outline</b><br>bordered, translucent · lightest</div></div>
+
+  <div class="unit"><div class="ph t-mono" data-choice="mono-chip" onclick="toggleSelect(this)"><div class="pad">
+    <div class="kick">Album of the Day · No.142 · Sat 31 May</div>
+    <div class="mast">today's<br>record</div>
+    <div class="cover"><div class="overlap">SOUVLAKI</div><div class="tags"><span>SHOEGAZE</span><span>1993</span></div></div>
+    <div class="date">Slowdive — 39 min</div>
+    <div class="paren">( from artists you keep saving )</div>
+    <div class="body">Picked from the edges of your saved music.</div>
+    <div class="link"><span>Open in Spotify</span><span class="arr">↗</span></div>
+  </div></div><div class="sl"><b>C · Mono chip</b><br>uppercase Space Mono on ink · spec-sheet voice</div></div>
+
+</div>
+
+<p class="subtitle" style="margin-top:14px">My pick: <b>A (ink marker)</b> — strongest editorial contrast, calm next to the moving accent. Tap your choice, then I lock the full spec and write the plan.</p>

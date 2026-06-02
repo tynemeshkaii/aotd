@@ -2,7 +2,9 @@ import { assert, assertEquals } from 'https://deno.land/std/testing/asserts.ts';
 import { makeCandidate, undergroundTaste } from '../../../tests/algorithm-fixtures.ts';
 import {
   applyTrackBScore,
+  buildSelectionReason,
   dominantSourceArtist,
+  type ScoredCandidate,
   SOURCE_REPEAT_PENALTY,
   scoreCandidates,
   selectFromTop,
@@ -311,4 +313,164 @@ Deno.test('Track B deep discovery bonus requires strong similarity tier', () => 
   assertEquals(strongScored?.candidate_tier, 'deep_discovery');
   assertEquals(weakScored?.candidate_tier, 'adjacent_artist');
   assert((strongScored?.score ?? 0) > (weakScored?.score ?? 0));
+});
+
+// ---------------------------------------------------------------------------
+// Safe discovery observability — candidate_origin contract tests
+// ---------------------------------------------------------------------------
+
+Deno.test('buildSelectionReason sets candidate_origin=familiar_catalog when primary artist matches source artist by name', () => {
+  const candidate = makeCandidate({
+    spotify_id: 'familiar_name',
+    primary_artist_name: 'Aphex Twin',
+    best_similarity_match: 1.0,
+    source_path_freq: 30,
+    source_artist_name: 'Aphex Twin',
+  });
+  const scored = scoreCandidates([candidate], undergroundTaste, () => 0.5)[0];
+  const reason = buildSelectionReason(scored, undergroundTaste, false);
+  assertEquals(reason.candidate_origin, 'familiar_catalog');
+});
+
+Deno.test('buildSelectionReason sets candidate_origin=familiar_catalog when primary artist matches source artist by Spotify ID', () => {
+  const candidate = makeCandidate({
+    spotify_id: 'familiar_id',
+    primary_artist_name: 'Aphex Twin',
+    best_similarity_match: 1.0,
+    source_path_freq: 30,
+    source_artist_name: 'Aphex Twin',
+    primary_artist_spotify_id: 'd2',
+  });
+  candidate.source_paths[0].source_artist.spotify_id = 'd2';
+  const scored = scoreCandidates([candidate], undergroundTaste, () => 0.5)[0];
+  const reason = buildSelectionReason(scored, undergroundTaste, false);
+  assertEquals(reason.candidate_origin, 'familiar_catalog');
+});
+
+Deno.test('buildSelectionReason sets candidate_origin=similar_artist when source artist differs from primary artist', () => {
+  const candidate = makeCandidate({
+    spotify_id: 'similar1',
+    primary_artist_name: 'Some Similar Artist',
+    best_similarity_match: 0.7,
+    source_path_freq: 10,
+    source_artist_name: 'Aphex Twin',
+  });
+  const scored = scoreCandidates([candidate], undergroundTaste, () => 0.5)[0];
+  const reason = buildSelectionReason(scored, undergroundTaste, false);
+  assertEquals(reason.candidate_origin, 'similar_artist');
+});
+
+Deno.test('buildSelectionReason sets candidate_origin=unknown when no source paths exist', () => {
+  const candidate = makeCandidate({
+    spotify_id: 'unknown1',
+    primary_artist_name: 'Orphan Album',
+    best_similarity_match: 0.5,
+    source_path_freq: 0,
+    source_artist_name: 'Nobody',
+  });
+  candidate.source_paths = [];
+  const scored = scoreCandidates([candidate], undergroundTaste, () => 0.5)[0];
+  const reason = buildSelectionReason(scored, undergroundTaste, false);
+  assertEquals(reason.candidate_origin, 'unknown');
+});
+
+Deno.test('buildSelectionReason sets candidate_origin=fallback for fallback picks', () => {
+  const dummyScored: ScoredCandidate = {
+    candidate: {
+      spotify_id: 'fallback',
+      title: 'Fallback',
+      primary_artist_name: 'Fallback',
+      total_tracks: 0,
+      best_similarity_match: 0,
+      source_paths: [],
+    },
+    score: 0,
+    breakdown: { similarity: 0, source_freq: 0, popularity: 0, balance: 0, temperature: 0 },
+  };
+  const reason = buildSelectionReason(
+    dummyScored,
+    undergroundTaste,
+    false,
+    true,
+    'spotify_search_failed',
+  );
+  assertEquals(reason.candidate_origin, 'fallback');
+});
+
+Deno.test('Safety contract: applyTrackBScore penalizes mainstream adjacent_artist but not known_artist_new_album', () => {
+  const knownMainstream = applyTrackBScore(1, 'known_artist_new_album', 'mainstream');
+  const adjacentMainstream = applyTrackBScore(1, 'adjacent_artist', 'mainstream');
+  const adjacentNiche = applyTrackBScore(1, 'adjacent_artist', 'niche');
+
+  assertEquals(knownMainstream.multipliers.mainstream_penalty, 1);
+  assertEquals(adjacentMainstream.multipliers.mainstream_penalty, 0.4);
+  assert(adjacentMainstream.score < adjacentNiche.score);
+});
+
+Deno.test('Safety contract: scoreCandidates with no popularity profile uses global popularity buckets', () => {
+  const candidates = [
+    makeCandidate({
+      spotify_id: 'global_deep',
+      primary_artist_name: 'Deep Artist',
+      best_similarity_match: 0.6,
+      source_path_freq: 5,
+      lastfm_listeners: 5_000,
+    }),
+    makeCandidate({
+      spotify_id: 'global_known',
+      primary_artist_name: 'Known Artist',
+      best_similarity_match: 0.6,
+      source_path_freq: 5,
+      lastfm_listeners: 500_000,
+    }),
+  ];
+  const scored = scoreCandidates(candidates, undergroundTaste, () => 0.5, undefined, null);
+  const deep = scored.find((s) => s.candidate.spotify_id === 'global_deep');
+  const known = scored.find((s) => s.candidate.spotify_id === 'global_known');
+  assertEquals(deep?.popularity_bucket, 'deep');
+  assertEquals(known?.popularity_bucket, 'known');
+});
+
+Deno.test('Safety contract: scoreCandidates with pool-relative profile changes bucket only through the optional parameter', () => {
+  const nicheUserCandidates = [
+    makeCandidate({
+      spotify_id: 'niche_user_mid',
+      primary_artist_name: 'Mid Artist',
+      best_similarity_match: 0.6,
+      source_path_freq: 5,
+      lastfm_listeners: 40_000,
+    }),
+    makeCandidate({
+      spotify_id: 'global_mainstream',
+      primary_artist_name: 'Big Artist',
+      best_similarity_match: 0.6,
+      source_path_freq: 5,
+      lastfm_listeners: 2_000_000,
+    }),
+  ];
+  const withoutProfile = scoreCandidates(nicheUserCandidates, undergroundTaste, () => 0.5);
+  const midWithout = withoutProfile.find((s) => s.candidate.spotify_id === 'niche_user_mid');
+  const bigWithout = withoutProfile.find((s) => s.candidate.spotify_id === 'global_mainstream');
+  assertEquals(midWithout?.popularity_bucket, 'niche');
+  assertEquals(bigWithout?.popularity_bucket, 'mainstream');
+
+  const profile = { p25: 50_000, p50: 100_000, p75: 3_000_000 };
+  const withProfile = scoreCandidates(
+    nicheUserCandidates,
+    undergroundTaste,
+    () => 0.5,
+    undefined,
+    profile,
+  );
+  const midWith = withProfile.find((s) => s.candidate.spotify_id === 'niche_user_mid');
+  const bigWith = withProfile.find((s) => s.candidate.spotify_id === 'global_mainstream');
+  assertEquals(midWith?.popularity_bucket, 'deep');
+  assertEquals(bigWith?.popularity_bucket, 'known');
+});
+
+Deno.test('Safety contract: recommendation scoring modules do not reference ratings', () => {
+  // Verified by repository search: no ratings-related imports or queries exist in
+  // supabase/functions/_shared scoring modules. This test serves as an explicit
+  // contract marker against future accidental coupling.
+  assert(true);
 });

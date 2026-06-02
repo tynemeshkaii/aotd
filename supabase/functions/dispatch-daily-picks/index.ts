@@ -32,7 +32,7 @@ Deno.serve(async (req) => {
 
   const { data: due, error } = await admin.rpc('find_users_due_for_compute', {
     p_lead_minutes: 60,
-    p_catchup_minutes: 720,
+    p_catchup_minutes: 1440,
   });
   if (error) return jsonError(500, 'rpc_failed', error.message);
   if (!due || due.length === 0) {

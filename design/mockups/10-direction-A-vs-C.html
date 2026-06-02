@@ -1,0 +1,214 @@
+<h2>A · Editorial/Swiss  vs  C · Generative Abstract</h2>
+<p class="subtitle">Two genuinely different design languages — not the same layout recolored. <b>Different type, grid, surfaces, list style, rating treatment, motion.</b> Each row = all 4 screens of the app in that one language. Scroll rows sideways. Feel each universe, then tell me which wins (or which bits to steal from each).</p>
+
+<style>
+  .deck{margin-top:16px}
+  .deck>h3{font:800 16px/1 sans-serif;margin:0 0 2px}
+  .deck>.dl{font:700 10px/1 ui-monospace,monospace;letter-spacing:.16em;text-transform:uppercase;opacity:.55;margin-bottom:12px}
+  .rail{display:flex;gap:16px;overflow-x:auto;padding:4px 2px 18px}
+  .unit{flex:0 0 auto;width:198px}
+  .unit>.sl{font:700 8px/1 ui-monospace,monospace;letter-spacing:.14em;text-transform:uppercase;opacity:.5;margin:8px 2px 0;text-align:center}
+  .ph{width:198px;aspect-ratio:9/18.5;border-radius:24px;overflow:hidden;position:relative;box-shadow:0 18px 44px #0008;cursor:pointer;border:2px solid transparent;transition:border-color .15s}
+  .ph.selected{border-color:#d9a441}
+  .pad{position:relative;height:100%;display:flex;flex-direction:column}
+
+  /* ========================================================= */
+  /* A · EDITORIAL / SWISS  — print poster, sharp, type-driven */
+  /* ========================================================= */
+  .ed{background:#efe8da;color:#14100e;font-family:'Helvetica Neue',Arial,sans-serif}
+  .ed .pad{padding:14px 13px}
+  .ed .kick{font:700 7px/1 ui-monospace,monospace;letter-spacing:.22em;text-transform:uppercase;opacity:.6}
+  .ed .rule{height:2.5px;background:#14100e;margin:8px 0}
+  .ed .hair{height:1px;background:#14100e;opacity:.35;margin:7px 0}
+  .ed .num{font:800 52px/.8 'Arial Narrow',sans-serif;transform:scaleY(1.18);transform-origin:left;letter-spacing:-.03em}
+  .ed .disp{font:800 30px/.84 'Arial Narrow',sans-serif;transform:scaleY(1.18);transform-origin:left;letter-spacing:-.02em;text-transform:uppercase}
+  .ed .disp.sm{font-size:21px}
+  .ed .spec{font:700 7px/1.6 ui-monospace,monospace;letter-spacing:.1em;text-transform:uppercase}
+  .ed .why{font:italic 500 10px/1.35 Georgia,serif;margin-top:8px}
+  .ed .plate{aspect-ratio:1;border:2.5px solid #14100e;background:linear-gradient(135deg,#1f6f8b,#c9622f)}
+  .ed .link{font:800 9px/1 ui-monospace,monospace;letter-spacing:.14em;text-transform:uppercase;display:flex;justify-content:space-between;border-top:2.5px solid #14100e;padding-top:9px}
+  .ed .stamp{position:absolute;width:46px;height:46px;border:2px solid #87263b;color:#87263b;border-radius:50%;font:800 7px/1.1 ui-monospace,monospace;display:flex;align-items:center;justify-content:center;text-align:center;transform:rotate(-13deg);text-transform:uppercase}
+  .ed .toc{display:flex;align-items:baseline;gap:8px;padding:7px 0;border-bottom:1px solid #14100e2e}
+  .ed .toc .n{font:700 8px/1 ui-monospace,monospace;opacity:.5;width:20px}
+  .ed .toc .t{font:800 15px/.95 'Arial Narrow',sans-serif;transform:scaleY(1.12);transform-origin:left;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .ed .toc .r{font:800 6.5px/1 ui-monospace,monospace;text-transform:uppercase;letter-spacing:.08em}
+  .ed .loved{color:#87263b}.ed .okk{color:#9a7b1e}.ed .neu{opacity:.45}
+  .ed .stat{display:flex;justify-content:space-between;align-items:baseline;border-bottom:1px solid #14100e2e;padding:6px 0;font:700 7.5px/1 ui-monospace,monospace;text-transform:uppercase;letter-spacing:.06em}
+
+  /* ========================================================= */
+  /* C · GENERATIVE ABSTRACT — fluid color, glass, soft, light */
+  /* ========================================================= */
+  .gn{background:#07060a;color:#f6f3ef;font-family:'Helvetica Neue',sans-serif}
+  .gn .mesh{position:absolute;inset:-15%;filter:blur(14px)}
+  .gn .mesh.full:before{content:"";position:absolute;inset:0;background:
+    radial-gradient(120px 150px at 20% 12%,#16b5c9,transparent 62%),
+    radial-gradient(150px 170px at 86% 26%,#ff6a3d,transparent 64%),
+    radial-gradient(180px 180px at 60% 96%,#ffcf5c,transparent 66%),
+    radial-gradient(140px 150px at 8% 86%,#9b3df0,transparent 66%)}
+  .gn .mesh.soft:before{content:"";position:absolute;inset:0;opacity:.7;background:
+    radial-gradient(150px 170px at 88% 6%,#9b3df0,transparent 64%),
+    radial-gradient(150px 170px at 4% 4%,#16b5c9,transparent 64%),
+    radial-gradient(170px 170px at 50% 104%,#ff6a3d,transparent 66%)}
+  .gn .blob{position:absolute;border-radius:46% 54% 38% 62%/52% 38% 62% 48%;filter:blur(.4px);box-shadow:0 24px 60px #000a}
+  .gn .scrim{position:absolute;inset:0;background:linear-gradient(180deg,#07060a44,#07060a00 30%,#07060a88 72%,#07060ae6)}
+  .gn .pad{padding:16px 14px}
+  .gn .ey{font:600 7.5px/1 sans-serif;letter-spacing:.28em;text-transform:uppercase;opacity:.65}
+  .gn .t1{font:300 26px/1.02 'Helvetica Neue',sans-serif;letter-spacing:-.01em;margin-top:4px}
+  .gn .t2{font:300 19px/1.05 'Helvetica Neue',sans-serif;letter-spacing:-.01em}
+  .gn .sub{font:500 8px/1.5 sans-serif;letter-spacing:.04em;opacity:.7;margin-top:5px}
+  .gn .glass{background:#ffffff14;backdrop-filter:blur(10px);border:1px solid #ffffff26;border-radius:18px;padding:13px}
+  .gn .pill{border-radius:30px;text-align:center;font:600 9px/1 sans-serif;letter-spacing:.04em;padding:11px;background:#f6f3ef;color:#111}
+  .gn .pillg{border-radius:30px;text-align:center;font:600 8px/1 sans-serif;padding:9px;background:#ffffff1f;border:1px solid #ffffff33;backdrop-filter:blur(8px)}
+  .gn .orb{position:absolute;width:46px;height:46px;border-radius:50%;background:#ffffff22;border:1px solid #ffffff44;backdrop-filter:blur(8px);font:600 7px/1.1 sans-serif;display:flex;align-items:center;justify-content:center;text-align:center}
+  .gn .tile{display:flex;align-items:center;gap:11px;background:#ffffff12;border:1px solid #ffffff1f;border-radius:16px;padding:9px;margin-bottom:9px;backdrop-filter:blur(6px)}
+  .gn .tile .cv{width:42px;height:42px;border-radius:11px;flex:none}
+  .gn .tile .nm{font:500 13px/1.05 sans-serif}
+  .gn .tile .ar{font:500 8px/1 sans-serif;opacity:.62;margin-top:3px;letter-spacing:.03em}
+  .gn .dot{width:9px;height:9px;border-radius:50%;flex:none;box-shadow:0 0 10px currentColor}
+  .gn .ring{width:84px;height:84px;border-radius:50%;border:3px solid #ffcf5c;box-shadow:0 0 24px #ffcf5c66, inset 0 0 18px #ffcf5c44;display:flex;align-items:center;justify-content:center;font:200 30px/1 sans-serif}
+  .gn .chip{display:inline-block;background:#ffffff16;border:1px solid #ffffff2b;border-radius:30px;font:500 9px/1 sans-serif;padding:7px 11px;margin:0 6px 6px 0;backdrop-filter:blur(6px)}
+  .gn .bento{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+  .gn .bento .glass{padding:11px}
+  .gn .big{font:200 30px/1 sans-serif}
+  .gn .cap{font:500 7px/1 sans-serif;letter-spacing:.18em;text-transform:uppercase;opacity:.6;margin-top:4px}
+</style>
+
+<!-- ================= DECK A : EDITORIAL ================= -->
+<div class="deck">
+  <h3>A · Editorial / Swiss</h3>
+  <div class="dl">cream paper · ink · giant condensed type · hard rules · zero blur</div>
+  <div class="rail">
+
+    <!-- HOME -->
+    <div class="unit"><div class="ph ed" data-choice="editorial" onclick="toggleSelect(this)"><div class="pad">
+      <div class="kick">Album of the Day</div>
+      <div class="num">142</div>
+      <div class="kick" style="margin-top:-2px">Saturday 31 May</div>
+      <div class="rule"></div>
+      <div class="plate" style="margin-top:2px"></div>
+      <div class="stamp" style="top:118px;right:16px">Rate<br>it</div>
+      <div class="disp" style="margin-top:11px">SOUVLAKI</div>
+      <div class="spec">Slowdive — Shoegaze — 1993 — 39 min</div>
+      <div class="why">You keep saving woozy guitar bands.</div>
+      <div class="link" style="margin-top:auto"><span>Open in Spotify</span><span>→</span></div>
+    </div></div><div class="sl">Home · today</div></div>
+
+    <!-- ALBUM DETAIL -->
+    <div class="unit"><div class="ph ed"><div class="pad">
+      <div class="kick" style="display:flex;justify-content:space-between"><span>‹ Archive</span><span>No.139</span></div>
+      <div class="rule"></div>
+      <div class="plate" style="background:linear-gradient(135deg,#3a2f5e,#b14a3c);margin-top:2px"></div>
+      <div class="disp" style="margin-top:11px">UNTRUE</div>
+      <div class="spec">Burial — Dubstep — 2007 — 50 min</div>
+      <div class="why" style="margin-bottom:6px">Ghostly UK night-bus music.</div>
+      <div class="kick loved" style="color:#87263b">★ Loved — rated 28 may</div>
+      <div class="link" style="margin-top:auto"><span>Open in Spotify</span><span>→</span></div>
+    </div></div><div class="sl">Album detail</div></div>
+
+    <!-- DISCOVERIES -->
+    <div class="unit"><div class="ph ed"><div class="pad">
+      <div class="kick">142 issues · 9-day streak</div>
+      <div class="disp" style="font-size:34px;margin-top:3px">CONTENTS</div>
+      <div class="rule"></div>
+      <div class="kick" style="display:flex;gap:12px;margin-bottom:2px"><span style="border-bottom:2px solid #d9a441;padding-bottom:2px">All</span><span style="opacity:.45">Unrated</span><span style="opacity:.45">Rated</span></div>
+      <div class="toc"><span class="n">141</span><span class="t">In Rainbows · Radiohead</span><span class="r loved">Loved</span></div>
+      <div class="toc"><span class="n">140</span><span class="t">For Emma · Bon Iver</span><span class="r okk">Alright</span></div>
+      <div class="toc"><span class="n">139</span><span class="t">Untrue · Burial</span><span class="r neu">Opened</span></div>
+      <div class="toc"><span class="n">138</span><span class="t">Madvillainy · Madvillain</span><span class="r loved">Loved</span></div>
+      <div class="toc"><span class="n">137</span><span class="t">Blonde · Frank Ocean</span><span class="r loved">Loved</span></div>
+      <div class="toc"><span class="n">136</span><span class="t">Discovery · Daft Punk</span><span class="r okk">Alright</span></div>
+    </div></div><div class="sl">Discoveries</div></div>
+
+    <!-- PROFILE -->
+    <div class="unit"><div class="ph ed"><div class="pad">
+      <div class="kick" style="display:flex;justify-content:space-between"><span>@tyne</span><span>Est. 2026</span></div>
+      <div class="num" style="margin-top:4px">9</div>
+      <div class="kick" style="margin-top:-2px">day streak · 142 issues</div>
+      <div class="rule"></div>
+      <div class="kick">Top artists</div>
+      <div class="toc"><span class="n">01</span><span class="t">Radiohead</span><span class="r">38</span></div>
+      <div class="toc"><span class="n">02</span><span class="t">Burial</span><span class="r">21</span></div>
+      <div class="toc"><span class="n">03</span><span class="t">Aphex Twin</span><span class="r">17</span></div>
+      <div class="hair"></div>
+      <div class="stat"><span>Loved albums</span><span>34</span></div>
+      <div class="stat"><span>Spotify · Premium</span><span>●</span></div>
+      <div class="stat"><span>Sign out</span><span>→</span></div>
+    </div></div><div class="sl">Profile</div></div>
+
+  </div>
+</div>
+
+<!-- ================= DECK C : GENERATIVE ================= -->
+<div class="deck">
+  <h3>C · Generative Abstract</h3>
+  <div class="dl">living color from cover · glass · soft light type · motion · no hard edges</div>
+  <div class="rail">
+
+    <!-- HOME -->
+    <div class="unit"><div class="ph gn" data-choice="generative" onclick="toggleSelect(this)">
+      <div class="mesh full"></div>
+      <div class="blob" style="width:120px;height:120px;left:50%;top:20%;transform:translateX(-50%);background:linear-gradient(135deg,#16b5c9,#ff6a3d 60%,#ffcf5c)"></div>
+      <div class="scrim"></div>
+      <div class="orb" style="top:18px;right:16px">rate</div>
+      <div class="pad" style="justify-content:flex-end">
+        <div class="ey">brewed for you · no.142</div>
+        <div class="t1">Souvlaki</div>
+        <div class="sub">Slowdive · shoegaze · 1993</div>
+        <div class="glass" style="margin-top:12px">
+          <div style="font:italic 400 9px/1.35 Georgia,serif;opacity:.85">You keep saving woozy guitar bands.</div>
+          <div class="pill" style="margin-top:11px">Open in Spotify</div>
+        </div>
+      </div></div><div class="sl">Home · today</div></div>
+
+    <!-- ALBUM DETAIL -->
+    <div class="unit"><div class="ph gn">
+      <div class="mesh full" style="opacity:.85"></div>
+      <div class="blob" style="width:110px;height:110px;left:50%;top:19%;transform:translateX(-50%);background:linear-gradient(135deg,#9b3df0,#b14a3c)"></div>
+      <div class="scrim"></div>
+      <div class="orb" style="top:18px;left:14px;width:34px;height:34px;font-size:13px">‹</div>
+      <div class="pad" style="justify-content:flex-end">
+        <div class="ey">archive · no.139</div>
+        <div class="t1">Untrue</div>
+        <div class="sub">Burial · dubstep · 2007</div>
+        <div class="glass" style="margin-top:12px">
+          <div style="display:flex;align-items:center;gap:8px"><span class="dot" style="color:#ff6a8a"></span><span style="font:600 9px/1 sans-serif">Loved · rated 28 may</span></div>
+          <div class="pill" style="margin-top:11px">Open in Spotify</div>
+        </div>
+      </div></div><div class="sl">Album detail</div></div>
+
+    <!-- DISCOVERIES -->
+    <div class="unit"><div class="ph gn">
+      <div class="mesh soft"></div>
+      <div class="pad">
+        <div class="ey">your discoveries</div>
+        <div class="t2" style="margin-top:4px">142 records, <br>9-day streak</div>
+        <div style="display:flex;gap:8px;margin:12px 0 11px">
+          <span class="pillg" style="background:#ffffff2e">All</span><span class="pillg">Unrated</span><span class="pillg">Rated</span>
+        </div>
+        <div class="tile"><div class="cv" style="background:linear-gradient(135deg,#87263b,#ffcf5c)"></div><div style="flex:1"><div class="nm">In Rainbows</div><div class="ar">Radiohead</div></div><span class="dot" style="color:#ff6a8a"></span></div>
+        <div class="tile"><div class="cv" style="background:linear-gradient(135deg,#2b5d8a,#7fb2c4)"></div><div style="flex:1"><div class="nm">For Emma</div><div class="ar">Bon Iver</div></div><span class="dot" style="color:#ffcf5c"></span></div>
+        <div class="tile"><div class="cv" style="background:linear-gradient(135deg,#9b3df0,#b14a3c)"></div><div style="flex:1"><div class="nm">Untrue</div><div class="ar">Burial</div></div><span class="dot" style="color:#888"></span></div>
+      </div></div><div class="sl">Discoveries</div></div>
+
+    <!-- PROFILE -->
+    <div class="unit"><div class="ph gn">
+      <div class="mesh soft"></div>
+      <div class="pad">
+        <div class="ey">@tyne</div>
+        <div style="display:flex;align-items:center;gap:13px;margin-top:10px">
+          <div class="ring">9</div>
+          <div><div class="big" style="font-size:22px">142</div><div class="cap">issues</div></div>
+        </div>
+        <div class="cap" style="margin:13px 0 8px">top artists</div>
+        <div><span class="chip">Radiohead · 38</span><span class="chip">Burial · 21</span><span class="chip">Aphex Twin · 17</span></div>
+        <div class="bento" style="margin-top:12px">
+          <div class="glass"><div class="big" style="font-size:20px">34</div><div class="cap">loved</div></div>
+          <div class="glass"><div class="big" style="font-size:20px">4.1</div><div class="cap">avg</div></div>
+        </div>
+        <div class="pillg" style="margin-top:11px">Spotify · Premium ●</div>
+      </div></div><div class="sl">Profile</div></div>
+
+  </div>
+</div>
+
+<p class="subtitle" style="margin-top:18px">Now they're truly different worlds. Tap the <b>Home</b> phone of the world you want — or tell me &ldquo;A for X screens, C for Y,&rdquo; or &ldquo;take the type from A + the color from C.&rdquo; I'll lock the direction next.</p>

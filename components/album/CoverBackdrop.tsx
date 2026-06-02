@@ -57,8 +57,8 @@ export function CoverBackdrop({ uri, scrollY, reduceMotion, topInset }: Props) {
         />
       </Animated.View>
       <LinearGradient
-        colors={['transparent', colors.bg] as const}
-        locations={[0.15, 1]}
+        colors={['rgba(18,10,12,0.16)', 'rgba(18,10,12,0.72)', colors.bg] as const}
+        locations={[0, 0.58, 1]}
         style={StyleSheet.absoluteFill}
       />
     </View>

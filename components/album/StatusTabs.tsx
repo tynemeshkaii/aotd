@@ -20,20 +20,21 @@ type Props = {
 
 export function StatusTabs({ value, onChange }: Props) {
   return (
-    <View className="flex-row rounded-lg bg-surface p-1">
+    <View className="flex-row rounded-xl border border-text/5 bg-surface p-1">
       {tabs.map((tab) => {
         const selected = tab.value === value;
         return (
           <Pressable
             key={tab.value}
             accessibilityRole="tab"
+            accessibilityLabel={`Show ${tab.label.toLowerCase()} discoveries`}
             accessibilityState={{ selected }}
             onPress={() => onChange(tab.value)}
-            className={`h-10 flex-1 items-center justify-center rounded-md ${
-              selected ? 'bg-accent' : 'bg-transparent'
+            className={`min-h-11 flex-1 items-center justify-center rounded-lg ${
+              selected ? 'bg-accent/15' : 'bg-transparent'
             }`}
           >
-            <Text className={selected ? 'font-semibold text-bg' : 'font-semibold text-muted'}>
+            <Text className={selected ? 'font-semibold text-accent' : 'font-semibold text-muted'}>
               {tab.label}
             </Text>
           </Pressable>

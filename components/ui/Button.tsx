@@ -71,7 +71,7 @@ export function Button({
       accessibilityState={{ disabled: !!isDisabled, busy: loading }}
       disabled={isDisabled}
       onPress={handlePress}
-      className={`min-h-12 flex-row items-center justify-center rounded-2xl px-5 py-3.5 ${containerClasses[variant]} ${isDisabled ? 'opacity-60' : ''} ${className ?? ''}`}
+      className={`min-h-12 flex-row items-center justify-center rounded-xl px-5 py-3.5 ${containerClasses[variant]} ${isDisabled ? 'opacity-60' : ''} ${className ?? ''}`}
       {...rest}
     >
       {loading ? (

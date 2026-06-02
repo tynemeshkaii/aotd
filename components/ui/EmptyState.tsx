@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import type { ComponentProps } from 'react';
 import { View } from 'react-native';
 
+import { BrandMark } from '@/components/brand/BrandMark';
 import { Button } from '@/components/ui/Button';
 import { Text } from '@/components/ui/Text';
 import colors from '@/theme/colors';
@@ -27,9 +28,15 @@ export function EmptyState({
 }: Props) {
   return (
     <View className="flex-1 items-center justify-center px-8 py-12">
-      <View className="mb-5 h-16 w-16 items-center justify-center rounded-full bg-surface">
-        <Ionicons name={icon} size={28} color={colors.accent} />
-      </View>
+      {icon === 'sparkles-outline' ? (
+        <View className="mb-5 rounded-2xl bg-surface p-4">
+          <BrandMark size={56} muted />
+        </View>
+      ) : (
+        <View className="mb-5 h-16 w-16 items-center justify-center rounded-2xl bg-surface">
+          <Ionicons name={icon} size={28} color={colors.accent} />
+        </View>
+      )}
       <Text variant="h2" className="text-center">
         {title}
       </Text>

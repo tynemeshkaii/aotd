@@ -1,16 +1,31 @@
 import { router } from 'expo-router';
+import type { ReactNode } from 'react';
 import { Pressable, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AlbumDetail } from '@/components/album/AlbumDetail';
-import { AlbumDetailSkeleton } from '@/components/album/AlbumDetailSkeleton';
-import { PickError } from '@/components/home/PickError';
-import { WaitingForPick } from '@/components/home/WaitingForPick';
-import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
 import { useDiscoveries } from '@/lib/hooks/useDiscoveries';
 import { useTodayPick } from '@/lib/hooks/useTodayPick';
+import { useSkinComponents } from '@/theme/skins/registry';
+
+function HomeStateShell({ children }: { children: ReactNode }) {
+  const { chrome } = useSkinComponents();
+  const insets = useSafeAreaInsets();
+
+  return (
+    <View
+      className="flex-1"
+      style={{ paddingTop: insets.top, backgroundColor: chrome.rootBackground }}
+    >
+      <View className="flex-1 px-5 pt-4 pb-24">{children}</View>
+    </View>
+  );
+}
 
 export default function HomeScreen() {
+  const components = useSkinComponents();
+  const { chrome } = components;
   const { data: pick, isError, isLoading, isRefetching, refetch } = useTodayPick();
   const { data: discoveries } = useDiscoveries();
   const oldPendingCount =
@@ -20,35 +35,24 @@ export default function HomeScreen() {
   // Loading: pick skeleton (not a blank screen).
   if (isLoading) {
     return (
-      <Screen>
-        <Text variant="h1">Today</Text>
-        <View className="mt-5">
-          <AlbumDetailSkeleton />
-        </View>
-      </Screen>
+      <HomeStateShell>
+        <View className="mt-5">{components.States.AlbumDetailSkeleton()}</View>
+      </HomeStateShell>
     );
   }
 
   // Error: retryable — never masked as "waiting".
   if (isError) {
     return (
-      <Screen>
-        <Text variant="h1" className="mb-5">
-          Today
-        </Text>
-        <PickError onRetry={() => void refetch()} retrying={isRefetching} />
-      </Screen>
+      <HomeStateShell>
+        {components.States.PickError({ onRetry: () => void refetch(), retrying: isRefetching })}
+      </HomeStateShell>
     );
   }
 
   // No row for today (successful response): brewing.
   if (!pick) {
-    return (
-      <Screen>
-        <Text variant="h1">Today</Text>
-        <WaitingForPick />
-      </Screen>
-    );
+    return <HomeStateShell>{components.States.WaitingForPick()}</HomeStateShell>;
   }
 
   // Today's pick: full-bleed rich treatment.
@@ -59,9 +63,12 @@ export default function HomeScreen() {
         onPress={() => {
           router.push({ pathname: '/(tabs)/discoveries', params: { filter: 'pending' } });
         }}
-        className="rounded-2xl bg-surface px-4 py-3 active:opacity-80"
+        className="border-2 px-4 py-3 active:opacity-80"
+        style={{ borderColor: chrome.text, backgroundColor: chrome.rootBackground }}
       >
-        <Text variant="body">A few past picks are still waiting whenever you are.</Text>
+        <Text className="font-prose text-sm leading-5" style={{ color: chrome.text }}>
+          A few past picks are still waiting whenever you are.
+        </Text>
       </Pressable>
     ) : null;
 

@@ -2,14 +2,16 @@ import * as Linking from 'expo-linking';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Alert, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Screen } from '@/components/ui/Screen';
+import { BrandMark } from '@/components/brand/BrandMark';
 import { Text } from '@/components/ui/Text';
 import {
   bootstrapSpotifySession,
   completeSpotifyOAuthFromUrl,
   getSpotifyRedirectTo,
 } from '@/lib/auth';
+import { useSkinComponents } from '@/theme/skins/registry';
 
 function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error);
@@ -75,6 +77,8 @@ function buildCallbackUrl(url: string | null, params: CallbackParams) {
 
 export default function AuthCallbackScreen() {
   const router = useRouter();
+  const { chrome } = useSkinComponents();
+  const insets = useSafeAreaInsets();
   const linkingUrl = Linking.useURL();
   const params = useLocalSearchParams() as CallbackParams;
   const [status, setStatus] = useState('Finishing Spotify sign-in...');
@@ -124,12 +128,27 @@ export default function AuthCallbackScreen() {
   }, [linkingUrl, params, router]);
 
   return (
-    <Screen scroll={false}>
+    <View
+      className="flex-1"
+      style={{ paddingTop: insets.top, backgroundColor: chrome.rootBackground }}
+    >
       <View className="flex-1 items-center justify-center px-5">
-        <Text variant="caption" className="text-center">
+        <View className="mb-6 border-2 p-5" style={{ borderColor: chrome.text }}>
+          <BrandMark size={64} />
+        </View>
+        <Text
+          className="text-center font-display text-3xl uppercase leading-8"
+          style={{ color: chrome.text }}
+        >
+          Tuning the turntable
+        </Text>
+        <Text
+          className="mt-2 text-center font-mono text-[11px] uppercase leading-4"
+          style={{ color: chrome.muted, letterSpacing: 0.8 }}
+        >
           {status}
         </Text>
       </View>
-    </Screen>
+    </View>
   );
 }

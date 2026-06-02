@@ -25,6 +25,7 @@ export type AlbumDiscovery = {
   album_id: string;
   album_title: string;
   album_primary_artist_name: string;
+  album_artist_country: string | null;
   album_cover_url: string | null;
   album_spotify_id: string;
   album_release_year: number | null;
@@ -66,6 +67,17 @@ export function formatAlbumDuration(durationMs: number | null): string | null {
   const hours = Math.floor(minutes / 60);
   const rest = minutes % 60;
   return rest ? `${hours}h ${rest}m` : `${hours}h`;
+}
+
+export function formatArtistCountry(code: string | null | undefined): string | null {
+  if (!code) return null;
+  const normalized = code.trim().toUpperCase();
+  if (!/^[A-Z]{2}$/.test(normalized)) return null;
+  return (
+    {
+      GB: 'UK',
+    }[normalized] ?? normalized
+  );
 }
 
 export function spotifyAlbumUri(spotifyId: string): string {

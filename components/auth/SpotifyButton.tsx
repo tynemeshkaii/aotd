@@ -15,7 +15,8 @@ export function SpotifyButton({ disabled, loading, onPress }: Props) {
     <Pressable
       accessibilityRole="button"
       accessibilityLabel="Continue with Spotify"
-      className={`h-14 w-full flex-row items-center justify-center rounded-full bg-spotify px-6 active:opacity-80 ${
+      accessibilityState={{ disabled: !!disabled, busy: !!loading }}
+      className={`min-h-14 w-full flex-row items-center justify-center rounded-full bg-spotify px-6 active:opacity-80 ${
         disabled ? 'opacity-60' : ''
       }`}
       disabled={disabled}
@@ -28,7 +29,7 @@ export function SpotifyButton({ disabled, loading, onPress }: Props) {
           <FontAwesome name="spotify" color={colors.bg} size={24} />
         )}
       </View>
-      <Text className="text-bg font-bold">
+      <Text numberOfLines={1} className="px-8 text-center font-bold text-bg">
         {loading ? 'Opening Spotify...' : 'Continue with Spotify'}
       </Text>
     </Pressable>

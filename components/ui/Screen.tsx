@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { ScrollView, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSkinComponents } from '@/theme/skins/registry';
 
 type Props = {
   children: ReactNode;
@@ -8,19 +9,25 @@ type Props = {
 };
 
 export function Screen({ children, scroll = true }: Props) {
+  const { chrome } = useSkinComponents();
+  const insets = useSafeAreaInsets();
+
   return (
-    <SafeAreaView className="flex-1 bg-bg" edges={['top', 'left', 'right']}>
+    <View
+      className="flex-1"
+      style={{ paddingTop: insets.top, backgroundColor: chrome.rootBackground }}
+    >
       {scroll ? (
         <ScrollView
           className="flex-1"
-          contentContainerClassName="px-5 pt-4 pb-8"
+          contentContainerClassName="px-5 pt-4 pb-24"
           showsVerticalScrollIndicator={false}
         >
           {children}
         </ScrollView>
       ) : (
-        <View className="flex-1 px-5 pt-4 pb-8">{children}</View>
+        <View className="flex-1 px-5 pt-4 pb-24">{children}</View>
       )}
-    </SafeAreaView>
+    </View>
   );
 }
