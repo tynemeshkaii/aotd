@@ -10,6 +10,7 @@ import {
 } from '../_shared/candidate-generation.ts';
 import { corsHeaders, jsonError, jsonResponse } from '../_shared/cors.ts';
 import { getCuratedFallback } from '../_shared/curated-fallback.ts';
+import { shouldDeferFirstPick } from '../_shared/day1-deferral.ts';
 import { getExternalApiCircuitState } from '../_shared/external-api-breaker.ts';
 import { logInfo, logWarn } from '../_shared/logger.ts';
 import { getArtistCountryCached } from '../_shared/musicbrainz.ts';
@@ -187,7 +188,7 @@ Deno.serve(async (req) => {
       .from('recommendation_history')
       .select('album:albums(spotify_id, mb_release_group_id, primary_artist_name, title)')
       .eq('user_id', userId);
-    const historyRows = (hist ?? []) as HistoryRow[];
+    const historyRows = (hist ?? []) as unknown as HistoryRow[];
 
     const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
     const { data: recentPicks } = await admin
@@ -196,7 +197,7 @@ Deno.serve(async (req) => {
       .eq('user_id', userId)
       .gte('date', since);
     const recentArtists = new Set(
-      ((recentPicks ?? []) as RecentPickRow[])
+      ((recentPicks ?? []) as unknown as RecentPickRow[])
         .map((r) => r.album?.primary_artist_name)
         .filter(isNonEmptyString),
     );
@@ -557,6 +558,47 @@ Deno.serve(async (req) => {
     if (!fallbackReason) {
       fallbackReason = classifyFallbackReason(errMsg);
     }
+
+    // Day-1 first-pick guard: defer non-personal fallbacks for users with
+    // enough library data. A cold start with an empty cache is common; saving
+    // a random curated fallback as the user's first impression is worse than
+    // asking the caller to retry after prewarm has settled. This now covers
+    // all non-personal fallback reasons — not just `compute_timeout`.
+    const { count: existingPicks } = await admin
+      .from('albums_of_the_day')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId);
+    const { data: libStatus } = await admin
+      .from('library_sync_status')
+      .select('aggregated_albums_count')
+      .eq('user_id', userId)
+      .maybeSingle();
+    const deferral = shouldDeferFirstPick({
+      fallbackReason,
+      existingPicks: existingPicks ?? 0,
+      aggregatedAlbumsCount: libStatus?.aggregated_albums_count ?? 0,
+    });
+    if (deferral.defer) {
+      logWarn(
+        `[compute] day1_deferred reason=${deferral.reason} source=${fallbackReason} lib_count=${
+          libStatus?.aggregated_albums_count ?? 0
+        }`,
+      );
+      recordDiag('day1_deferred', {
+        reason: deferral.reason,
+        source_reason: fallbackReason,
+        library_count: libStatus?.aggregated_albums_count ?? 0,
+      });
+      return jsonResponse(
+        {
+          ok: false,
+          status: 'deferred',
+          reason: deferral.reason,
+        },
+        { status: 202 },
+      );
+    }
+
     let fb: { album_id: string } | null;
     try {
       fb = await withTimeout(

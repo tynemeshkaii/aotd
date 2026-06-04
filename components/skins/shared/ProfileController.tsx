@@ -38,7 +38,7 @@ export function ProfileController() {
     refetch: refetchOverview,
   } = useProfileOverview();
   const triggerSync = useTriggerLibrarySync();
-  const { status: syncStatus } = useLibrarySyncStatus();
+  const { status: syncStatus, refetch: refetchSyncStatus } = useLibrarySyncStatus();
   const isSyncing =
     triggerSync.isPending || (isActiveLibrarySync(syncStatus) && !isStaleLibrarySync(syncStatus));
 
@@ -46,6 +46,7 @@ export function ProfileController() {
     void refetchProfile();
     void refetchConnection();
     void refetchOverview();
+    void refetchSyncStatus();
   };
 
   const handleSyncNow = () => {

@@ -119,7 +119,11 @@ export type SyncBannerProps = {
 export type StatesComponentSet = {
   AlbumDetailSkeleton: () => ReactNode;
   PickError: (props: { onRetry: () => void; retrying?: boolean }) => ReactNode;
-  WaitingForPick: () => ReactNode;
+  WaitingForPick: (props?: {
+    syncCompleted?: boolean;
+    isFirstPick?: boolean;
+    libraryAlbumCount?: number;
+  }) => ReactNode;
   EmptyState: (props: {
     title: string;
     subtitle?: string;

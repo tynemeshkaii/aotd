@@ -64,7 +64,7 @@ const type = {
     fontFamily: 'Archivo_800ExtraBold',
     fontSize: 34,
     lineHeight: 32,
-    letterSpacing: -1,
+    letterSpacing: 0,
   },
   monoKicker: {
     fontFamily: 'SpaceMono_400Regular',
@@ -1188,7 +1188,7 @@ function EditorialSignInView({ loading, onSignIn }: Parameters<SkinComponentSet[
       <View className="gap-4">
         <Text
           className="font-display text-[62px] uppercase leading-[60px]"
-          style={{ color: editorialColors.ink, letterSpacing: -1.4 }}
+          style={{ color: editorialColors.ink, letterSpacing: 0 }}
         >
           Album of the Day
         </Text>
@@ -1243,7 +1243,7 @@ function EditorialInitialSyncingView(props: Parameters<SkinComponentSet['Initial
         {props.isFailed || props.isStale
           ? props.isStale
             ? 'You can safely restart the library import.'
-            : 'Library sync could not finish. Try again from Profile.'
+            : 'Library sync could not finish. Tap below to retry.'
           : props.isStarting
             ? 'Connecting to Spotify...'
             : `Importing ${props.processed} of ${props.total || '?'}`}
@@ -1451,12 +1451,20 @@ export const editorialSkin: SkinComponentSet = {
         onRetry={onRetry}
       />
     ),
-    WaitingForPick: () => (
-      <EditorialEmptyState
-        title="Your pick is brewing"
-        subtitle="Should be ready by your usual push time. Check back soon."
-      />
-    ),
+    WaitingForPick: (props) => {
+      const isFirstReady =
+        props?.syncCompleted && props?.isFirstPick && (props?.libraryAlbumCount ?? 0) >= 5;
+      return (
+        <EditorialEmptyState
+          title={isFirstReady ? 'Building your first pick' : 'Your pick is brewing'}
+          subtitle={
+            isFirstReady
+              ? 'We imported your Spotify library. Now we are narrowing the first album.'
+              : 'Should be ready by your usual push time. Check back soon.'
+          }
+        />
+      );
+    },
     EmptyState: EditorialEmptyState,
     ErrorState: EditorialErrorState,
   },
@@ -1467,7 +1475,7 @@ function syncFailureCopy(status: LibrarySyncStatus) {
     return 'Spotify asked us to slow down. Try syncing again in a little while.';
   }
 
-  return 'Library sync could not finish. Try again from Profile.';
+  return 'Library sync could not finish. Try syncing again.';
 }
 
 function EditorialSyncBanner({

@@ -1,6 +1,10 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
 import { corsHeaders, jsonError, jsonResponse } from '../_shared/cors.ts';
+import {
+  type Day1Deps,
+  day1OnboardingCompute as runDay1OnboardingCompute,
+} from '../_shared/day1-onboarding.ts';
 import { aggregateLibrary } from '../_shared/library-aggregation.ts';
 import {
   fetchAllSpotifyPaged,
@@ -8,6 +12,7 @@ import {
   type SpotifySavedAlbum,
   type SpotifySavedTrack,
 } from '../_shared/spotify.ts';
+import { parseSyncBody, type SyncMode } from '../_shared/sync-request.ts';
 
 declare const EdgeRuntime: { waitUntil: (p: Promise<unknown>) => void };
 
@@ -24,8 +29,6 @@ const SYNC_LOG_EVERY_PAGES = 10;
 const DEFAULT_BOUNDED_SYNC_PAGES = 3;
 const SYNC_PROGRESS_MIN_INTERVAL_MS = 5_000;
 const SYNC_PROGRESS_MIN_PAGE_DELTA = 5;
-
-type SyncMode = 'initial' | 'bounded' | 'full_reconcile';
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
@@ -53,16 +56,31 @@ Deno.serve(async (req) => {
 
     const admin = createClient(supabaseUrl, serviceRoleKey);
 
-    const payload = await parsePayload(req).catch((error) => {
-      if (error instanceof Error && error.message === 'invalid_sync_mode') {
-        throw new Response(JSON.stringify({ error: 'invalid_sync_mode' }), {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
-      throw error;
-    });
+    // Fail closed: malformed/non-object body must not silently start an
+    // initial sync. Empty body is allowed and defaults to mode='initial'.
+    const parsed = parseSyncBody(await req.text());
+    if (!parsed.ok) {
+      return jsonError(400, parsed.error);
+    }
+    const payload = parsed.payload;
     const mode = payload.mode ?? 'initial';
+    const deviceTimezone = payload.device_timezone;
+
+    // Harden timezone handoff: validate through DB guard before persisting.
+    // Invalid timezones are skipped with a warning; downstream compute uses
+    // safe_profile_timezone, so it will fall back to UTC gracefully.
+    if (isNonEmptyString(deviceTimezone)) {
+      const { data: validatedTz, error: tzErr } = await admin.rpc('set_profile_timezone_if_valid', {
+        p_user_id: user.id,
+        p_timezone: deviceTimezone,
+      });
+      if (tzErr) {
+        console.warn('[sync-spotify-library] tz_update_failed', tzErr.message);
+      } else if (!validatedTz) {
+        console.warn('[sync-spotify-library] invalid_timezone_skipped', deviceTimezone);
+      }
+    }
+
     const startedAt = new Date().toISOString();
     const start = await tryStartLibrarySync(admin, user.id, startedAt);
 
@@ -79,7 +97,9 @@ Deno.serve(async (req) => {
     }
 
     // Background — client gets 202 immediately and listens via Realtime.
-    EdgeRuntime.waitUntil(runSync(admin, user.id, start.started_at ?? startedAt, mode));
+    EdgeRuntime.waitUntil(
+      runSync(admin, user.id, start.started_at ?? startedAt, mode, deviceTimezone),
+    );
 
     return jsonResponse({ ok: true, status: 'queued', mode }, { status: 202 });
   } catch (e) {
@@ -88,7 +108,13 @@ Deno.serve(async (req) => {
   }
 });
 
-async function runSync(admin: SupabaseClient, userId: string, startedAt: string, mode: SyncMode) {
+async function runSync(
+  admin: SupabaseClient,
+  userId: string,
+  startedAt: string,
+  mode: SyncMode,
+  deviceTimezone: unknown,
+) {
   try {
     await patchSyncStatus(admin, userId, { status: 'syncing', processed_count: 0 }, startedAt);
     const patchProgress = createSyncProgressPatcher(admin, userId, startedAt);
@@ -225,41 +251,25 @@ async function runSync(admin: SupabaseClient, userId: string, startedAt: string,
       startedAt,
     );
 
-    // Day-1 prewarm + compute trigger — fire-and-forget.
+    // Day-1 ordered onboarding: prewarm first, check result, then compute.
+    // Only for mode='initial'. Bounded/manual syncs leave compute to the
+    // daily dispatcher.
     try {
       const cronSecret = Deno.env.get('CRON_SECRET');
       const supabaseUrl = Deno.env.get('SUPABASE_URL');
-      if (mode !== 'bounded' && cronSecret && supabaseUrl) {
-        EdgeRuntime.waitUntil(
-          (async () => {
-            try {
-              await fetch(`${supabaseUrl}/functions/v1/prewarm-user-candidates`, {
-                method: 'POST',
-                headers: {
-                  Authorization: `Bearer ${cronSecret}`,
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ user_id: userId }),
-              });
-              await fetch(`${supabaseUrl}/functions/v1/compute-album-of-the-day`, {
-                method: 'POST',
-                headers: {
-                  Authorization: `Bearer ${cronSecret}`,
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ user_id: userId }),
-              });
-            } catch (e) {
-              console.warn(
-                '[day-1-prewarm-compute] trigger failed',
-                e instanceof Error ? e.message : e,
-              );
-            }
-          })(),
-        );
+      if (mode === 'initial' && cronSecret && supabaseUrl) {
+        const deps: Day1Deps = {
+          fetchFn: globalThis.fetch,
+          cronSecret,
+          supabaseUrl,
+          now: () => Date.now(),
+          setTimeoutFn: setTimeout,
+          sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
+        };
+        EdgeRuntime.waitUntil(runDay1OnboardingCompute(admin, userId, deviceTimezone, deps));
       }
     } catch {
-      // Non-blocking: failure here doesn't break sync completion.
+      // Non-blocking.
     }
   } catch (e) {
     try {
@@ -280,24 +290,6 @@ async function runSync(admin: SupabaseClient, userId: string, startedAt: string,
         statusError instanceof Error ? statusError.message : String(statusError),
       );
     }
-  }
-}
-
-async function parsePayload(req: Request): Promise<{ mode?: SyncMode }> {
-  try {
-    const payload = (await req.json()) as { mode?: unknown };
-    if (
-      payload.mode === undefined ||
-      payload.mode === 'initial' ||
-      payload.mode === 'bounded' ||
-      payload.mode === 'full_reconcile'
-    ) {
-      return payload as { mode?: SyncMode };
-    }
-    throw new Error('invalid_sync_mode');
-  } catch (e) {
-    if (e instanceof SyntaxError) return {};
-    throw e;
   }
 }
 
@@ -414,4 +406,8 @@ async function countActiveLibraryAlbums(admin: SupabaseClient, userId: string) {
     .is('removed_at', null);
   if (error) throw new Error(`library_count_failed:${error.message}`);
   return count ?? 0;
+}
+
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === 'string' && value.trim().length > 0;
 }

@@ -10,6 +10,15 @@ export const UNRATED_PAST_PICK_COUNT_KEY = (userId?: string, excludeAotdId?: str
   userId,
   excludeAotdId,
 ];
+// Stable prefix for cross-key invalidation. The full key carries an
+// `excludeAotdId` 3rd element, so mutations that don't know that id (e.g.
+// `useSaveRating`) must invalidate by this 2-element prefix — passing the full
+// key with `undefined` at index 2 would never partial-match an active query
+// whose 3rd element is a real aotd id.
+export const UNRATED_PAST_PICK_COUNT_PREFIX = (userId?: string) => [
+  'unrated-past-pick-count',
+  userId,
+];
 const UNRATED_PAST_PICK_COUNT_REALTIME_TABLES = ['albums_of_the_day'];
 
 export function useUnratedPastPickCount(excludeAotdId?: string) {

@@ -4,7 +4,7 @@ import * as QueryParams from 'expo-auth-session/build/QueryParams';
 import * as WebBrowser from 'expo-web-browser';
 
 import { triggerLibrarySync } from './library';
-import { syncDeviceTimeZone } from './profile';
+import { getDeviceTimeZone, syncDeviceTimeZone } from './profile';
 import { supabase } from './supabase';
 
 WebBrowser.maybeCompleteAuthSession();
@@ -173,18 +173,24 @@ export function bootstrapSpotifySession(session: Session | null): Promise<void> 
   const run = (async () => {
     await syncSpotifyConnection(session);
 
+    const deviceTimezone = getDeviceTimeZone();
+
     await syncDeviceTimeZone(userId).catch((error) => {
       if (__DEV__) {
         console.warn('[profile] timezone sync skipped:', error);
       }
     });
 
-    // Initial sync is fire-and-forget. The splash picks up status via Realtime.
-    triggerLibrarySync('initial').catch((error) => {
-      if (__DEV__) {
-        console.warn('[initial-sync] failed:', error);
-      }
-    });
+    // Initial sync is fire-and-forget. Pass device timezone so the server
+    // can persist it before downstream compute (hardens against UTC race).
+    // The splash picks up status via Realtime.
+    triggerLibrarySync('initial', { deviceTimezone: deviceTimezone ?? undefined }).catch(
+      (error) => {
+        if (__DEV__) {
+          console.warn('[initial-sync] failed:', error);
+        }
+      },
+    );
   })();
 
   bootstrapInFlight.set(userId, run);

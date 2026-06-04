@@ -1,20 +1,12 @@
 import { createClient } from '@supabase/supabase-js';
 
 import { corsHeaders, jsonError, jsonResponse } from '../_shared/cors.ts';
+import { parseOptionalJsonBody } from '../_shared/request-body.ts';
 import { refreshSpotifyAccessToken } from '../_shared/spotify.ts';
 
 type RefreshBody = {
   user_id?: string;
 };
-
-async function parseJsonBody(req: Request): Promise<RefreshBody> {
-  const text = await req.text();
-  if (!text.trim()) {
-    return {};
-  }
-
-  return JSON.parse(text) as RefreshBody;
-}
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -38,16 +30,18 @@ Deno.serve(async (req) => {
     const apiKey = req.headers.get('apikey');
     const isServiceRequest = authHeader === `Bearer ${serviceRoleKey}` || apiKey === serviceRoleKey;
 
-    let body: RefreshBody;
-    try {
-      body = await parseJsonBody(req);
-    } catch {
-      return jsonError(400, 'invalid_json_body');
-    }
+    // Validate auth before reading the body: an unauthenticated user request
+    // must fail with 401, not leak a 400 invalid_json_body. The body is only
+    // parsed after the caller is established (service header or valid JWT).
+    let userId: string | undefined;
 
-    let userId = body.user_id;
-
-    if (!isServiceRequest) {
+    if (isServiceRequest) {
+      const parsed = parseOptionalJsonBody(await req.text());
+      if (!parsed.ok) {
+        return jsonError(400, 'invalid_json_body');
+      }
+      userId = (parsed.value as RefreshBody).user_id;
+    } else {
       if (!authHeader) {
         return jsonError(401, 'missing_auth');
       }
@@ -64,7 +58,13 @@ Deno.serve(async (req) => {
         return jsonError(401, 'invalid_user');
       }
 
-      if (userId && userId !== user.id) {
+      const parsed = parseOptionalJsonBody(await req.text());
+      if (!parsed.ok) {
+        return jsonError(400, 'invalid_json_body');
+      }
+      const body = parsed.value as RefreshBody;
+
+      if (body.user_id && body.user_id !== user.id) {
         return jsonError(403, 'user_mismatch');
       }
 

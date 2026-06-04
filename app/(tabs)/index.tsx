@@ -5,8 +5,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AlbumDetail } from '@/components/album/AlbumDetail';
 import { Text } from '@/components/ui/Text';
+import { useLibrarySyncStatus } from '@/lib/hooks/useLibrarySyncStatus';
+import { useProfileOverview } from '@/lib/hooks/useProfileOverview';
 import { useTodayPick } from '@/lib/hooks/useTodayPick';
 import { useUnratedPastPickCount } from '@/lib/hooks/useUnratedPastPickCount';
+import { hasCompletedLibrarySync } from '@/lib/library';
 import { useTabContentBottomPadding } from '@/lib/navigationChrome';
 import { useSkinComponents } from '@/theme/skins/registry';
 
@@ -32,6 +35,8 @@ export default function HomeScreen() {
   const { chrome } = components;
   const { data: pick, isError, isLoading, isRefetching, refetch } = useTodayPick();
   const { data: oldPendingCount = 0 } = useUnratedPastPickCount(pick?.aotd_id);
+  const { status: syncStatus } = useLibrarySyncStatus();
+  const { data: overview } = useProfileOverview();
 
   // Loading: pick skeleton (not a blank screen).
   if (isLoading) {
@@ -51,9 +56,16 @@ export default function HomeScreen() {
     );
   }
 
-  // No row for today (successful response): brewing.
+  // No row for today (successful response): brewing or first-pick building.
   if (!pick) {
-    return <HomeStateShell>{components.States.WaitingForPick()}</HomeStateShell>;
+    const syncCompleted = hasCompletedLibrarySync(syncStatus);
+    const isFirstPick = overview?.total_discovered === 0;
+    const libraryAlbumCount = syncStatus?.aggregated_albums_count ?? 0;
+    return (
+      <HomeStateShell>
+        {components.States.WaitingForPick({ syncCompleted, isFirstPick, libraryAlbumCount })}
+      </HomeStateShell>
+    );
   }
 
   // Today's pick: full-bleed rich treatment.

@@ -56,7 +56,7 @@ export async function getCuratedFallback(
     .from('recommendation_history')
     .select('album_id, album:albums(spotify_id, mb_release_group_id, primary_artist_name, title)')
     .eq('user_id', userId);
-  const historyRows = (history ?? []) as HistoryFallbackRow[];
+  const historyRows = (history ?? []) as unknown as HistoryFallbackRow[];
 
   const libSpotifyIds = new Set<string>();
   const usedAlbumIds = new Set<string>();
@@ -96,7 +96,7 @@ export async function getCuratedFallback(
     .eq('user_id', userId)
     .gte('date', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10));
   const recentArtists = new Set(
-    ((recentPicks ?? []) as RecentPickRow[])
+    ((recentPicks ?? []) as unknown as RecentPickRow[])
       .map((r) => r.album?.primary_artist_name?.toLowerCase().trim())
       .filter(isNonEmptyString),
   );

@@ -16,7 +16,7 @@ export function SyncBanner() {
         <Text variant="caption" className="text-text">
           {isStale
             ? 'Sync is taking longer than expected. You can try again now.'
-            : `Sync failed: ${status.error_message ?? 'unknown error'}. Try again from Profile.`}
+            : `Sync failed: ${status.error_message ?? 'unknown error'}. Try syncing again.`}
         </Text>
       </View>
     );

@@ -48,10 +48,12 @@ export function AlbumDetailController({
   };
 
   const share = async () => {
-    const available = await Sharing.isAvailableAsync();
-    if (!available) {
-      Alert.alert('Sharing is not available on this device.');
-      return;
+    if (Platform.OS !== 'ios') {
+      const available = await Sharing.isAvailableAsync();
+      if (!available) {
+        Alert.alert('Sharing is not available on this device.');
+        return;
+      }
     }
 
     if (!shareCardRef.current) {

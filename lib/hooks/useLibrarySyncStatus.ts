@@ -1,4 +1,9 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  type QueryObserverResult,
+  type RefetchOptions,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query';
 import { useEffect, useId, useMemo } from 'react';
 
 import { useSession } from '@/components/auth/AuthProvider';
@@ -8,7 +13,13 @@ import type { Database } from '@/types/database';
 
 export type LibrarySyncStatus = Database['public']['Tables']['library_sync_status']['Row'];
 
-export function useLibrarySyncStatus(): { status: LibrarySyncStatus | null; loading: boolean } {
+export function useLibrarySyncStatus(): {
+  status: LibrarySyncStatus | null;
+  loading: boolean;
+  refetch: (
+    options?: RefetchOptions,
+  ) => Promise<QueryObserverResult<LibrarySyncStatus | null, Error>>;
+} {
   const { session } = useSession();
   const userId = session?.user.id;
   const qc = useQueryClient();
@@ -19,7 +30,7 @@ export function useLibrarySyncStatus(): { status: LibrarySyncStatus | null; load
   // subscription — negligible overhead for one row per user.
   const instanceId = useId();
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, refetch } = useQuery({
     queryKey,
     enabled: !!userId,
     queryFn: async () => {
@@ -69,5 +80,5 @@ export function useLibrarySyncStatus(): { status: LibrarySyncStatus | null; load
     };
   }, [userId, qc, queryKey, instanceId]);
 
-  return { status: data ?? null, loading: isLoading };
+  return { status: data ?? null, loading: isLoading, refetch };
 }

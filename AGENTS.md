@@ -52,7 +52,7 @@ Final-response rules:
 
 # Album of the Day - Agent Guide
 
-Last updated from the working tree on 2026-06-02.
+Last updated from the working tree on 2026-06-05.
 
 This file is for both humans and AI agents. It should describe the project as it is now, not as an older phase plan described it.
 
@@ -83,8 +83,10 @@ When sources conflict, use this order:
    - `plans/artist-country-chip.md`
    - `plans/safe-discovery-observability-plan.md`
    - `plans/api-request-optimization-plan.md`
+   - `plans/day-1-onboarding-pick-remediation-plan.md`
    - `plans/discoveries-pivot.md`
    - `plans/profile-screen-design-remediation-plan.md`
+   - `plans/comprehensive-debug-audit-remediation-plan.md` — audit-originated follow-up; Phases 1, 3–6 shipped (incl. Phase 4 API strictness, Phase 5 UI/accessibility partially shipped), Phase 2 (Day-1 recommendation correctness) in progress.
 4. Older phase plans as historical context only.
 5. `README.md` as onboarding prose only, not implementation truth.
 
@@ -111,6 +113,8 @@ Hard dependency rules:
 - For SDK 54, `expo-auth-session` is `~7.0.11`.
 - Reanimated 4 needs `react-native-worklets` installed explicitly.
 - If `npx` or nested npm is missing in Codex desktop, run commands with `PATH=/opt/homebrew/bin:$PATH`.
+- `postcss` has an npm override (`"postcss": ">=8.5.10"`) to resolve GHSA-qx2v-qp2m-jg93 while `@expo/metro-config@54` pins `~8.4.32`. Do not remove the override until Expo upgrades its metro-config postcss constraint past 8.5.10.
+- The remaining `uuid` 7.x advisory (GHSA-w5hq-g745-h8pq, 13 paths via `xcode`) is accepted: `xcode` calls only `uuid.v4()` without a `buf` argument, so the vulnerability (buffer bounds check in v3/v5/v6 when `buf` is provided) is not exploitable. Will resolve when Expo upgrades `xcode`.
 - Stray parent `node_modules` directories can poison resolution. If runtime versions look impossible, check parent directories.
 
 Manual step reminders:
@@ -129,7 +133,7 @@ Manual step reminders:
 - `components/ui/` - app primitives such as `Text`, `Button`, `Screen`, `Card`, `Badge`, states, progress, cover image.
 - `lib/` - Supabase client, auth, env, copy, formatting, query hooks, recommendation helpers, haptics/motion, navigation chrome helpers.
 - `supabase/migrations/` - database schema, policies, grants, RPCs, operational views.
-- `supabase/functions/` - Deno Edge Functions and shared recommendation/API modules.
+- `supabase/functions/` - Deno Edge Functions and shared recommendation/API modules. Day-1 ordering and deferral live in `supabase/functions/_shared/day1-onboarding.ts` and `supabase/functions/_shared/day1-deferral.ts`; entrypoint functions resolve their `Day1Deps` and delegate.
 - `types/database.ts` - generated from Supabase; do not hand-edit except as a temporary fallback if CLI/login is unavailable.
 - `design/mockups/` and `plans/` - design/reference material.
 
@@ -139,6 +143,7 @@ General conventions:
 - `global.css` is intentionally excluded from Biome because Tailwind directives are not valid ordinary CSS to its linter.
 - Keep import/style patterns aligned with nearby files. Prefer focused changes over broad refactors.
 - Use token imports from `theme/colors.js` for JS-level colors before introducing literals.
+- For shared Deno modules that need a stubbable Supabase surface, prefer a narrow structural type (e.g. `Pick<SupabaseClient, 'rpc'>`) over the full client so tests don't pull transitive npm deps.
 
 ## Product Invariants
 
@@ -155,7 +160,7 @@ Keep these behaviors unless the user explicitly changes the product plan:
 - Recommendations must be album/EP/mixtape-like releases, not one-track singles, compilations, live records, soundtracks, remix/DJ-mix release groups, or repeated variants.
 - Algorithm copy and ranking must not rely on genre taxonomy.
 - Spotify Free/Open users get a persistent soft badge and a one-time awaited explainer before opening Spotify.
-- Share is file-first: generate a PNG share card via `react-native-view-shot`, prefetch the cover, use React Native `Share.share` on iOS, and `expo-sharing` elsewhere.
+- Share is file-first: generate a PNG share card via `react-native-view-shot`, prefetch the cover, use React Native `Share.share` on iOS (no `expo-sharing` availability gate), and `expo-sharing` elsewhere (gated by `Sharing.isAvailableAsync()`).
 
 ## Current UI And Skin System
 
@@ -204,6 +209,7 @@ Editorial design contracts:
 - `EditorialActionButton` preserves its provided `title` while loading, so callers should pass specific loading copy such as `Syncing...`, `Retrying...`, or `Saving...`.
 - Country chip renders only when `album_artist_country` is present; `GB` displays as `UK`. Hide the chip when country is null.
 - The spec line should not add genres. The product does not explain picks by genre.
+- Do not use negative `letterSpacing`. It causes text clipping at large accessibility text sizes. Positive tracking values (0.8, 1.2, etc.) for mono/kicker labels are intentional editorial tracking.
 - Flowing accent is scarce: masthead `day`, hairline rules, and CTA arrow. Do not animate album titles, metadata, rows, body copy, skeletons, errors, or lists.
 
 Font contracts:
@@ -253,6 +259,15 @@ Spotify OAuth:
 - Spotify refresh tokens are not guaranteed on every OAuth login. Preserve the existing DB refresh token when `provider_refresh_token` is absent.
 - `refresh-spotify-token` must tolerate an empty request body for authenticated user refreshes and derive `user_id` from JWT. Invalid JSON should return `400 invalid_json_body`.
 - `upsert-streaming-connection` and `refresh-spotify-token` both use `verify_jwt=false`; keep their explicit CORS and Authorization/JWT validation if changing them.
+- Auth must be established before the body is read. `refresh-spotify-token` parses the body only after the caller is known: a service request parses after the service-header check; a user request parses only after `getUser()` succeeds. Do not move parsing ahead of auth — an unauthenticated request must fail `401 missing_auth`/`invalid_user`, not leak a `400 invalid_json_body`. `upsert-streaming-connection` already validates the JWT before parsing; keep that order.
+
+## Edge Function Request Body Parsing
+
+Request-body parsing for functions with optional JSON bodies (`verify_jwt=false`, auth checked by hand) is centralized and fails closed:
+
+- `supabase/functions/_shared/request-body.ts` exports `parseOptionalJsonBody(rawText)`. Empty/whitespace body → ok with `{}`; valid JSON object → ok; malformed JSON or valid-but-non-object JSON (number / string / boolean / array / `null`) → not ok. The non-object rejection matters: `JSON.parse('5')` would otherwise coerce to `{}` and silently run a default path. `refresh-spotify-token` and `upsert-streaming-connection` use it directly and return `400 invalid_json_body` when not ok.
+- `supabase/functions/_shared/sync-request.ts` exports `parseSyncBody(rawText)` for `sync-spotify-library`. It builds on `parseOptionalJsonBody` and adds mode validation: empty body → ok (mode defaults to `initial` downstream); malformed/non-object → `invalid_json_body`; unknown `mode` → `invalid_sync_mode`; `initial`/`bounded`/`full_reconcile`/omitted → ok. A malformed body must never silently start an initial sync. Do not reintroduce the old `parsePayload` that swallowed `SyntaxError` into `{}`.
+- Tests: `supabase/functions/_shared/request-body.test.ts` and `supabase/functions/_shared/sync-request.test.ts`.
 
 ## Library Sync
 
@@ -267,24 +282,72 @@ Core files:
 
 Modes:
 
-- `initial` - after OAuth, fire-and-forget, can trigger day-1 warm/compute.
+- `initial` - after OAuth, fire-and-forget from the client, then server-side library import and ordered day-1 warm/compute.
 - `bounded` - stale restore auto-sync, fetches limited pages, skips removal reconciliation, must still update `streaming_connections.last_synced_at`.
 - `full_reconcile` - Profile/manual sync, may reconcile removals and trigger full follow-up work.
 
 Guards:
 
 - `AuthProvider` handles stale auto-sync after session restore, but only once per user per app session.
+- `bootstrapSpotifySession` passes the device timezone into `triggerLibrarySync('initial')`; `sync-spotify-library` may persist `device_timezone` before downstream compute to avoid UTC day-1 races. Persist it only through the `set_profile_timezone_if_valid(p_user_id, p_timezone)` RPC, not by directly updating `profiles.timezone` from the function.
 - Skip auto-sync while status is `queued` or `syncing`.
 - Do not retry a failed sync inside the 60-minute failed retry cooldown.
 - Avoid cascades in Spotify Development Mode. A bad auto-sync loop can 429 all Spotify API calls, including OAuth `/me`.
 - `RouterGuard` shows `InitialSyncingScreen` only for the first-time missing-library state after sync status has loaded.
 - Realtime channel names must be unique per hook instance. Use `useId()` in channel names.
 - `ProfileController` passes the current `syncStatus` into `ProfileView`. The editorial `SyncBanner` accepts an optional `status` override so `app/skin-fixtures.tsx` can render syncing/failed states without starting a live subscription; when no override is provided it reads live status itself.
-- Sync failure UI should use concise user-facing copy and keep raw backend `error_message` details out of the primary Profile surface.
+- Query invalidation must survive Realtime being unavailable (Expo Go firewall / dropped WebSocket). React Query `invalidateQueries` is prefix-match by default, so the passed key must be a true prefix of the active query key:
+  - `useTriggerLibrarySync` reads `userId` from `useSession` and invalidates user-scoped keys (`['library-sync-status', userId]`, `['library-stats', userId]`, `PROFILE_OVERVIEW_KEY(userId)`). Do not regress to `PROFILE_OVERVIEW_KEY()` — `['profile-overview', undefined]` never matches the active `[..., userId]` query and silently leaves the overview stale offline.
+  - `useLibrarySyncStatus` returns `refetch`; `ProfileController.handleRefresh` calls it so pull-to-refresh updates sync status without waiting for Realtime.
+- Sync failure UI should use concise user-facing copy and keep raw backend `error_message` details out of the primary Profile surface. First-sync failure copy (in `EditorialInitialSyncingView`) must reference the on-screen retry button, not Profile (which is unreachable during first sync). Profile-context sync failure copy should not reference Profile either — the user is already there.
+- Day-1 onboarding compute is ordered: after an `initial` sync completes, `sync-spotify-library` should call `prewarm-user-candidates` with `force: true`, wait for that result, resolve the current target date/timezone, then call `compute-album-of-the-day`. Do not revert this to parallel fire-and-forget prewarm and compute.
+- The day-1 ordering is implemented in `supabase/functions/_shared/day1-onboarding.ts` (`runPrewarmStep`, `runComputeStep`, `day1OnboardingCompute`). `sync-spotify-library/index.ts` is a thin adapter that resolves `Day1Deps` from runtime env and delegates to it. Do not re-introduce inline orchestration in the entry point.
+- `compute-album-of-the-day` can return HTTP 202 with `{ status: 'deferred', reason: 'day1_<x>' }` for any first-pick non-personal fallback when the user has enough library data (see Day-1 deferral below). Treat this by response body, not by `Response.ok`, because 202 is still `ok`.
+- The day1 wrapper retries once after 15 s on any `day1_*` deferred reason, and stops if the retry also defers. The matcher is `body.reason.startsWith('day1_')` — do not regress to per-reason branching.
 
 Critical DB write rule:
 
 - Do not `.upsert()` partial progress patches to `library_sync_status`. Postgres checks NOT NULL constraints before `ON CONFLICT`. Use create/upsert only with all required NOT NULL fields, then plain `.update().eq('user_id', userId)` for progress patches.
+
+## Day-1 Deferral And Prewarm Gating
+
+Day-1 onboarding has a stricter correctness bar than established users: a first-time user with enough library data must not receive a silent curated fallback as issue #1. Two pieces of code own this contract.
+
+### `shouldDeferFirstPick` — pure deferral matrix
+
+`supabase/functions/_shared/day1-deferral.ts` exports `shouldDeferFirstPick({ fallbackReason, existingPicks, aggregatedAlbumsCount, libraryCountThreshold? })`. Decision matrix:
+
+| `fallbackReason` | `existingPicks === 0` | `aggregated_albums_count >= 10` | Result |
+|---|---|---|---|
+| `compute_timeout` / `no_candidates` / `spotify_search_failed` / `spotify_audio_unavailable` / `lastfm_unavailable` / `mb_timeout` / `unknown_error` | yes | yes | defer → `day1_<reason>` |
+| `library_too_small` | yes | yes | defer → `day1_library_quality_issue` |
+| `library_too_small` | yes | no | no defer (honest small-library fallback) |
+| any | no | (any) | no defer (established user) |
+| `null` / unknown | (any) | (any) | no defer (defensive) |
+
+`library_too_small` defers only when `aggregated_albums_count >= 10` — with 10+ albums the issue is taste-extraction quality, not library size, so the user deserves a real pick. Established users and tiny-library users still get honest fallbacks during outages.
+
+`compute-album-of-the-day` calls this helper in its catch block. Every `day1_*` reason is namespaced so the day1 wrapper can match any of them with `body.reason.startsWith('day1_')` instead of per-reason branching. Do not regress the matcher to a literal `day1_compute_timeout` check.
+
+### `runPrewarmStep` — strict status validation
+
+`supabase/functions/_shared/day1-onboarding.ts` exports `runPrewarmStep(deps, userId) -> PrewarmOutcome`. The per-user status from `prewarm-user-candidates` (`results[0].status`) is validated strictly:
+
+- `warmed` / `partial` / `skipped` → `usable` (compute proceeds; `skipped` is honest and compute will produce its own `library_too_small` fallback if applicable)
+- `failed` → `hard_failed` with `reason: item.reason ?? 'prewarm_failed'`
+- any other string → `hard_failed` with `reason: 'prewarm_unexpected_status:<value>'`
+- HTTP 5xx / network exception / malformed JSON / missing status → `hard_failed`
+
+`prewarm-user-candidates` returns HTTP 200 even when an individual user's prewarm fails (the per-user catch at `prewarm-user-candidates/index.ts:138` puts `status: 'failed'` inside `results[0]`). The day-1 wrapper must NOT treat that as `usable` — otherwise Phase 2 silently regresses and compute runs without a warmed cache. The full server-side status set lives in that file: `warmed` / `partial` / `skipped` / `failed`.
+
+Hard failures skip compute, log `prewarm_hard_failed reason=<...>`, and let the daily dispatcher retry on the next cron tick. Do not reintroduce the old "if `prewarmResult.status` is undefined, fall through" behavior.
+
+### Test coverage
+
+- `supabase/functions/_shared/day1-deferral.test.ts` — pure-function tests for the entire matrix plus boundary cases (count 9 vs 10, `existingPicks` 0 vs 1, custom threshold, null reason, unknown reason, namespacing).
+- `supabase/functions/sync-spotify-library/index.test.ts` — full integration harness with stubbed `fetchFn` (queue-driven `Response` specs), stubbed Supabase admin via the narrow `Day1Admin` structural type, and injected clock / sleep. Covers prewarm outcomes (warmed / partial / skipped / 500 / throws / malformed JSON / missing status / `failed` / unknown), compute outcomes (ok / deferred / retry-deferred / failed), context-resolve failure, timezone fallback, and retry matcher for non-`day1_` reasons.
+
+The `Day1Admin` structural type is intentionally narrower than `SupabaseClient` so the test file does not have to instantiate the full client (which pulls in transitive npm deps that break Deno's resolver). Production `SupabaseClient` satisfies it; tests pass a stub.
 
 ## Supabase Database Contracts
 
@@ -293,6 +356,7 @@ General:
 - Schema lives in `supabase/migrations/`.
 - Regenerate types from the linked DB with `npm run db:types` after migrations are applied.
 - Edge Functions use Deno and per-function `deno.json` import maps. They are excluded from app `tsconfig.json`.
+- Functions that import npm/jsr deps (e.g. `@supabase/supabase-js`) keep a per-function `deno.lock` next to their `deno.json` so `deno check --frozen` resolves locally instead of falling back to the stale repo-root lock. `sync-spotify-library`, `compute-album-of-the-day`, `prewarm-user-candidates`, `refresh-spotify-token`, and `upsert-streaming-connection` each have one. If you add such a dep to a function lacking a local lock, generate it: `deno check --lock=supabase/functions/<fn>/deno.lock --config supabase/functions/<fn>/deno.json supabase/functions/<fn>/index.ts`.
 - Never detach Supabase methods from the client object. Always call `supabase.rpc(...)`, `supabase.from(...)`, etc. inline. Detached methods lose `this` binding and can crash.
 - When a new RPC is not yet in generated types, cast the RPC name and args through `never`, call inline, then assert the return shape.
 - If changing the return table or signature of an existing Postgres function, `drop function ...` first. `create or replace function` cannot change return types.
@@ -307,6 +371,7 @@ Security/grants:
 - `streaming_connections` contains tokens. Clients must not `SELECT` from it. Clients read only `streaming_connections_safe`.
 - `user_library_active` and `streaming_connections_safe` intentionally use security-definer view behavior plus explicit `auth.uid() = user_id` filtering. Do not switch them to `security_invoker = true` unless you redesign base-table grants/RLS.
 - Operational tables/views such as external API logs, circuit breakers, rate limits, shadow picks, discovery observability, and MB artist cache are service-role only.
+- Operational health views, including `v1_fallback_health` and `v1_external_api_health`, are service-role only. Do not grant them to `anon` or `authenticated`.
 
 Current client RPCs and shapes:
 
@@ -316,6 +381,7 @@ Current client RPCs and shapes:
 - `save_album_rating(p_user_id, p_aotd_id, p_score, p_comment)` is the only client write path for ratings.
 - `get_profile_overview(p_user_id)` returns profile stats JSON for the Profile screen.
 - `safe_profile_timezone(text)` is callable by authenticated users and service role.
+- `set_profile_timezone_if_valid(p_user_id, p_timezone)` is callable by `authenticated` and `service_role`. It validates with `safe_profile_timezone`, writes only valid timezone strings to `profiles.timezone`, and is currently called by `sync-spotify-library` after JWT validation. It should also be used for any client-side timezone updates instead of direct `profiles.timezone` writes.
 
 Ratings:
 
@@ -386,6 +452,7 @@ Scoring/current tuning:
 - Pool-relative popularity banding is used in shadow via the optional popularity profile parameter.
 - Mainstream penalty applies only to `tier === 'adjacent_artist'`; known-artist new album, safe anchor, and deep discovery are exempt.
 - `selection_reason` may include QA metadata such as `candidate_tier`, `popularity_bucket`, `candidate_origin`, `source_artist_count`, and `track_b_multipliers`. UI copy should still use human formatting.
+- For a user's first AOTD, do not silently insert a curated fallback when there is enough imported library data, regardless of which non-personal reason triggered the fallback. The deferral policy and prewarm gating live in `supabase/functions/_shared/day1-deferral.ts` and `supabase/functions/_shared/day1-onboarding.ts`; the day1 retry matcher accepts any `day1_*` reason. Established users and tiny-library users may still receive fallback during outages.
 
 Artist country chip:
 
@@ -397,9 +464,12 @@ Artist country chip:
 
 Daily dispatch:
 
-- `find_users_due_for_compute(p_lead_minutes default 60, p_catchup_minutes default 1440)` is calendar-day based.
+- `find_users_due_for_compute(p_lead_minutes default 60, p_catchup_minutes default 1440, p_first_pick_grace_minutes default 60)` is calendar-day based.
 - The dispatcher should precompute tomorrow shortly before the user's local midnight and catch up during the current local day if needed.
+- If today's local pick is missing, today wins over tomorrow precompute, even near midnight.
+- Tomorrow precompute requires today's pick to exist and should respect the first-pick grace window so a brand-new user does not receive two picks within minutes.
 - It should not dispatch users who already have an `albums_of_the_day` row for the target local date.
+- Day-1 operational diagnostic views such as `v_day1_pick_diagnostics`, `v_rapid_double_pick`, and `v_late_night_picks` are service-role only.
 - `dispatch-daily-picks` returns `failed_count` and `failed`, and uses HTTP 207 for partial failures.
 - `net.http_post(...)` only returns a queue id; inspect `net._http_response` for the actual function result.
 - Cron jobs are operational live state, not fully represented by migrations. Verify `cron.job` / `cron.job_run_details` before changing schedules.
@@ -411,8 +481,10 @@ Home:
 
 - Reads today's pick through `useTodayPick()` and `get_current_pick`.
 - `WaitingForPick` is only for a successful RPC response with no row for the user's local date.
+- When sync is complete, the user has no discovered picks yet, and the imported library has enough albums, Home should use the first-pick "Building your first pick" state instead of generic brewing copy. This also covers day-1 deferral: when `compute-album-of-the-day` returns HTTP 202 `{ status: 'deferred', reason: 'day1_<x>' }`, the day1 wrapper retries once and the dispatcher catches up on the next cron tick if needed.
+- Do not infer first-pick state from unrated-past-pick count. Use profile overview/discovered count or another explicit AOTD count.
 - RPC/network failures must render retryable `PickError`, not waiting/brewing copy.
-- Today's successful pick renders `AlbumDetail` directly and may include a footer nudge for old unrated picks.
+- Today's successful pick renders `AlbumDetail` directly and may include a footer nudge for old unrated picks. The nudge reads `useUnratedPastPickCount(pick.aotd_id)`, keyed `['unrated-past-pick-count', userId, excludeAotdId]`. After a rating, `useSaveRating` must invalidate via `UNRATED_PAST_PICK_COUNT_PREFIX(userId)` (2-element prefix), not `UNRATED_PAST_PICK_COUNT_KEY(userId)` — the latter is a 3-element key with `undefined` at index 2 and never partial-matches the active query, leaving the footer count stale when Realtime is down.
 - Home passes `refreshing`/`onRefresh` (from `useTodayPick`) into `AlbumDetail` for pull-to-refresh.
 
 Discoveries:
@@ -431,7 +503,7 @@ Profile:
 - Profile shows library status and manual sync. `SyncBanner` should stay Profile-only and visually subordinate unless sync has failed or gone stale.
 - The Taste map restores library span copy when `span_min` and `span_max` are available, wraps long artist names, and keeps decade counts readable in text.
 - Listening summary should distinguish loading, empty, and rated states. Rated states summarize journal mood with emotional rating language derived from `avg_score`.
-- Profile supports pull-to-refresh: `ProfileController` exposes `onRefresh` (fans out to profile, connection, overview, and library-stats refetches) and `refreshing` (overview query).
+- Profile supports pull-to-refresh: `ProfileController` exposes `onRefresh` (fans out to profile, connection, overview, and `useLibrarySyncStatus` refetches) and `refreshing` (overview query). Library stats are read from the overview payload, so refetching overview refreshes them.
 - When no Spotify connection row exists, the Connections section reads "No Spotify connection yet" (not "syncing").
 - Push time and delete account are future work unless explicitly requested.
 
@@ -463,6 +535,7 @@ For Supabase migrations:
 For Edge Functions/shared recommendation logic:
 
 - Run targeted Deno tests for touched modules.
+- For deploy-bound Edge Function changes, run `deno check --frozen` on touched function entrypoints when practical; app `tsc` excludes Supabase functions.
 - Check method/CORS/auth handling.
 - Check external API logging/rate-limit/circuit-breaker behavior.
 - Keep primary compute within its budget and fail to fallback gracefully.
@@ -472,6 +545,9 @@ For OAuth/sync changes:
 - Test sign-in, explicit callback, restored session, sign-out then sign-in.
 - Confirm bootstrap dedupe is preserved.
 - Confirm initial/bounded/full sync mode semantics.
+- Confirm day-1 ordered prewarm/compute and deferred retry behavior, including the strict prewarm `status` validation (`warmed` / `partial` / `skipped` are usable; `failed` and unknown statuses are `hard_failed`).
+- Confirm device timezone is passed/persisted before day-1 compute when available.
+- Run the regression suites: `deno test --allow-env supabase/functions/_shared/day1-deferral.test.ts supabase/functions/sync-spotify-library/index.test.ts`.
 - Watch for Spotify Development Mode 429 cascades.
 
 For album detail/share/rating changes:
@@ -492,8 +568,10 @@ Use plans as scoped context, not automatic instructions. Relevant current plans:
 - `plans/discovery-improvements-v2.1.md` - familiar catalog, pool-relative shadow mode, scoring decisions.
 - `plans/safe-discovery-observability-plan.md` - service-role-only recommendation observability.
 - `plans/api-request-optimization-plan.md` - external API caching, breakers, limiters, bounded sync.
+- `plans/day-1-onboarding-pick-remediation-plan.md` - canonical day-1 reference (phases 1–9): first-login pick, late-night dispatch, generalized deferral, prewarm failure hardening, regression tests.
 - `plans/discoveries-pivot.md` - why Library/Friends/Stats tabs are gone from v1.
 - `plans/profile-screen-design-remediation-plan.md` - Profile editorial identity, safe-area/loading/accessibility, taste/listening hierarchy, badges, sync copy, and fixture requirements.
+- `plans/comprehensive-debug-audit-remediation-plan.md` - audit-originated follow-up; Phases 1, 3–6 shipped (incl. Phase 6 dependency hygiene: postcss override shipped, uuid accepted as unexploitable), Phase 2 (Day-1 recommendation correctness) in progress.
 - `plans/v2-social.md` - deferred social scope.
 
 Older phase plans can be useful for intent, but the current code and this guide win when they conflict.

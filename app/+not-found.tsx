@@ -25,7 +25,7 @@ export default function NotFoundScreen() {
           </View>
           <Text
             className="font-display text-4xl uppercase leading-10"
-            style={{ color: chrome.text, letterSpacing: -0.8 }}
+            style={{ color: chrome.text, letterSpacing: 0 }}
           >
             This track is missing
           </Text>

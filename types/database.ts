@@ -907,6 +907,24 @@ export type Database = {
         }
         Relationships: []
       }
+      v_day1_pick_diagnostics: {
+        Row: {
+          album_title: string | null
+          current_profile_timezone: string | null
+          fallback_reason: string | null
+          first_pick_created_at: string | null
+          first_pick_date: string | null
+          is_fallback: boolean | null
+          library_albums_count: number | null
+          library_sync_completed_at: string | null
+          primary_artist_name: string | null
+          selection_reason: Json | null
+          tz_mismatch_flag: boolean | null
+          user_id: string | null
+          user_timezone_at_compute: string | null
+        }
+        Relationships: []
+      }
       v_discovery_pick_observability: {
         Row: {
           aotd_id: string | null
@@ -951,6 +969,53 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      v_late_night_picks: {
+        Row: {
+          created_at: string | null
+          date: string | null
+          fallback_reason: string | null
+          is_fallback: boolean | null
+          local_creation_time: string | null
+          local_midnight_edge: string | null
+          user_id: string | null
+          user_timezone_at_compute: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          date?: string | null
+          fallback_reason?: string | null
+          is_fallback?: boolean | null
+          local_creation_time?: never
+          local_midnight_edge?: never
+          user_id?: string | null
+          user_timezone_at_compute?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          date?: string | null
+          fallback_reason?: string | null
+          is_fallback?: boolean | null
+          local_creation_time?: never
+          local_midnight_edge?: never
+          user_id?: string | null
+          user_timezone_at_compute?: string | null
+        }
+        Relationships: []
+      }
+      v_rapid_double_pick: {
+        Row: {
+          first_created: string | null
+          first_date: string | null
+          first_fallback: boolean | null
+          first_fallback_reason: string | null
+          second_created: string | null
+          second_date: string | null
+          second_fallback: boolean | null
+          seconds_between: number | null
+          user_id: string | null
+        }
+        Relationships: []
       }
       v1_external_api_health: {
         Row: {
@@ -1020,7 +1085,11 @@ export type Database = {
         }[]
       }
       find_users_due_for_compute: {
-        Args: { p_catchup_minutes?: number; p_lead_minutes?: number }
+        Args: {
+          p_catchup_minutes?: number
+          p_first_pick_grace_minutes?: number
+          p_lead_minutes?: number
+        }
         Returns: {
           push_time: string
           target_date: string
@@ -1172,6 +1241,10 @@ export type Database = {
           updated_at: string
           user_id: string
         }[]
+      }
+      set_profile_timezone_if_valid: {
+        Args: { p_timezone: string; p_user_id: string }
+        Returns: string
       }
       try_start_library_sync: {
         Args: {

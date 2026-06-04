@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 
 import { corsHeaders, jsonError, jsonResponse } from '../_shared/cors.ts';
+import { parseOptionalJsonBody } from '../_shared/request-body.ts';
 import { fetchSpotifyProfile } from '../_shared/spotify.ts';
 
 type UpsertBody = {
@@ -9,15 +10,6 @@ type UpsertBody = {
   expires_in?: number;
   scopes?: string[];
 };
-
-async function parseJsonBody(req: Request): Promise<UpsertBody> {
-  const text = await req.text();
-  if (!text.trim()) {
-    return {};
-  }
-
-  return JSON.parse(text) as UpsertBody;
-}
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -54,12 +46,11 @@ Deno.serve(async (req) => {
       return jsonError(401, 'invalid_user');
     }
 
-    let body: UpsertBody;
-    try {
-      body = await parseJsonBody(req);
-    } catch {
+    const parsed = parseOptionalJsonBody(await req.text());
+    if (!parsed.ok) {
       return jsonError(400, 'invalid_json_body');
     }
+    const body = parsed.value as UpsertBody;
 
     if (!body.provider_token) {
       return jsonError(400, 'missing_provider_token');
