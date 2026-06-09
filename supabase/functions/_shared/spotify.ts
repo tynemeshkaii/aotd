@@ -135,12 +135,21 @@ export async function getValidSpotifyToken(admin: SupabaseClient, userId: string
   const refreshed = await refreshSpotifyAccessToken(data.refresh_token);
   const newExpiresAt = new Date(Date.now() + refreshed.expires_in * 1000).toISOString();
 
+  let spotifyProduct: string | null = null;
+  try {
+    const profile = await fetchSpotifyProfile(refreshed.access_token);
+    spotifyProduct = profile.product ?? null;
+  } catch {
+    // Best-effort: product update failure must not break token refresh.
+  }
+
   const { error: updateError } = await admin
     .from('streaming_connections')
     .update({
       access_token: refreshed.access_token,
       token_expires_at: newExpiresAt,
       ...(refreshed.refresh_token ? { refresh_token: refreshed.refresh_token } : {}),
+      ...(spotifyProduct != null ? { spotify_product: spotifyProduct } : {}),
     })
     .eq('user_id', userId)
     .eq('provider', 'spotify');

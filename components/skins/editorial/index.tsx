@@ -452,6 +452,13 @@ function EditorialAlbumDetailView(props: Parameters<SkinComponentSet['AlbumDetai
               onOpen={props.onOpen}
               onShare={props.onShare}
             />
+            <Image
+              // eslint-disable-next-line @typescript-eslint/no-require-imports
+              source={require('@/assets/spotify_logo/Spotify_Full_Logo_RGB_Black.png')}
+              resizeMode="contain"
+              accessibilityLabel="Powered by Spotify"
+              style={{ width: 58, height: 16, marginTop: 8, opacity: 0.55 }}
+            />
           </View>
 
           {props.isFreeSpotify ? (
@@ -1159,11 +1166,6 @@ function EditorialProfileView(props: Parameters<SkinComponentSet['ProfileView']>
           >
             Connected {relativeTime(props.connection.connected_at)}
           </Text>
-        ) : null}
-        {props.product ? (
-          <View className="self-start">
-            <EditorialMarker label={`Spotify ${props.product}`} tone="paper" />
-          </View>
         ) : null}
       </View>
 

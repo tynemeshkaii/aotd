@@ -2,7 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 
 import { corsHeaders, jsonError, jsonResponse } from '../_shared/cors.ts';
 import { parseOptionalJsonBody } from '../_shared/request-body.ts';
-import { refreshSpotifyAccessToken } from '../_shared/spotify.ts';
+import { fetchSpotifyProfile, refreshSpotifyAccessToken } from '../_shared/spotify.ts';
 
 type RefreshBody = {
   user_id?: string;
@@ -94,12 +94,21 @@ Deno.serve(async (req) => {
     const refreshed = await refreshSpotifyAccessToken(connection.refresh_token);
     const tokenExpiresAt = new Date(Date.now() + refreshed.expires_in * 1000).toISOString();
 
+    let spotifyProduct: string | null = null;
+    try {
+      const profile = await fetchSpotifyProfile(refreshed.access_token);
+      spotifyProduct = profile.product ?? null;
+    } catch {
+      // Best-effort: product update failure must not break token refresh.
+    }
+
     const { error: updateError } = await admin
       .from('streaming_connections')
       .update({
         access_token: refreshed.access_token,
         token_expires_at: tokenExpiresAt,
         ...(refreshed.refresh_token ? { refresh_token: refreshed.refresh_token } : {}),
+        ...(spotifyProduct != null ? { spotify_product: spotifyProduct } : {}),
       })
       .eq('user_id', userId)
       .eq('provider', 'spotify');

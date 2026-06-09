@@ -16,7 +16,7 @@ export function EditorialAlbumActions({ opening, sharing, onOpen, onShare }: Pro
     <View className="gap-3">
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Listen on Spotify"
+        accessibilityLabel="Open in Spotify"
         accessibilityState={{ busy: opening }}
         disabled={opening}
         onPress={() => {
@@ -57,7 +57,7 @@ export function EditorialAlbumActions({ opening, sharing, onOpen, onShare }: Pro
             className="flex-1 self-center font-display text-[30px] uppercase leading-[29px]"
             style={{ color: editorialColors.paper, letterSpacing: 0 }}
           >
-            Listen{'\n'}on Spotify
+            Open in{'\n'}Spotify
           </Text>
         </View>
       </Pressable>
