@@ -4,7 +4,7 @@
 >
 > Сроки: 1–2 часа работы. Делается **между фазой 3 и фазой 4**, до начала планирования алгоритма.
 >
-> Связан с: [master-plan.md](./master-plan.md), [phase-3-library-import.md](./phase-3-library-import.md).
+> Связан с: [master-plan.md](./archive/master-plan.md), [phase-3-library-import.md](./archive/phase-3-library-import.md).
 
 ---
 
@@ -353,7 +353,7 @@ triggerLibrarySync().catch((e) => {
 
 ### Шаг 7 — Обновить документацию
 
-**`plans/master-plan.md`:**
+**`plans/archive/master-plan.md`:**
 
 §5 фаза 3 — обновить текст:
 ```
@@ -382,7 +382,7 @@ triggerLibrarySync().catch((e) => {
   сортировка по date desc
 ```
 
-**`plans/phase-3-library-import.md`:**
+**`plans/archive/phase-3-library-import.md`:**
 
 В §3 (Definition of Done) добавить новый блок в конце:
 ```

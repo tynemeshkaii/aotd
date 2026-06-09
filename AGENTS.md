@@ -135,7 +135,8 @@ Manual step reminders:
 - `supabase/migrations/` - database schema, policies, grants, RPCs, operational views.
 - `supabase/functions/` - Deno Edge Functions and shared recommendation/API modules. Day-1 ordering and deferral live in `supabase/functions/_shared/day1-onboarding.ts` and `supabase/functions/_shared/day1-deferral.ts`; entrypoint functions resolve their `Day1Deps` and delegate.
 - `types/database.ts` - generated from Supabase; do not hand-edit except as a temporary fallback if CLI/login is unavailable.
-- `design/mockups/` and `plans/` - design/reference material.
+- `design/mockups/` and `plans/` - current design/reference material.
+- `plans/archive/` - historical phase plans and retired planning notes; useful for archaeology, not source of truth.
 
 General conventions:
 

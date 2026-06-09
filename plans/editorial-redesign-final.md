@@ -2,9 +2,9 @@
 
 > **Single source of truth** for the app redesign. Consolidates every decision locked during the design
 > session (companion-preview approvals) plus the implementation reality.
-> Related docs: `plans/editorial-redesign.md` (earlier reconciled plan), `plans/editorial-font-fix.md`
+> Related docs: `plans/archive/editorial-redesign.md` (earlier reconciled plan), `plans/editorial-font-fix.md`
 > (the font-wiring bug), `plans/artist-country-chip.md` (the country data pipeline),
-> `plans/redesign-dual-skin-ab-test.md` (the concluded bakeoff).
+> `plans/archive/redesign-dual-skin-ab-test.md` (the concluded bakeoff).
 
 ---
 

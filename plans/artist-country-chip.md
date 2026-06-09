@@ -4,7 +4,7 @@
 > **Goal:** Replace the low-value second chip on the album cover (rating/status) with the **artist's country**
 > (e.g. `UK` / `US` / `FR` / `IT`). Chip 1 stays release year.
 > **Scope:** This is a small **backend + client** mini-phase. It is **independent of** the editorial redesign
-> (`plans/editorial-redesign.md`), which stays "backend: zero changes". The editorial work renders chip 2 as
+> (`plans/archive/editorial-redesign.md`), which stays "backend: zero changes". The editorial work renders chip 2 as
 > country-when-present, else year-only; this plan supplies the data.
 
 ---
