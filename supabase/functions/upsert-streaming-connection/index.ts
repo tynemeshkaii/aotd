@@ -75,8 +75,17 @@ Deno.serve(async (req) => {
       return jsonError(400, 'missing_provider_refresh_token');
     }
 
-    const expiresIn = Number.isFinite(body.expires_in) ? Number(body.expires_in) : 3600;
+    // Guard against a non-positive expires_in: a 0/negative value would stamp
+    // token_expires_at in the past and force perpetual refreshes.
+    const rawExpiresIn = Number(body.expires_in);
+    const expiresIn = Number.isFinite(rawExpiresIn) && rawExpiresIn > 0 ? rawExpiresIn : 3600;
     const tokenExpiresAt = new Date(Date.now() + expiresIn * 1000).toISOString();
+
+    // scopes is a text[] column; keep only string entries so a malformed
+    // payload can't write non-string array elements.
+    const scopes = Array.isArray(body.scopes)
+      ? body.scopes.filter((scope): scope is string => typeof scope === 'string')
+      : [];
 
     const { error: upsertError } = await admin.from('streaming_connections').upsert(
       {
@@ -86,7 +95,7 @@ Deno.serve(async (req) => {
         access_token: body.provider_token,
         refresh_token: refreshToken,
         token_expires_at: tokenExpiresAt,
-        scopes: body.scopes ?? [],
+        scopes,
         spotify_product: spotifyProfile.product ?? null,
         connected_at: new Date().toISOString(),
       },

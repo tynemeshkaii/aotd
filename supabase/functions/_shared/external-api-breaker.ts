@@ -38,6 +38,35 @@ export async function getExternalApiCircuitState(
   return row ?? { state: 'closed', cooldown_until: null, failure_count: 0 };
 }
 
+/**
+ * Read-only circuit check. Unlike getExternalApiCircuitState, this does NOT
+ * claim the half-open probe lease — use it for "is this circuit usable right
+ * now" gating (compute / prewarm live-recovery) so the real probe request is
+ * not delayed by a cycle. The actual probe path should use the claiming
+ * getExternalApiCircuitState / assertExternalApiCircuitAllows.
+ */
+export async function peekExternalApiCircuitState(
+  admin: SupabaseClient,
+  service: string,
+  endpoint: string,
+): Promise<BreakerState> {
+  const { data, error } = await admin.rpc(
+    'peek_external_api_circuit_state' as never,
+    {
+      p_service: service,
+      p_endpoint: endpoint,
+    } as never,
+  );
+  if (error) {
+    console.warn(
+      `[external-api-breaker] peek_failed service=${service} endpoint=${endpoint} error=${error.message}`,
+    );
+    return { state: 'closed', cooldown_until: null, failure_count: 0 };
+  }
+  const row = (Array.isArray(data) ? data[0] : data) as BreakerState | null;
+  return row ?? { state: 'closed', cooldown_until: null, failure_count: 0 };
+}
+
 export async function assertExternalApiCircuitAllows(
   admin: SupabaseClient,
   service: string,

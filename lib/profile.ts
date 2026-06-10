@@ -23,8 +23,15 @@ export async function syncDeviceTimeZone(userId: string) {
 
   if (existing?.timezone === timezone) return false;
 
-  const { error } = await supabase.from('profiles').update({ timezone }).eq('id', userId);
+  // Route through the validating RPC instead of a raw profiles update: it
+  // rejects invalid timezones server-side and is the only client write path
+  // for profiles.timezone. Returns the persisted (validated) zone, or null if
+  // the input was rejected.
+  const { data: validated, error } = await supabase.rpc('set_profile_timezone_if_valid', {
+    p_user_id: userId,
+    p_timezone: timezone,
+  });
   if (error) throw error;
 
-  return true;
+  return validated != null;
 }

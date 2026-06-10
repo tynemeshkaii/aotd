@@ -52,7 +52,7 @@ Final-response rules:
 
 # Album of the Day - Agent Guide
 
-Last updated from the working tree on 2026-06-05.
+Last updated from the working tree on 2026-06-10.
 
 This file is for both humans and AI agents. It should describe the project as it is now, not as an older phase plan described it.
 
@@ -343,6 +343,10 @@ Day-1 onboarding has a stricter correctness bar than established users: a first-
 
 Hard failures skip compute, log `prewarm_hard_failed reason=<...>`, and let the daily dispatcher retry on the next cron tick. Do not reintroduce the old "if `prewarmResult.status` is undefined, fall through" behavior.
 
+A candidate-cache write failure inside `prewarmUser` must NOT become `failed`: it is downgraded to `partial` (`reason: 'cache_write_failed'`) so day-1 still treats prewarm as `usable` and compute serves its own fallback if the cache is thin. `writeCandidatesToCache` already absorbs a transient `23505` against the strict `(source_artist_key, spotify_album_id)` index with one re-read-and-retry before throwing.
+
+Cron prewarm fairness: `prewarm-user-candidates` selects completed-sync users ordered by `library_sync_status.last_prewarmed_at` (nulls first, then `updated_at`), and stamps `last_prewarmed_at = now()` after each non-throwing user (warmed/partial/skipped) in cron mode. Do not revert to ordering by sync `updated_at` — that re-selects the same head users every tick and starves the tail once user count exceeds `limit_users`. A targeted single-user call (`payload.user_id`) does not stamp.
+
 ### Test coverage
 
 - `supabase/functions/_shared/day1-deferral.test.ts` — pure-function tests for the entire matrix plus boundary cases (count 9 vs 10, `existingPicks` 0 vs 1, custom threshold, null reason, unknown reason, namespacing).
@@ -367,7 +371,7 @@ Security/grants:
 - PostgreSQL grants function `EXECUTE` to `PUBLIC` by default. Every migration that creates or replaces functions must explicitly revoke and then grant the intended roles.
 - Service-only RPCs grant only `service_role`.
 - Client RPCs grant `authenticated` only, never `anon`.
-- `profiles` is client-readable/updatable only for authenticated users; do not re-grant broad table privileges.
+- `profiles` is client-readable for authenticated users. Client `UPDATE` is column-scoped to `display_name, avatar_url, preferred_push_time, onboarding_completed` — `timezone` is intentionally NOT in that grant (it is written only via `set_profile_timezone_if_valid`), and `created_at` is server-owned. Do not restore a blanket `grant update on profiles`.
 - Service-role keys never go in the app or repo.
 - `streaming_connections` contains tokens. Clients must not `SELECT` from it. Clients read only `streaming_connections_safe`.
 - `user_library_active` and `streaming_connections_safe` intentionally use security-definer view behavior plus explicit `auth.uid() = user_id` filtering. Do not switch them to `security_invoker = true` unless you redesign base-table grants/RLS.
@@ -382,12 +386,12 @@ Current client RPCs and shapes:
 - `save_album_rating(p_user_id, p_aotd_id, p_score, p_comment)` is the only client write path for ratings.
 - `get_profile_overview(p_user_id)` returns profile stats JSON for the Profile screen.
 - `safe_profile_timezone(text)` is callable by authenticated users and service role.
-- `set_profile_timezone_if_valid(p_user_id, p_timezone)` is callable by `authenticated` and `service_role`. It validates with `safe_profile_timezone`, writes only valid timezone strings to `profiles.timezone`, and is currently called by `sync-spotify-library` after JWT validation. It should also be used for any client-side timezone updates instead of direct `profiles.timezone` writes.
+- `set_profile_timezone_if_valid(p_user_id, p_timezone)` is callable by `authenticated` and `service_role`. It validates with `safe_profile_timezone` and writes only valid timezone strings to `profiles.timezone`. It carries an ownership guard: an authenticated caller may only target their own row (`auth.uid() = p_user_id`); the service role (sync, where `auth.uid()` is null) bypasses. It is the ONLY timezone write path — the client (`lib/profile.ts` `syncDeviceTimeZone`) calls it via `supabase.rpc(...)`, and `sync-spotify-library` calls it after JWT validation. Do not reintroduce a direct `profiles.timezone` update from the client.
 
 Ratings:
 
 - Authenticated clients should not insert/update `public.ratings` directly.
-- `save_album_rating` validates ownership, trims empty comments to null, forces `is_public=false`, upserts by `(user_id, album_id)`, and moves the AOTD row to `rated`.
+- `save_album_rating` validates ownership, trims empty comments to null, rejects comments longer than 2000 chars (`rating_comment_too_long`), forces `is_public=false`, upserts by `(user_id, album_id)`, and moves the AOTD row to `rated`.
 - Keep `on conflict on constraint ratings_user_id_album_id_key`; plain `on conflict (user_id, album_id)` can be ambiguous in PL/pgSQL.
 
 Albums of the day:
@@ -396,6 +400,8 @@ Albums of the day:
 - Recommendation fields are immutable from the client.
 - `opened_at` is set/protected by DB trigger.
 - Idempotency uses `ensure_recommendation_atomic` with `INSERT ... ON CONFLICT (user_id, date) DO NOTHING`; do not reintroduce check-then-insert.
+- All user-scoped tables FK to `auth.users(id) ON DELETE CASCADE`, including `aotd_shadow_picks` (its original FK lacked the cascade and would block user deletion). Keep cascade on any new user-scoped table.
+- `handle_new_user` inserts the profile with `ON CONFLICT (id) DO NOTHING` so a duplicate `auth.users` insert cannot abort signup.
 
 ## Recommendation Pipeline
 
@@ -433,10 +439,13 @@ External API discipline:
 
 - Use DB-backed `reserve_external_api_slot` for Spotify Search, MusicBrainz release-group search/artist lookup, Last.fm top albums, and bounded library paging.
 - Use circuit breakers for high-risk endpoints. Spotify Search is fail-closed: 429/403/5xx/timeouts/network errors open/write cooldown.
+- Two breaker reads: `get_external_api_circuit_state` (RPC, claims the single half-open probe lease — use right before making the actual probe request, e.g. `assertExternalApiCircuitAllows`) vs `peek_external_api_circuit_state` (read-only, claims nothing — use for "is this circuit usable" gating in compute/prewarm live-recovery). Do not use the claiming variant for a plain check; it burns the probe lease and delays the real probe by a cycle.
+- All external-API advisory locks (rate limit + breaker) and `try_start_library_sync` hash on `hashtextextended(..., 0)` (int8). Do not reintroduce `hashtext()` (int4) — both share Postgres' advisory-lock key space and int4 keys can alias int8 keys.
+- Spotify token refresh is reconciled via compare-and-swap: `persistRefreshedSpotifyToken` in `_shared/spotify.ts` writes conditioned on the stale `access_token`; on a lost race (0 rows) it adopts the concurrently-persisted token instead of clobbering it. `getValidSpotifyToken` and `refresh-spotify-token` both go through it. Do not revert to an unconditional update — Spotify rotates refresh tokens and a clobber triggers `invalid_grant` cascades.
 - `spotifyFetch` in `_shared/spotify-extended.ts` intentionally caps 429 retries to one short retry.
 - Never log raw Spotify URLs, auth headers, callback codes, or tokens.
 - Log normalized endpoints such as `search_album`, `artist_albums`, `artist_get_top_albums`, `release_group_search`, `artist_lookup`, `paged_library_albums`, `paged_library_tracks`.
-- `v1_external_api_health` and `v_discovery_pick_observability` are service-role operational surfaces.
+- `v1_external_api_health` and `v_discovery_pick_observability` are service-role operational surfaces. `v_discovery_pick_observability` reads `live_is_fallback` / `live_fallback_reason` from the `albums_of_the_day` columns, not from `selection_reason` JSON (the JSON only carries those keys on fallback picks, so reading it reported NULL for successful picks and skewed the fallback-share metric).
 - `prune_external_api_request_log` owns log retention.
 
 Release eligibility:
@@ -470,7 +479,7 @@ Daily dispatch:
 - If today's local pick is missing, today wins over tomorrow precompute, even near midnight.
 - Tomorrow precompute requires today's pick to exist and should respect the first-pick grace window so a brand-new user does not receive two picks within minutes.
 - It should not dispatch users who already have an `albums_of_the_day` row for the target local date.
-- Day-1 operational diagnostic views such as `v_day1_pick_diagnostics`, `v_rapid_double_pick`, and `v_late_night_picks` are service-role only.
+- Day-1 operational diagnostic views such as `v_day1_pick_diagnostics`, `v_rapid_double_pick`, and `v_late_night_picks` are service-role only. `v_late_night_picks` wraps `user_timezone_at_compute` in `safe_profile_timezone(...)` before `at time zone` so one row with a bad zone string cannot break the whole view.
 - `dispatch-daily-picks` returns `failed_count` and `failed`, and uses HTTP 207 for partial failures.
 - `net.http_post(...)` only returns a queue id; inspect `net._http_response` for the actual function result.
 - Cron jobs are operational live state, not fully represented by migrations. Verify `cron.job` / `cron.job_run_details` before changing schedules.
@@ -499,7 +508,7 @@ Discoveries:
 Profile:
 
 - `ProfileController` owns profile, connection, overview, library stats, sync-now, sign-out, and product label.
-- `get_profile_overview` aggregates stats server-side because user libraries can be large.
+- `get_profile_overview` aggregates stats server-side because user libraries can be large. Its `rated_this_month` count buckets by the user's local timezone (`updated_at at time zone <zone>` vs `now() at time zone <zone>`), not UTC, so it does not flip a day early/late at a month boundary.
 - Profile renders as an editorial listening identity surface: hero identity, honest ledger loading, Taste map, Listening summary, then quieter operational sections.
 - Profile shows library status and manual sync. `SyncBanner` should stay Profile-only and visually subordinate unless sync has failed or gone stale.
 - The Taste map restores library span copy when `span_min` and `span_max` are available, wraps long artist names, and keeps decade counts readable in text.
@@ -549,6 +558,7 @@ For OAuth/sync changes:
 - Confirm day-1 ordered prewarm/compute and deferred retry behavior, including the strict prewarm `status` validation (`warmed` / `partial` / `skipped` are usable; `failed` and unknown statuses are `hard_failed`).
 - Confirm device timezone is passed/persisted before day-1 compute when available.
 - Run the regression suites: `deno test --allow-env supabase/functions/_shared/day1-deferral.test.ts supabase/functions/sync-spotify-library/index.test.ts`.
+- For token-refresh / candidate-cache changes also run `deno test --allow-env --allow-net supabase/functions/_shared/spotify-token-persist.test.ts supabase/functions/_shared/candidate-cache.test.ts`. `spotify-token-persist.test.ts` covers the CAS reconcile in `persistRefreshedSpotifyToken` (win / lost-race adopt / update error / read error / no-guard); `candidate-cache.test.ts` covers the `writeCandidatesToCache` 23505 single re-prepare+retry. `--allow-net` is needed only because the best-effort `/me` product fetch is stubbed at the global-fetch level.
 - Watch for Spotify Development Mode 429 cascades.
 
 For album detail/share/rating changes:

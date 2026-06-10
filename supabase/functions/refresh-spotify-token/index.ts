@@ -2,7 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 
 import { corsHeaders, jsonError, jsonResponse } from '../_shared/cors.ts';
 import { parseOptionalJsonBody } from '../_shared/request-body.ts';
-import { fetchSpotifyProfile, refreshSpotifyAccessToken } from '../_shared/spotify.ts';
+import { persistRefreshedSpotifyToken, refreshSpotifyAccessToken } from '../_shared/spotify.ts';
 
 type RefreshBody = {
   user_id?: string;
@@ -78,7 +78,7 @@ Deno.serve(async (req) => {
     const admin = createClient(supabaseUrl, serviceRoleKey);
     const { data: connection, error: connectionError } = await admin
       .from('streaming_connections')
-      .select('refresh_token')
+      .select('refresh_token, access_token')
       .eq('user_id', userId)
       .eq('provider', 'spotify')
       .maybeSingle();
@@ -92,36 +92,20 @@ Deno.serve(async (req) => {
     }
 
     const refreshed = await refreshSpotifyAccessToken(connection.refresh_token);
-    const tokenExpiresAt = new Date(Date.now() + refreshed.expires_in * 1000).toISOString();
-
-    let spotifyProduct: string | null = null;
-    try {
-      const profile = await fetchSpotifyProfile(refreshed.access_token);
-      spotifyProduct = profile.product ?? null;
-    } catch {
-      // Best-effort: product update failure must not break token refresh.
-    }
-
-    const { error: updateError } = await admin
-      .from('streaming_connections')
-      .update({
-        access_token: refreshed.access_token,
-        token_expires_at: tokenExpiresAt,
-        ...(refreshed.refresh_token ? { refresh_token: refreshed.refresh_token } : {}),
-        ...(spotifyProduct != null ? { spotify_product: spotifyProduct } : {}),
-      })
-      .eq('user_id', userId)
-      .eq('provider', 'spotify');
-
-    if (updateError) {
-      return jsonError(500, 'db_update_failed', updateError.message);
-    }
+    // CAS-guarded persist: if a concurrent refresh already rotated the row, we
+    // adopt the persisted token instead of clobbering it.
+    const { accessToken, tokenExpiresAt } = await persistRefreshedSpotifyToken(
+      admin,
+      userId,
+      refreshed,
+      connection.access_token,
+    );
 
     return jsonResponse({
       ok: true,
       expires_in: refreshed.expires_in,
       token_expires_at: tokenExpiresAt,
-      ...(isServiceRequest ? { access_token: refreshed.access_token } : {}),
+      ...(isServiceRequest ? { access_token: accessToken } : {}),
     });
   } catch (error) {
     return jsonError(500, 'unexpected', error instanceof Error ? error.message : String(error));

@@ -37,7 +37,7 @@ export async function getLastfmSimilarCached(
   }
 
   const fresh = await fetchSimilarArtists(artistName);
-  await admin.from('artist_similarity_cache').upsert(
+  const { error } = await admin.from('artist_similarity_cache').upsert(
     {
       source: 'lastfm',
       source_artist_key: key,
@@ -47,6 +47,7 @@ export async function getLastfmSimilarCached(
     },
     { onConflict: 'source,source_artist_key' },
   );
+  warnOnCacheError('artist_similarity_cache:lastfm', error);
   return fresh;
 }
 
@@ -71,7 +72,7 @@ export async function getSpotifyRelatedCached(
   const fresh = await fetchRelatedArtistsOptional(spotifyToken, spotifyArtistId);
   if (fresh === null) return null;
 
-  await admin.from('artist_similarity_cache').upsert(
+  const { error } = await admin.from('artist_similarity_cache').upsert(
     {
       source: 'spotify',
       source_artist_key: key,
@@ -81,6 +82,7 @@ export async function getSpotifyRelatedCached(
     },
     { onConflict: 'source,source_artist_key' },
   );
+  warnOnCacheError('artist_similarity_cache:spotify', error);
   return fresh;
 }
 
@@ -114,9 +116,20 @@ export async function getAudioFeaturesCached(
     rows.push({ spotify_track_id: id, features: f, fetched_at: new Date().toISOString() });
   }
   if (rows.length > 0) {
-    await admin.from('audio_features_cache').upsert(rows, { onConflict: 'spotify_track_id' });
+    const { error } = await admin
+      .from('audio_features_cache')
+      .upsert(rows, { onConflict: 'spotify_track_id' });
+    warnOnCacheError('audio_features_cache', error);
   }
   return out;
+}
+
+function warnOnCacheError(label: string, error: { message?: string } | null) {
+  if (error) {
+    console.warn(
+      `[external-cache] upsert_failed cache=${label} error=${error.message ?? 'unknown'}`,
+    );
+  }
 }
 
 function isStale(fetchedAt: string, ttlDays: number) {

@@ -257,16 +257,26 @@ async function runSync(
     try {
       const cronSecret = Deno.env.get('CRON_SECRET');
       const supabaseUrl = Deno.env.get('SUPABASE_URL');
-      if (mode === 'initial' && cronSecret && supabaseUrl) {
-        const deps: Day1Deps = {
-          fetchFn: globalThis.fetch,
-          cronSecret,
-          supabaseUrl,
-          now: () => Date.now(),
-          setTimeoutFn: setTimeout,
-          sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
-        };
-        EdgeRuntime.waitUntil(runDay1OnboardingCompute(admin, userId, deviceTimezone, deps));
+      if (mode === 'initial') {
+        if (cronSecret && supabaseUrl) {
+          const deps: Day1Deps = {
+            fetchFn: globalThis.fetch,
+            cronSecret,
+            supabaseUrl,
+            now: () => Date.now(),
+            setTimeoutFn: setTimeout,
+            sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
+          };
+          EdgeRuntime.waitUntil(runDay1OnboardingCompute(admin, userId, deviceTimezone, deps));
+        } else {
+          // Without these, day-1 prewarm+compute silently never runs and the
+          // user waits on the next cron dispatch. Make the gap observable.
+          console.warn(
+            `[sync-spotify-library] day1_compute_skipped missing_env cron_secret=${
+              cronSecret ? 'set' : 'missing'
+            } supabase_url=${supabaseUrl ? 'set' : 'missing'}`,
+          );
+        }
       }
     } catch {
       // Non-blocking.

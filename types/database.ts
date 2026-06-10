@@ -377,6 +377,7 @@ export type Database = {
           completed_at: string | null
           error_code: string | null
           error_message: string | null
+          last_prewarmed_at: string | null
           processed_count: number
           provider: string
           saved_albums_count: number | null
@@ -392,6 +393,7 @@ export type Database = {
           completed_at?: string | null
           error_code?: string | null
           error_message?: string | null
+          last_prewarmed_at?: string | null
           processed_count?: number
           provider: string
           saved_albums_count?: number | null
@@ -407,6 +409,7 @@ export type Database = {
           completed_at?: string | null
           error_code?: string | null
           error_message?: string | null
+          last_prewarmed_at?: string | null
           processed_count?: number
           provider?: string
           saved_albums_count?: number | null
@@ -1190,6 +1193,14 @@ export type Database = {
       get_unrated_past_pick_count: {
         Args: { p_exclude_aotd_id?: string; p_user_id: string }
         Returns: number
+      }
+      peek_external_api_circuit_state: {
+        Args: { p_endpoint: string; p_service: string }
+        Returns: {
+          cooldown_until: string
+          failure_count: number
+          state: string
+        }[]
       }
       prune_external_api_request_log: { Args: never; Returns: undefined }
       record_external_api_circuit_failure: {

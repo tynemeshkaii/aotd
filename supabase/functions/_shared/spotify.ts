@@ -114,9 +114,71 @@ export async function refreshSpotifyAccessToken(refreshToken: string) {
 }
 
 /**
+ * Persist a freshly-refreshed Spotify token with a compare-and-swap guard.
+ *
+ * Multiple workers (compute, sync, prewarm, the explicit refresh endpoint) can
+ * refresh concurrently. Spotify may rotate the refresh_token on each call, so a
+ * naive last-writer-wins update can clobber a newer token with an older one and
+ * trigger an invalid_grant cascade. The CAS write is conditioned on the stale
+ * access_token the caller observed: if another worker already rotated the row,
+ * zero rows update and we adopt the persisted token instead of overwriting it.
+ *
+ * Pass `staleAccessToken = null` to skip the guard (unconditional write).
+ */
+export async function persistRefreshedSpotifyToken(
+  admin: SupabaseClient,
+  userId: string,
+  refreshed: SpotifyRefreshResult,
+  staleAccessToken: string | null,
+): Promise<{ accessToken: string; tokenExpiresAt: string }> {
+  const tokenExpiresAt = new Date(Date.now() + refreshed.expires_in * 1000).toISOString();
+
+  let spotifyProduct: string | null = null;
+  try {
+    const profile = await fetchSpotifyProfile(refreshed.access_token);
+    spotifyProduct = profile.product ?? null;
+  } catch {
+    // Best-effort: product update failure must not break token refresh.
+  }
+
+  let update = admin
+    .from('streaming_connections')
+    .update({
+      access_token: refreshed.access_token,
+      token_expires_at: tokenExpiresAt,
+      ...(refreshed.refresh_token ? { refresh_token: refreshed.refresh_token } : {}),
+      ...(spotifyProduct != null ? { spotify_product: spotifyProduct } : {}),
+    })
+    .eq('user_id', userId)
+    .eq('provider', 'spotify');
+  if (staleAccessToken != null) {
+    update = update.eq('access_token', staleAccessToken);
+  }
+
+  const { data, error } = await update.select('access_token');
+  if (error) throw new Error('db_update_failed');
+
+  if (staleAccessToken != null && (!data || data.length === 0)) {
+    // Lost the race: a concurrent refresh already rotated the row. Adopt the
+    // persisted token rather than overwriting it with ours.
+    const { data: current, error: readError } = await admin
+      .from('streaming_connections')
+      .select('access_token, token_expires_at')
+      .eq('user_id', userId)
+      .eq('provider', 'spotify')
+      .single();
+    if (readError || !current) throw new Error('connection_not_found');
+    return { accessToken: current.access_token, tokenExpiresAt: current.token_expires_at };
+  }
+
+  return { accessToken: refreshed.access_token, tokenExpiresAt };
+}
+
+/**
  * Return a valid access_token for the user. If the stored token expires within
  * 60s, refresh it and persist the new access_token (and refresh_token, if
- * Spotify rotated it) before returning.
+ * Spotify rotated it) before returning. Concurrent refreshes are reconciled by
+ * the compare-and-swap in persistRefreshedSpotifyToken.
  */
 export async function getValidSpotifyToken(admin: SupabaseClient, userId: string): Promise<string> {
   const { data, error } = await admin
@@ -133,32 +195,13 @@ export async function getValidSpotifyToken(admin: SupabaseClient, userId: string
   if (!isExpiringSoon) return data.access_token;
 
   const refreshed = await refreshSpotifyAccessToken(data.refresh_token);
-  const newExpiresAt = new Date(Date.now() + refreshed.expires_in * 1000).toISOString();
-
-  let spotifyProduct: string | null = null;
-  try {
-    const profile = await fetchSpotifyProfile(refreshed.access_token);
-    spotifyProduct = profile.product ?? null;
-  } catch {
-    // Best-effort: product update failure must not break token refresh.
-  }
-
-  const { error: updateError } = await admin
-    .from('streaming_connections')
-    .update({
-      access_token: refreshed.access_token,
-      token_expires_at: newExpiresAt,
-      ...(refreshed.refresh_token ? { refresh_token: refreshed.refresh_token } : {}),
-      ...(spotifyProduct != null ? { spotify_product: spotifyProduct } : {}),
-    })
-    .eq('user_id', userId)
-    .eq('provider', 'spotify');
-
-  if (updateError) {
-    throw new Error('db_update_failed');
-  }
-
-  return refreshed.access_token;
+  const { accessToken } = await persistRefreshedSpotifyToken(
+    admin,
+    userId,
+    refreshed,
+    data.access_token,
+  );
+  return accessToken;
 }
 
 /**

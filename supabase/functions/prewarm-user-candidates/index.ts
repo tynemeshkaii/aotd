@@ -16,7 +16,7 @@ import {
   generateCandidates,
 } from '../_shared/candidate-generation.ts';
 import { corsHeaders, jsonError, jsonResponse } from '../_shared/cors.ts';
-import { getExternalApiCircuitState } from '../_shared/external-api-breaker.ts';
+import { peekExternalApiCircuitState } from '../_shared/external-api-breaker.ts';
 import { getValidSpotifyToken } from '../_shared/spotify.ts';
 import { extractTasteSignal } from '../_shared/taste-extraction.ts';
 
@@ -110,6 +110,7 @@ Deno.serve(async (req) => {
       ? [payload.user_id]
       : await loadCompletedSyncUsers(admin, limitUsers);
     const results = [];
+    const globalDeadlineAtMs = startedAt + MAX_RUNTIME_MS;
 
     for (const userId of userIds) {
       if (!payload.user_id) {
@@ -120,16 +121,23 @@ Deno.serve(async (req) => {
         break;
       }
       try {
-        results.push(
-          await prewarmUser(admin, userId, {
-            force: payload.force ?? false,
-            sourceArtistLimit,
-            spotifyResolutionTopK,
-            maxTextArtistLookups,
-            familiarCatalogLimit,
-            diag: payload.diag ? diag : undefined,
-          }),
-        );
+        const result = await prewarmUser(admin, userId, {
+          force: payload.force ?? false,
+          sourceArtistLimit,
+          spotifyResolutionTopK,
+          maxTextArtistLookups,
+          familiarCatalogLimit,
+          globalDeadlineAtMs,
+          diag: payload.diag ? diag : undefined,
+        });
+        results.push(result);
+        // Rotate this user to the back of the cron queue regardless of warmed /
+        // partial / skipped — only hard failures (caught below) are left
+        // un-stamped so they retry sooner. Skip when a specific user was
+        // targeted (no fairness rotation needed for a direct call).
+        if (!payload.user_id) {
+          await stampUserPrewarmed(admin, userId);
+        }
       } catch (e) {
         const reason = classifyPrewarmFailure(e);
         console.warn(`[prewarm-user-candidates] user=${userId} failed reason=${reason}`);
@@ -154,14 +162,29 @@ Deno.serve(async (req) => {
 });
 
 async function loadCompletedSyncUsers(admin: SupabaseClient, limitUsers: number) {
+  // Fairness rotation: pick never-warmed users first (last_prewarmed_at null),
+  // then the longest-ago-warmed. Ordering by sync `updated_at` instead would
+  // re-select the same head-of-list users every tick and starve the tail once
+  // the user count exceeds limitUsers.
   const { data, error } = await admin
     .from('library_sync_status')
     .select('user_id')
     .eq('status', 'completed')
+    .order('last_prewarmed_at', { ascending: true, nullsFirst: true })
     .order('updated_at', { ascending: true })
     .limit(limitUsers);
   if (error) throw new Error(`load_users_failed:${error.message}`);
   return ((data ?? []) as LibraryStatusRow[]).map((row) => row.user_id);
+}
+
+async function stampUserPrewarmed(admin: SupabaseClient, userId: string) {
+  const { error } = await admin
+    .from('library_sync_status')
+    .update({ last_prewarmed_at: new Date().toISOString() })
+    .eq('user_id', userId);
+  if (error) {
+    console.warn(`[prewarm-user-candidates] stamp_failed user=${userId} error=${error.message}`);
+  }
 }
 
 async function prewarmUser(
@@ -173,6 +196,7 @@ async function prewarmUser(
     spotifyResolutionTopK: number;
     maxTextArtistLookups: number;
     familiarCatalogLimit: number;
+    globalDeadlineAtMs: number;
     diag?: DiagEvent[];
   },
 ) {
@@ -219,7 +243,7 @@ async function prewarmUser(
     }
   }
 
-  const spotifySearchCircuit = await getExternalApiCircuitState(admin, 'spotify', 'search_album');
+  const spotifySearchCircuit = await peekExternalApiCircuitState(admin, 'spotify', 'search_album');
   if (spotifySearchCircuit.state === 'open') {
     return {
       user_id: userId,
@@ -234,7 +258,10 @@ async function prewarmUser(
     releaseGroupIds: new Set(),
     normalizedAlbumKeys: new Set(),
   };
-  const deadlineAtMs = Math.min(Date.now() + USER_BUDGET_MS, userStart + MAX_RUNTIME_MS);
+  // Bound by both the per-user budget and the function-global runtime budget
+  // (startedAt + MAX_RUNTIME_MS), so a late user in the batch cannot overrun the
+  // whole invocation.
+  const deadlineAtMs = Math.min(Date.now() + USER_BUDGET_MS, opts.globalDeadlineAtMs);
   let candidates: AlbumCandidate[];
   let partialReason: string | null = null;
   try {
@@ -274,7 +301,19 @@ async function prewarmUser(
     );
   }
 
-  await writeCandidatesToCache(admin, candidates);
+  // A cache-write failure (e.g. a transient conflict that survives the single
+  // retry inside writeCandidatesToCache) must not flip a successfully-generated
+  // warm into a hard `failed` that day-1 reads as a prewarm gate failure.
+  // Downgrade to `partial`; compute will still produce its own fallback if the
+  // cache ends up thin.
+  try {
+    await writeCandidatesToCache(admin, candidates);
+  } catch (e) {
+    if (!partialReason) partialReason = 'cache_write_failed';
+    console.warn(
+      `[prewarm-user-candidates] user=${userId} candidate_cache_write_failed error=${formatError(e)}`,
+    );
+  }
 
   let familiarCandidates: AlbumCandidate[] = [];
   if (opts.familiarCatalogLimit > 0) {

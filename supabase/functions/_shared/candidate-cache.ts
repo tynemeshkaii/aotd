@@ -77,13 +77,29 @@ export async function writeCandidatesToCache(
   candidates: AlbumCandidate[],
   source: 'lastfm' | 'spotify' = 'lastfm',
 ) {
+  const onConflict = 'source,source_artist_key,candidate_artist_name,candidate_album_name';
+
   const rows = await prepareCandidateCacheRows(admin, candidates, source);
   if (rows.length === 0) return;
 
-  const { error } = await admin.from('recommendation_candidates').upsert(rows, {
-    onConflict: 'source,source_artist_key,candidate_artist_name,candidate_album_name',
-  });
-  if (error) throw new Error(`candidate_cache_write_failed:${error.message}`);
+  const { error } = await admin.from('recommendation_candidates').upsert(rows, { onConflict });
+  if (!error) return;
+
+  // 23505 = unique_violation. prepareCandidateCacheRows filters rows that would
+  // collide with the strict (source_artist_key, spotify_album_id) index, but a
+  // concurrent writer can insert a conflicting row between that read and this
+  // upsert. Re-derive the rows against the now-current cache and retry once.
+  if (error.code !== '23505') {
+    throw new Error(`candidate_cache_write_failed:${error.message}`);
+  }
+
+  const retryRows = await prepareCandidateCacheRows(admin, candidates, source);
+  if (retryRows.length === 0) return;
+
+  const { error: retryError } = await admin
+    .from('recommendation_candidates')
+    .upsert(retryRows, { onConflict });
+  if (retryError) throw new Error(`candidate_cache_write_failed:${retryError.message}`);
 }
 
 export async function newestCandidateFetchedAt(

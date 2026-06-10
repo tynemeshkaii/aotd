@@ -82,7 +82,10 @@
         "npm:tailwindcss@^3.4.19",
         "npm:typescript@~5.9.2",
         "npm:zod@^4.4.3"
-      ]
+      ],
+      "overrides": {
+        "postcss": ">=8.5.10"
+      }
     }
   }
 }

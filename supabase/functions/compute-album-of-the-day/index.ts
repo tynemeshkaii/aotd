@@ -11,7 +11,7 @@ import {
 import { corsHeaders, jsonError, jsonResponse } from '../_shared/cors.ts';
 import { getCuratedFallback } from '../_shared/curated-fallback.ts';
 import { shouldDeferFirstPick } from '../_shared/day1-deferral.ts';
-import { getExternalApiCircuitState } from '../_shared/external-api-breaker.ts';
+import { peekExternalApiCircuitState } from '../_shared/external-api-breaker.ts';
 import { logInfo, logWarn } from '../_shared/logger.ts';
 import { getArtistCountryCached } from '../_shared/musicbrainz.ts';
 import { computePoolRelativeProfile } from '../_shared/popularity-bucket.ts';
@@ -118,12 +118,17 @@ Deno.serve(async (req) => {
     if (!targetDate) return jsonError(400, 'profile_not_found');
   }
 
-  const { data: existing } = await admin
+  const { data: existing, error: existingErr } = await admin
     .from('albums_of_the_day')
     .select('id')
     .eq('user_id', userId)
     .eq('date', targetDate)
     .maybeSingle();
+  if (existingErr) {
+    // Don't fail on the pre-check — ensure_recommendation_atomic is the real
+    // idempotency guard (INSERT ... ON CONFLICT). Log and proceed.
+    logWarn(`[compute] existing_pick_precheck_failed error=${existingErr.message}`);
+  }
   if (existing) {
     return jsonResponse({
       ok: true,
@@ -248,7 +253,7 @@ Deno.serve(async (req) => {
     recordDiag('cache_candidates_ready', { count: candidates.length });
 
     if (candidates.length < MIN_CACHE_POOL_SIZE && Date.now() < primaryDeadlineAtMs - 1_000) {
-      const spotifySearchCircuit = await getExternalApiCircuitState(
+      const spotifySearchCircuit = await peekExternalApiCircuitState(
         admin,
         'spotify',
         'search_album',
@@ -564,20 +569,38 @@ Deno.serve(async (req) => {
     // a random curated fallback as the user's first impression is worse than
     // asking the caller to retry after prewarm has settled. This now covers
     // all non-personal fallback reasons — not just `compute_timeout`.
-    const { count: existingPicks } = await admin
+    const { count: existingPicks, error: existingPicksErr } = await admin
       .from('albums_of_the_day')
       .select('id', { count: 'exact', head: true })
       .eq('user_id', userId);
-    const { data: libStatus } = await admin
+    const { data: libStatus, error: libStatusErr } = await admin
       .from('library_sync_status')
       .select('aggregated_albums_count')
       .eq('user_id', userId)
       .maybeSingle();
-    const deferral = shouldDeferFirstPick({
-      fallbackReason,
-      existingPicks: existingPicks ?? 0,
-      aggregatedAlbumsCount: libStatus?.aggregated_albums_count ?? 0,
-    });
+    // Fail open: if either signal couldn't be read, we cannot safely tell a
+    // genuine first pick from an established user (existingPicks ?? 0 would
+    // misread a DB error as "0 picks" and wrongly defer). Skip deferral and
+    // serve the curated fallback instead.
+    const deferral =
+      existingPicksErr || libStatusErr
+        ? { defer: false as const }
+        : shouldDeferFirstPick({
+            fallbackReason,
+            existingPicks: existingPicks ?? 0,
+            aggregatedAlbumsCount: libStatus?.aggregated_albums_count ?? 0,
+          });
+    if (existingPicksErr || libStatusErr) {
+      logWarn(
+        `[compute] day1_deferral_check_failed picks_err=${existingPicksErr?.message ?? '-'} lib_err=${
+          libStatusErr?.message ?? '-'
+        }`,
+      );
+      recordDiag('day1_deferral_check_failed', {
+        picks_error: existingPicksErr?.message ?? null,
+        lib_error: libStatusErr?.message ?? null,
+      });
+    }
     if (deferral.defer) {
       logWarn(
         `[compute] day1_deferred reason=${deferral.reason} source=${fallbackReason} lib_count=${
