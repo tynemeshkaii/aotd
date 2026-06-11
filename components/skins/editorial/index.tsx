@@ -1356,6 +1356,37 @@ function EditorialInitialSyncingView(props: Parameters<SkinComponentSet['Initial
   );
 }
 
+// Deterministic pseudo-barcode seeded by album id — print artifact for the
+// share card footer. Pure decoration, never scanned.
+function barcodeWidths(seed: string) {
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
+  const widths: number[] = [];
+  for (let i = 0; i < 24; i++) {
+    h = (h * 1664525 + 1013904223) >>> 0;
+    widths.push(2 + (h % 3) * 2);
+  }
+  return widths;
+}
+
+function EditorialBarcode({ seed }: { seed: string }) {
+  return (
+    <View className="flex-row items-end" style={{ height: 56, gap: 3 }}>
+      {barcodeWidths(seed).map((width, index) => (
+        <View
+          // biome-ignore lint/suspicious/noArrayIndexKey: static decorative bars, order never changes
+          key={index}
+          style={{
+            width,
+            height: index % 5 === 0 ? 56 : 44,
+            backgroundColor: editorialColors.ink,
+          }}
+        />
+      ))}
+    </View>
+  );
+}
+
 function EditorialShareCard({ album }: { album: AlbumDiscovery }) {
   return (
     <View
@@ -1417,13 +1448,24 @@ function EditorialShareCard({ album }: { album: AlbumDiscovery }) {
           </Text>
         </View>
       </View>
-      <Text
-        numberOfLines={1}
-        className="font-mono text-2xl"
-        style={{ color: editorialColors.muted }}
-      >
-        {spotifyAlbumUrl(album.album_spotify_id)}
-      </Text>
+      <View className="flex-row items-end justify-between gap-8">
+        <EditorialBarcode seed={album.album_spotify_id} />
+        <View className="min-w-0 flex-1 items-end">
+          <Text
+            className="font-mono-bold text-2xl uppercase"
+            style={{ color: editorialColors.ink, letterSpacing: tracking.kicker }}
+          >
+            {`AOTD · No. ${issueNo(album)}`}
+          </Text>
+          <Text
+            numberOfLines={1}
+            className="mt-2 font-mono text-xl"
+            style={{ color: editorialColors.muted }}
+          >
+            {spotifyAlbumUrl(album.album_spotify_id)}
+          </Text>
+        </View>
+      </View>
       <PaperGrain opacity={0.06} />
     </View>
   );
