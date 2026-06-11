@@ -249,6 +249,32 @@ function EditorialRatingEditor({ album }: { album: AlbumDiscovery }) {
   );
 }
 
+// Magazine-style raised initial: first letter set in display face inline.
+// True wrapped drop caps are not reliable in RN, so the cap is raised, not dropped.
+function ReasonParagraph({ text }: { text: string }) {
+  const trimmed = text.trim();
+  const first = trimmed.charAt(0);
+  const rest = trimmed.slice(1);
+  if (!/[A-Za-z]/.test(first)) {
+    return <Text style={[type.proseReason, { color: editorialColors.ink }]}>{trimmed}</Text>;
+  }
+  return (
+    <Text style={[type.proseReason, { color: editorialColors.ink }]}>
+      <Text
+        style={{
+          fontFamily: 'Archivo_800ExtraBold',
+          fontSize: 27,
+          lineHeight: 27,
+          color: editorialColors.ink,
+        }}
+      >
+        {first.toUpperCase()}
+      </Text>
+      {rest}
+    </Text>
+  );
+}
+
 function EditorialAlbumDetailView(props: Parameters<SkinComponentSet['AlbumDetailView']>[0]) {
   const date = formatIssueDate(props.album.pick_date);
   const markers = albumCoverMarkers(props.album);
@@ -392,9 +418,9 @@ function EditorialAlbumDetailView(props: Parameters<SkinComponentSet['AlbumDetai
 
           <View style={{ marginTop: space.s5 }}>
             <EditorialSectionRule title="Why this one?" weight="heavy" />
-            <Text className="mt-3" style={[type.proseReason, { color: editorialColors.ink }]}>
-              {formatSelectionReason(props.album.selection_reason)}
-            </Text>
+            <View className="mt-3">
+              <ReasonParagraph text={formatSelectionReason(props.album.selection_reason)} />
+            </View>
           </View>
 
           <View style={{ marginTop: space.s6 }}>
