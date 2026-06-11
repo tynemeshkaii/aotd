@@ -464,6 +464,45 @@ function ListSkeleton() {
   );
 }
 
+function ArchiveFilterTab({
+  label,
+  selected,
+  isFirst,
+  onPress,
+}: {
+  label: string;
+  selected: boolean;
+  isFirst: boolean;
+  onPress: () => void;
+}) {
+  const [pressed, setPressed] = React.useState(false);
+  const inverted = selected || pressed;
+  return (
+    <Pressable
+      accessibilityRole="tab"
+      accessibilityState={{ selected }}
+      onPress={onPress}
+      onPressIn={() => setPressed(true)}
+      onPressOut={() => setPressed(false)}
+      className="min-h-11 flex-1 items-center justify-center px-2"
+      style={{
+        backgroundColor: inverted ? editorialColors.ink : 'transparent',
+        borderLeftWidth: isFirst ? 0 : 1,
+        borderLeftColor: editorialColors.ink,
+      }}
+    >
+      <Text
+        className="uppercase"
+        style={[type.monoLabel, { color: inverted ? editorialColors.paper : editorialColors.ink }]}
+        numberOfLines={1}
+        adjustsFontSizeToFit
+      >
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
+
 function EditorialDiscoveriesView(props: Parameters<SkinComponentSet['DiscoveriesView']>[0]) {
   const insets = useSafeAreaInsets();
   const bottomPadding = getTabContentBottomPadding(insets.bottom);
@@ -509,35 +548,15 @@ function EditorialDiscoveriesView(props: Parameters<SkinComponentSet['Discoverie
           accessibilityRole="tablist"
           style={{ borderColor: editorialColors.ink }}
         >
-          {(Object.keys(filterLabels) as DiscoveryFilter[]).map((filter, index) => {
-            const selected = props.filter === filter;
-            return (
-              <Pressable
-                key={filter}
-                accessibilityRole="tab"
-                accessibilityState={{ selected }}
-                onPress={() => props.onFilterChange(filter)}
-                className="min-h-11 flex-1 items-center justify-center px-2 active:opacity-80"
-                style={{
-                  backgroundColor: selected ? editorialColors.ink : 'transparent',
-                  borderLeftWidth: index === 0 ? 0 : 1,
-                  borderLeftColor: editorialColors.ink,
-                }}
-              >
-                <Text
-                  className="uppercase"
-                  style={[
-                    type.monoLabel,
-                    { color: selected ? editorialColors.paper : editorialColors.ink },
-                  ]}
-                  numberOfLines={1}
-                  adjustsFontSizeToFit
-                >
-                  {filterLabels[filter]}
-                </Text>
-              </Pressable>
-            );
-          })}
+          {(Object.keys(filterLabels) as DiscoveryFilter[]).map((filter, index) => (
+            <ArchiveFilterTab
+              key={filter}
+              label={filterLabels[filter]}
+              selected={props.filter === filter}
+              isFirst={index === 0}
+              onPress={() => props.onFilterChange(filter)}
+            />
+          ))}
         </View>
 
         {props.loading ? (
@@ -806,23 +825,30 @@ function LibrarySpanLine({ min, max }: { min: number | null; max: number | null 
 }
 
 function EditorialArchiveLink({ onPress }: { onPress: () => void }) {
+  const [pressed, setPressed] = React.useState(false);
+  const foreground = pressed ? editorialColors.paper : editorialColors.ink;
   return (
     <Pressable
       accessibilityRole="button"
+      onPressIn={() => setPressed(true)}
+      onPressOut={() => setPressed(false)}
       onPress={() => {
         haptics.impactLight();
         onPress();
       }}
-      className="min-h-12 flex-row items-center justify-between border-2 px-3 py-3 active:opacity-70"
-      style={{ borderColor: editorialColors.ink }}
+      className="min-h-12 flex-row items-center justify-between border-2 px-3 py-3"
+      style={{
+        borderColor: editorialColors.ink,
+        backgroundColor: pressed ? editorialColors.ink : 'transparent',
+      }}
     >
       <Text
         className="font-mono-bold text-xs uppercase leading-4"
-        style={{ color: editorialColors.ink, letterSpacing: tracking.label }}
+        style={{ color: foreground, letterSpacing: tracking.label }}
       >
         Open rated archive
       </Text>
-      <Ionicons name="arrow-forward" size={18} color={editorialColors.ink} />
+      <Ionicons name="arrow-forward" size={18} color={foreground} />
     </Pressable>
   );
 }
