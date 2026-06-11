@@ -175,6 +175,7 @@ function EditorialRatingEditor({ album }: { album: AlbumDiscovery }) {
   return (
     <View className="gap-4">
       <EditorialSectionRule title="Editorial ballot" major />
+      {album.rating_score ? <EditorialStamp label={`Rated 0${album.rating_score}`} /> : null}
       <Text
         className="uppercase"
         style={[
@@ -245,6 +246,26 @@ function EditorialRatingEditor({ album }: { album: AlbumDiscovery }) {
         disabled={!score}
         loading={saveRating.isPending}
       />
+    </View>
+  );
+}
+
+// Rubber-stamp marker: stamp red, slight rotation. Decorative — the ballot
+// itself carries the selected state for accessibility.
+function EditorialStamp({ label }: { label: string }) {
+  return (
+    <View
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+      className="self-start border-2 px-2 py-1"
+      style={{ borderColor: editorialColors.red, transform: [{ rotate: '-3deg' }] }}
+    >
+      <Text
+        className="font-mono-bold text-[11px] uppercase leading-4"
+        style={{ color: editorialColors.red, letterSpacing: tracking.kicker }}
+      >
+        {label}
+      </Text>
     </View>
   );
 }
