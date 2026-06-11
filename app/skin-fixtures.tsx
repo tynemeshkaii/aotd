@@ -135,6 +135,7 @@ function syncStatus(
     completed_at: status === 'completed' ? now : null,
     error_code: null,
     error_message: null,
+    last_prewarmed_at: null,
     processed_count: status === 'syncing' ? 74 : 0,
     provider: 'spotify',
     saved_albums_count: null,
