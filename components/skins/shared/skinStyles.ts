@@ -22,3 +22,30 @@ export const ratingTone: Record<RatingScore, string> = {
   2: '#a8636b',
   1: '#8e3b46',
 };
+
+// 4pt spacing scale. Use these for editorial margins/gaps instead of ad-hoc
+// pixel values so vertical rhythm stays on-grid.
+export const space = {
+  s1: 4,
+  s2: 8,
+  s3: 12,
+  s4: 16,
+  s5: 20,
+  s6: 24,
+  s8: 32,
+} as const;
+
+// Letter-tracking scale. kicker = wide mono kickers, label = bordered mono
+// labels/buttons, micro = tiny mono metadata.
+export const tracking = {
+  label: 0.8,
+  micro: 1.0,
+  kicker: 1.4,
+} as const;
+
+// Printed rule weights.
+export const ruleWeight = {
+  hairline: 1,
+  rule: 2,
+  heavy: 3,
+} as const;
