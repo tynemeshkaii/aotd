@@ -1086,41 +1086,42 @@ function EditorialProfileView(props: Parameters<SkinComponentSet['ProfileView']>
                 max={props.overview.taste.span_max}
               />
               {artists.length > 0 ? (
-                <View className="gap-3">
+                <View className="border-y-2" style={{ borderColor: editorialColors.ink }}>
                   {artists.slice(0, 6).map((artist, index) => (
                     <View
                       key={artist.name}
-                      className="border-2 px-3 py-3"
-                      style={{ borderColor: editorialColors.ink }}
+                      className="flex-row items-start gap-3 py-3"
+                      style={{
+                        borderTopWidth: index === 0 ? 0 : 1,
+                        borderTopColor: editorialColors.ink,
+                      }}
                     >
-                      <View className="flex-row items-start gap-3">
+                      <Text
+                        className="w-9 font-mono-bold text-[11px] uppercase leading-5"
+                        style={{ color: editorialColors.muted, letterSpacing: tracking.label }}
+                      >
+                        {String(index + 1).padStart(2, '0')}
+                      </Text>
+                      <Text
+                        className="min-w-0 flex-1 font-prose-bold text-lg leading-6"
+                        style={{ color: editorialColors.ink }}
+                        numberOfLines={2}
+                      >
+                        {artist.name}
+                      </Text>
+                      <View className="min-w-[54px] items-end">
                         <Text
-                          className="w-9 font-mono-bold text-[11px] uppercase leading-5"
+                          className="font-mono-bold text-[11px] uppercase leading-5"
+                          style={{ color: editorialColors.ink, letterSpacing: tracking.label }}
+                        >
+                          {artist.count}
+                        </Text>
+                        <Text
+                          className="font-mono text-[10px] uppercase leading-4"
                           style={{ color: editorialColors.muted, letterSpacing: tracking.label }}
                         >
-                          {String(index + 1).padStart(2, '0')}
+                          saves
                         </Text>
-                        <Text
-                          className="min-w-0 flex-1 font-prose-bold text-lg leading-6"
-                          style={{ color: editorialColors.ink }}
-                          numberOfLines={2}
-                        >
-                          {artist.name}
-                        </Text>
-                        <View className="min-w-[54px] items-end">
-                          <Text
-                            className="font-mono-bold text-[11px] uppercase leading-5"
-                            style={{ color: editorialColors.ink, letterSpacing: tracking.label }}
-                          >
-                            {artist.count}
-                          </Text>
-                          <Text
-                            className="font-mono text-[10px] uppercase leading-4"
-                            style={{ color: editorialColors.muted, letterSpacing: tracking.label }}
-                          >
-                            saves
-                          </Text>
-                        </View>
                       </View>
                     </View>
                   ))}
