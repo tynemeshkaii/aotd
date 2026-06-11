@@ -52,7 +52,7 @@ Final-response rules:
 
 # Album of the Day - Agent Guide
 
-Last updated from the working tree on 2026-06-10.
+Last updated from the working tree on 2026-06-11.
 
 This file is for both humans and AI agents. It should describe the project as it is now, not as an older phase plan described it.
 
@@ -136,6 +136,7 @@ Manual step reminders:
 - `supabase/functions/` - Deno Edge Functions and shared recommendation/API modules. Day-1 ordering and deferral live in `supabase/functions/_shared/day1-onboarding.ts` and `supabase/functions/_shared/day1-deferral.ts`; entrypoint functions resolve their `Day1Deps` and delegate.
 - `types/database.ts` - generated from Supabase; do not hand-edit except as a temporary fallback if CLI/login is unavailable.
 - `design/mockups/` and `plans/` - current design/reference material.
+- `scripts/` - one-off dev generators (currently `generate-paper-grain.mjs` for `assets/textures/paper-grain.png`); not wired into the build.
 - `plans/archive/` - historical phase plans and retired planning notes; useful for archaeology, not source of truth.
 
 General conventions:
@@ -194,6 +195,16 @@ Bottom navigation contracts:
 Editorial design contracts:
 
 - Palette source of truth is `theme/colors.js` and `components/skins/shared/skinStyles.ts`.
+- Editorial design tokens live in `components/skins/shared/skinStyles.ts`: `space` (4pt scale s1–s8), `tracking` (`label` 0.8 / `micro` 1.0 / `kicker` 1.4), `ruleWeight` (`hairline` 1 / `rule` 2 / `heavy` 3). Use these instead of ad-hoc pixel margins, letterSpacing literals, or one-off rule heights. `EditorialSectionRule` takes a `weight` prop keyed to `ruleWeight`.
+- Pressed states on editorial bordered controls invert ink↔paper (print-impression feel), implemented with local `useState` + `onPressIn`/`onPressOut` — NOT Pressable style functions (NativeWind v4 reliability) and NOT `active:opacity-*`. Handlers call `setPressed(false)` first inside `onPress` so an app-switch (Spotify deep link) cannot strand a stuck inverted state. Applies to `EditorialActionButton` (own file, `components/skins/editorial/EditorialActionButton.tsx`), archive filter tabs, the rated-archive link, and the "Open in Spotify" CTA.
+- The album-detail cover renders as a print plate: paper margin (`space.s3` padding) with `EditorialCropMarks` at the corners (marks sit on paper, never over artwork), a `border-2` ink frame around the artwork, and the album title overlapping the plate by -14 via a `zIndex: 2` View wrapper (zIndex on a bare `Text` is unreliable in RN). Year/country marker chips stay inside the frame bottom-right.
+- All editorial surfaces (album detail, archive, profile, sign-in, initial sync, share card) carry a static `PaperGrain` overlay (`components/skins/editorial/PaperGrain.tsx`): core RN `Image` with `resizeMode="repeat"`, `pointerEvents="none"`, zIndex 20, opacity 0.05 (0.06 on the share card). The tile is `assets/textures/paper-grain.png`, regenerated deterministically by `scripts/generate-paper-grain.mjs` (dependency-free, seeded). Mount grain as a sibling of scroll containers, never inside them.
+- The "Why this one?" paragraph renders through `ReasonParagraph` with a raised initial cap (inline Archivo first letter); true wrapped drop caps are not reliable in RN — keep the raised-cap approach. Non-letter first characters fall back to plain prose.
+- A saved rating shows a decorative `EditorialStamp` ("Rated 0X", stamp red, -3° rotation) on the ballot, driven by persisted `album.rating_score` (not local selection state) and hidden from screen readers — the ballot rows carry the accessible selected state.
+- The Discoveries archive list groups rows by month: `buildArchiveItems` produces a flat header/row union for the `Animated.FlatList`; month headers carry the 2px rule, so the first row of each group drops its top border. Keep keys as `month-<label>` / `aotd_id`.
+- Profile Taste-map top artists render as a single ruled ledger (`border-y-2` container, hairline separators), not stacked bordered boxes.
+- The share card footer is a decorative deterministic pseudo-barcode (`barcodeWidths` seeded by Spotify album id — stable across captures) plus an "AOTD · No. N" colophon and the album URL.
+- The "Open in Spotify" CTA stripe uses `accentStatic` (CTA accent is allowed); do not use rating-tone gold there. Share is a full-width paper-tone `EditorialActionButton` ("Share this issue"), not a quiet text link.
 - Current base is warm paper/ink with `accent` / `accentStatic` `#ff4a2e`, flowing accent colors, and Spotify green only for Spotify-branded UI.
 - Do not reintroduce the old glass/rounded/dark SaaS look as the default.
 - The album cover is the dominant visual surface. Avoid generic decorative blobs/orbs.
@@ -207,7 +218,7 @@ Editorial design contracts:
 - The sign-in screen (`EditorialSignInView`) is safe-area-aware via `useSafeAreaInsets()` (top + 28 / bottom + 28); do not revert to a fixed `py-10` that collides with the notch/home indicator. The Spotify sign-in button is square (no `rounded-full`) with mono-bold uppercase label to match the skin, keeping Spotify green.
 - Taste map artist names should wrap cleanly, generally up to two lines, with stable rank/count alignment. Decade data should keep visible text counts and an editorial ruled/shelf feel, not a bare utility progress bar.
 - Listening summary should use the five emotional rating labels when summarizing mood. Avoid overemphasizing numeric averages.
-- `EditorialActionButton` preserves its provided `title` while loading, so callers should pass specific loading copy such as `Syncing...`, `Retrying...`, or `Saving...`.
+- `EditorialActionButton` (in `components/skins/editorial/EditorialActionButton.tsx`) preserves its provided `title` while loading, so callers should pass specific loading copy such as `Syncing...`, `Retrying...`, or `Saving...`. Its disabled state keeps the resting palette at reduced opacity and never inverts.
 - Country chip renders only when `album_artist_country` is present; `GB` displays as `UK`. Hide the chip when country is null.
 - The spec line should not add genres. The product does not explain picks by genre.
 - Do not use negative `letterSpacing`. It causes text clipping at large accessibility text sizes. Positive tracking values (0.8, 1.2, etc.) for mono/kicker labels are intentional editorial tracking.
@@ -574,6 +585,7 @@ For album detail/share/rating changes:
 Use plans as scoped context, not automatic instructions. Relevant current plans:
 
 - `plans/editorial-redesign-final.md` - current UI direction and final editorial details.
+- `plans/2026-06-11-editorial-visual-polish.md` - shipped editorial polish pass: design tokens, pressed ink/paper inversion, cover plate/crop marks, paper grain, initial cap, rated stamp, archive month grouping, profile ledger, share-card barcode.
 - `plans/editorial-font-fix.md` - why named font utilities are mandatory.
 - `plans/artist-country-chip.md` - country chip data plan and limitations.
 - `plans/discovery-improvements-v2.1.md` - familiar catalog, pool-relative shadow mode, scoring decisions.
