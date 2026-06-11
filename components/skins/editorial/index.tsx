@@ -22,6 +22,7 @@ import { AccentRule } from '@/components/skins/editorial/accent/AccentRule';
 import { AccentText } from '@/components/skins/editorial/accent/AccentText';
 import { EditorialActionButton } from '@/components/skins/editorial/EditorialActionButton';
 import { EditorialAlbumActions } from '@/components/skins/editorial/EditorialAlbumActions';
+import { EditorialCropMarks } from '@/components/skins/editorial/EditorialCropMarks';
 import { EditorialMarker } from '@/components/skins/editorial/EditorialMarker';
 import { EditorialSectionRule } from '@/components/skins/editorial/EditorialSectionRule';
 import { EditorialSpecLine } from '@/components/skins/editorial/EditorialSpecLine';
@@ -347,32 +348,38 @@ function EditorialAlbumDetailView(props: Parameters<SkinComponentSet['AlbumDetai
             >
               {props.album.album_title}
             </Text>
-            <View
-              className="aspect-square w-full overflow-hidden"
-              style={{ backgroundColor: editorialColors.paperAlt, marginTop: -8, zIndex: 1 }}
-            >
-              <Animated.View style={[{ flex: 1 }, coverStyle]}>
-                {props.album.album_cover_url ? (
-                  <CoverImage uri={props.album.album_cover_url} className="h-full w-full" />
-                ) : (
-                  <View className="h-full w-full items-center justify-center px-8">
-                    <BrandMark size={84} muted />
-                    <Text
-                      className="mt-5 text-center font-display text-3xl uppercase"
-                      style={{ color: editorialColors.muted }}
-                    >
-                      Cover unavailable
-                    </Text>
+            <View style={{ marginTop: -14, zIndex: 1, padding: space.s3 }}>
+              <EditorialCropMarks />
+              <View
+                className="aspect-square w-full overflow-hidden border-2"
+                style={{
+                  borderColor: editorialColors.ink,
+                  backgroundColor: editorialColors.paperAlt,
+                }}
+              >
+                <Animated.View style={[{ flex: 1 }, coverStyle]}>
+                  {props.album.album_cover_url ? (
+                    <CoverImage uri={props.album.album_cover_url} className="h-full w-full" />
+                  ) : (
+                    <View className="h-full w-full items-center justify-center px-8">
+                      <BrandMark size={84} muted />
+                      <Text
+                        className="mt-5 text-center font-display text-3xl uppercase"
+                        style={{ color: editorialColors.muted }}
+                      >
+                        Cover unavailable
+                      </Text>
+                    </View>
+                  )}
+                </Animated.View>
+                {markers.length > 0 ? (
+                  <View className="absolute bottom-2 right-2 flex-row gap-2">
+                    {markers.map((marker) => (
+                      <EditorialMarker key={marker} label={marker} />
+                    ))}
                   </View>
-                )}
-              </Animated.View>
-              {markers.length > 0 ? (
-                <View className="absolute bottom-2 right-2 flex-row gap-2">
-                  {markers.map((marker) => (
-                    <EditorialMarker key={marker} label={marker} />
-                  ))}
-                </View>
-              ) : null}
+                ) : null}
+              </View>
             </View>
           </View>
 
