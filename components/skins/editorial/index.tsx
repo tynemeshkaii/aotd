@@ -339,16 +339,18 @@ function EditorialAlbumDetailView(props: Parameters<SkinComponentSet['AlbumDetai
           </View>
 
           <View style={{ marginTop: space.s6 }}>
-            <Text
-              className="uppercase"
-              style={[type.display34, { color: editorialColors.ink, zIndex: 2 }]}
-              numberOfLines={4}
-              adjustsFontSizeToFit
-              minimumFontScale={0.8}
-              maxFontSizeMultiplier={1.4}
-            >
-              {props.album.album_title}
-            </Text>
+            <View style={{ zIndex: 2 }}>
+              <Text
+                className="uppercase"
+                style={[type.display34, { color: editorialColors.ink }]}
+                numberOfLines={4}
+                adjustsFontSizeToFit
+                minimumFontScale={0.8}
+                maxFontSizeMultiplier={1.4}
+              >
+                {props.album.album_title}
+              </Text>
+            </View>
             <View style={{ marginTop: -14, zIndex: 1, padding: space.s3 }}>
               <EditorialCropMarks />
               <View
