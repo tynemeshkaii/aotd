@@ -20,6 +20,7 @@ import { SpotifyButton } from '@/components/auth/SpotifyButton';
 import { BrandMark } from '@/components/brand/BrandMark';
 import { AccentRule } from '@/components/skins/editorial/accent/AccentRule';
 import { AccentText } from '@/components/skins/editorial/accent/AccentText';
+import { EditorialActionButton } from '@/components/skins/editorial/EditorialActionButton';
 import { EditorialAlbumActions } from '@/components/skins/editorial/EditorialAlbumActions';
 import { EditorialMarker } from '@/components/skins/editorial/EditorialMarker';
 import { EditorialSectionRule } from '@/components/skins/editorial/EditorialSectionRule';
@@ -146,59 +147,6 @@ function albumCoverMarkers(album: AlbumDiscovery) {
     album.album_release_year?.toString(),
     formatArtistCountry(album.album_artist_country),
   ].filter((item): item is string => Boolean(item));
-}
-
-function EditorialActionButton({
-  title,
-  onPress,
-  loading,
-  disabled,
-  tone = 'ink',
-}: {
-  title: string;
-  onPress: () => void;
-  loading?: boolean;
-  disabled?: boolean;
-  tone?: 'ink' | 'paper' | 'red';
-}) {
-  const isDisabled = disabled || loading;
-  const borderColor = tone === 'red' ? editorialColors.red : editorialColors.ink;
-  const backgroundColor = tone === 'ink' ? editorialColors.ink : 'transparent';
-  const foregroundColor =
-    tone === 'ink'
-      ? editorialColors.paper
-      : tone === 'red'
-        ? editorialColors.red
-        : editorialColors.ink;
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityState={{ disabled: !!isDisabled, busy: !!loading }}
-      disabled={isDisabled}
-      onPress={() => {
-        haptics.impactLight();
-        onPress();
-      }}
-      className={`min-h-12 flex-row items-center justify-center gap-2 border-2 px-4 py-3 active:opacity-70 ${
-        isDisabled ? 'opacity-60' : ''
-      }`}
-      style={{
-        borderColor,
-        backgroundColor,
-      }}
-    >
-      {loading ? <ActivityIndicator color={foregroundColor} size="small" /> : null}
-      <Text
-        className="font-mono-bold text-xs uppercase leading-4"
-        style={{
-          color: foregroundColor,
-          letterSpacing: tracking.label,
-        }}
-      >
-        {title}
-      </Text>
-    </Pressable>
-  );
 }
 
 function EditorialRatingEditor({ album }: { album: AlbumDiscovery }) {
