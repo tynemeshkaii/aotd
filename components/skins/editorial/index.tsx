@@ -26,6 +26,7 @@ import { EditorialCropMarks } from '@/components/skins/editorial/EditorialCropMa
 import { EditorialMarker } from '@/components/skins/editorial/EditorialMarker';
 import { EditorialSectionRule } from '@/components/skins/editorial/EditorialSectionRule';
 import { EditorialSpecLine } from '@/components/skins/editorial/EditorialSpecLine';
+import { PaperGrain } from '@/components/skins/editorial/PaperGrain';
 import { editorialColors, ratingTone, space, tracking } from '@/components/skins/shared/skinStyles';
 import { Avatar } from '@/components/ui/Avatar';
 import { CoverImage } from '@/components/ui/CoverImage';
@@ -438,6 +439,7 @@ function EditorialAlbumDetailView(props: Parameters<SkinComponentSet['AlbumDetai
           {props.footer ? <View style={{ marginTop: space.s6 }}>{props.footer}</View> : null}
         </View>
       </Animated.ScrollView>
+      <PaperGrain />
     </View>
   );
 }
@@ -614,6 +616,7 @@ function EditorialDiscoveriesView(props: Parameters<SkinComponentSet['Discoverie
           />
         )}
       </View>
+      <PaperGrain />
     </View>
   );
 }
@@ -876,278 +879,280 @@ function EditorialProfileView(props: Parameters<SkinComponentSet['ProfileView']>
   const listening = props.overview?.listening;
 
   return (
-    <ScrollView
-      className="flex-1"
-      contentContainerStyle={{
-        paddingHorizontal: 20,
-        paddingTop: Math.max(16, insets.top + 8),
-        paddingBottom: bottomPadding,
-        gap: 24,
-      }}
-      style={{ backgroundColor: editorialColors.paper }}
-      showsVerticalScrollIndicator={false}
-      refreshControl={
-        <RefreshControl
-          refreshing={props.refreshing}
-          onRefresh={props.onRefresh}
-          tintColor={editorialColors.ink}
-          colors={[editorialColors.ink]}
-          progressViewOffset={insets.top}
-        />
-      }
-    >
-      <View className="gap-3">
-        <Text
-          className="font-display text-[54px] uppercase leading-[52px]"
-          style={{ color: editorialColors.ink, letterSpacing: 0 }}
-          maxFontSizeMultiplier={1.3}
-          adjustsFontSizeToFit
-          numberOfLines={1}
-        >
-          Colophon
-        </Text>
-        <AccentRule />
-        <Text
-          className="font-mono text-[11px] uppercase leading-4"
-          style={{ color: editorialColors.muted, letterSpacing: tracking.label }}
-        >
-          LISTENING LEDGER / PRIVATE EDITION
-        </Text>
-      </View>
-
-      <View className="border-y-2 py-4" style={{ borderColor: editorialColors.ink }}>
-        <View className="flex-row gap-4">
-          <View className="pt-1">
-            {props.profileLoading ? (
-              <Skeleton className="h-[84px] w-[84px] rounded-none" />
-            ) : (
-              <Avatar
-                label={props.profile?.display_name}
-                size={84}
-                uri={props.profile?.avatar_url}
-                rounded={false}
-              />
-            )}
-          </View>
-          <View className="min-w-0 flex-1">
-            <Text
-              className="font-mono-bold text-[10px] uppercase leading-4"
-              style={{ color: editorialColors.muted, letterSpacing: tracking.label }}
-            >
-              PRIVATE LISTENING IDENTITY
-            </Text>
-            {props.profileLoading ? (
-              <View className="mt-2 gap-2">
-                <Skeleton className="h-8 w-full rounded-none" />
-                <Skeleton className="h-5 w-4/5 rounded-none" />
-              </View>
-            ) : (
-              <>
-                <Text
-                  className="mt-1 font-display text-3xl leading-8"
-                  style={{ color: editorialColors.ink, letterSpacing: 0 }}
-                  numberOfLines={3}
-                  maxFontSizeMultiplier={1.4}
-                >
-                  {props.profile?.display_name ?? 'Spotify listener'}
-                </Text>
-                <Text
-                  className="mt-2 font-prose text-sm leading-5"
-                  style={{ color: editorialColors.muted }}
-                >
-                  {heroSubtitle}
-                </Text>
-              </>
-            )}
-          </View>
-        </View>
-      </View>
-
-      <View className="flex-row gap-3">
-        <LedgerStat value={String(streak)} label="day streak" loading={props.overviewLoading} />
-        <LedgerStat value={String(discovered)} label="issues" loading={props.overviewLoading} />
-        <LedgerStat value={String(rated)} label="rated" loading={props.overviewLoading} />
-      </View>
-
-      <View className="gap-4">
-        <EditorialSectionRule title="Taste map" aside="source material" major />
-        {props.overviewLoading ? (
-          <View className="gap-3">
-            <Skeleton className="h-16 w-full rounded-none" />
-            <Skeleton className="h-16 w-full rounded-none" />
-            <Skeleton className="h-24 w-full rounded-none" />
-          </View>
-        ) : props.overview && (artists.length > 0 || decades.length > 0) ? (
-          <View className="gap-5">
-            <LibrarySpanLine
-              min={props.overview.taste.span_min}
-              max={props.overview.taste.span_max}
-            />
-            {artists.length > 0 ? (
-              <View className="gap-3">
-                {artists.slice(0, 6).map((artist, index) => (
-                  <View
-                    key={artist.name}
-                    className="border-2 px-3 py-3"
-                    style={{ borderColor: editorialColors.ink }}
-                  >
-                    <View className="flex-row items-start gap-3">
-                      <Text
-                        className="w-9 font-mono-bold text-[11px] uppercase leading-5"
-                        style={{ color: editorialColors.muted, letterSpacing: tracking.label }}
-                      >
-                        {String(index + 1).padStart(2, '0')}
-                      </Text>
-                      <Text
-                        className="min-w-0 flex-1 font-prose-bold text-lg leading-6"
-                        style={{ color: editorialColors.ink }}
-                        numberOfLines={2}
-                      >
-                        {artist.name}
-                      </Text>
-                      <View className="min-w-[54px] items-end">
-                        <Text
-                          className="font-mono-bold text-[11px] uppercase leading-5"
-                          style={{ color: editorialColors.ink, letterSpacing: tracking.label }}
-                        >
-                          {artist.count}
-                        </Text>
-                        <Text
-                          className="font-mono text-[10px] uppercase leading-4"
-                          style={{ color: editorialColors.muted, letterSpacing: tracking.label }}
-                        >
-                          saves
-                        </Text>
-                      </View>
-                    </View>
-                  </View>
-                ))}
-              </View>
-            ) : null}
-            {decades.length > 0 ? (
-              <View className="gap-3">
-                {decades.map((decade) => (
-                  <View key={decade.decade} className="gap-2">
-                    <View className="flex-row items-end justify-between gap-3">
-                      <Text
-                        className="font-mono-bold text-[11px] uppercase"
-                        style={{ color: editorialColors.ink, letterSpacing: tracking.label }}
-                      >
-                        {decade.decade}s
-                      </Text>
-                      <Text
-                        className="font-mono text-[11px] uppercase"
-                        style={{ color: editorialColors.muted, letterSpacing: tracking.label }}
-                      >
-                        {decade.count} albums
-                      </Text>
-                    </View>
-                    <View
-                      className="h-5 border-2 p-[2px]"
-                      style={{ borderColor: editorialColors.ink }}
-                    >
-                      <View
-                        className="h-full"
-                        style={{
-                          width: `${maxDecade ? Math.max(4, (decade.count / maxDecade) * 100) : 0}%`,
-                          backgroundColor: editorialColors.ink,
-                        }}
-                      />
-                    </View>
-                  </View>
-                ))}
-              </View>
-            ) : null}
-          </View>
-        ) : (
-          <Text className="font-prose text-sm leading-5" style={{ color: editorialColors.muted }}>
-            As soon as your library finishes importing, your top artists and eras show up here.
+    <View className="flex-1" style={{ backgroundColor: editorialColors.paper }}>
+      <ScrollView
+        className="flex-1"
+        contentContainerStyle={{
+          paddingHorizontal: 20,
+          paddingTop: Math.max(16, insets.top + 8),
+          paddingBottom: bottomPadding,
+          gap: 24,
+        }}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={props.refreshing}
+            onRefresh={props.onRefresh}
+            tintColor={editorialColors.ink}
+            colors={[editorialColors.ink]}
+            progressViewOffset={insets.top}
+          />
+        }
+      >
+        <View className="gap-3">
+          <Text
+            className="font-display text-[54px] uppercase leading-[52px]"
+            style={{ color: editorialColors.ink, letterSpacing: 0 }}
+            maxFontSizeMultiplier={1.3}
+            adjustsFontSizeToFit
+            numberOfLines={1}
+          >
+            Colophon
           </Text>
-        )}
-      </View>
-
-      <View className="gap-4">
-        <EditorialSectionRule title="Listening" aside="private journal" major />
-        {props.overviewLoading ? (
-          <View className="gap-3">
-            <Skeleton className="h-16 w-full rounded-none" />
-            <Skeleton className="h-12 w-full rounded-none" />
-          </View>
-        ) : listening?.total_rated ? (
-          <View className="gap-3">
-            <View className="border-2 p-3" style={{ borderColor: editorialColors.ink }}>
-              <Text
-                className="font-mono-bold text-[11px] uppercase leading-4"
-                style={{ color: editorialColors.muted, letterSpacing: tracking.label }}
-              >
-                Current journal mood
-              </Text>
-              <Text
-                className="mt-2 font-display text-3xl uppercase leading-8"
-                style={{ color: editorialColors.ink, letterSpacing: 0 }}
-              >
-                {listeningMoodLabel(listening.avg_score)}
-              </Text>
-            </View>
-            <View className="flex-row gap-3">
-              <LedgerStat value={String(listening.rated_this_month)} label="rated this month" />
-              <LedgerStat value={String(listening.loved_count)} label="loved" />
-            </View>
-            <EditorialArchiveLink onPress={props.onOpenRatedDiscoveries} />
-          </View>
-        ) : (
-          <Text className="font-prose text-sm leading-5" style={{ color: editorialColors.muted }}>
-            Rate a discovery and this becomes your private listening ledger.
-          </Text>
-        )}
-      </View>
-
-      <View className="gap-4 pt-2">
-        <EditorialSectionRule title="Production notes" aside="library" major />
-        <Text
-          className="font-mono text-[11px] uppercase leading-5"
-          style={{ color: editorialColors.muted, letterSpacing: tracking.label }}
-        >
-          {props.libraryStatsLoading
-            ? 'Loading...'
-            : props.libraryStats?.albumsTracked == null
-              ? 'Not synced yet'
-              : `${props.libraryStats.albumsTracked} albums tracked`}
-          {props.libraryStats?.lastSyncedAt
-            ? ` / synced ${relativeTime(props.libraryStats.lastSyncedAt)}`
-            : ''}
-        </Text>
-        <EditorialSyncBanner status={props.syncStatus} />
-        <EditorialActionButton
-          disabled={props.isSyncing}
-          loading={props.isSyncing}
-          onPress={props.onSyncNow}
-          title={props.isSyncing ? 'Syncing...' : 'Sync library now'}
-          tone="paper"
-        />
-      </View>
-
-      <View className="gap-4">
-        <EditorialSectionRule title="Connections" aside="spotify" major />
-        <Text className="font-prose text-base leading-6" style={{ color: editorialColors.ink }}>
-          {props.connection
-            ? `Spotify connected${props.profile?.display_name ? ` as ${props.profile.display_name}` : ''}`
-            : 'No Spotify connection yet'}
-        </Text>
-        {props.connection?.connected_at ? (
+          <AccentRule />
           <Text
             className="font-mono text-[11px] uppercase leading-4"
             style={{ color: editorialColors.muted, letterSpacing: tracking.label }}
           >
-            Connected {relativeTime(props.connection.connected_at)}
+            LISTENING LEDGER / PRIVATE EDITION
           </Text>
-        ) : null}
-      </View>
+        </View>
 
-      <View className="mt-3 border-t-2 pt-6" style={{ borderColor: editorialColors.ink }}>
-        <EditorialActionButton title="Log out" tone="red" onPress={props.onSignOut} />
-      </View>
-    </ScrollView>
+        <View className="border-y-2 py-4" style={{ borderColor: editorialColors.ink }}>
+          <View className="flex-row gap-4">
+            <View className="pt-1">
+              {props.profileLoading ? (
+                <Skeleton className="h-[84px] w-[84px] rounded-none" />
+              ) : (
+                <Avatar
+                  label={props.profile?.display_name}
+                  size={84}
+                  uri={props.profile?.avatar_url}
+                  rounded={false}
+                />
+              )}
+            </View>
+            <View className="min-w-0 flex-1">
+              <Text
+                className="font-mono-bold text-[10px] uppercase leading-4"
+                style={{ color: editorialColors.muted, letterSpacing: tracking.label }}
+              >
+                PRIVATE LISTENING IDENTITY
+              </Text>
+              {props.profileLoading ? (
+                <View className="mt-2 gap-2">
+                  <Skeleton className="h-8 w-full rounded-none" />
+                  <Skeleton className="h-5 w-4/5 rounded-none" />
+                </View>
+              ) : (
+                <>
+                  <Text
+                    className="mt-1 font-display text-3xl leading-8"
+                    style={{ color: editorialColors.ink, letterSpacing: 0 }}
+                    numberOfLines={3}
+                    maxFontSizeMultiplier={1.4}
+                  >
+                    {props.profile?.display_name ?? 'Spotify listener'}
+                  </Text>
+                  <Text
+                    className="mt-2 font-prose text-sm leading-5"
+                    style={{ color: editorialColors.muted }}
+                  >
+                    {heroSubtitle}
+                  </Text>
+                </>
+              )}
+            </View>
+          </View>
+        </View>
+
+        <View className="flex-row gap-3">
+          <LedgerStat value={String(streak)} label="day streak" loading={props.overviewLoading} />
+          <LedgerStat value={String(discovered)} label="issues" loading={props.overviewLoading} />
+          <LedgerStat value={String(rated)} label="rated" loading={props.overviewLoading} />
+        </View>
+
+        <View className="gap-4">
+          <EditorialSectionRule title="Taste map" aside="source material" major />
+          {props.overviewLoading ? (
+            <View className="gap-3">
+              <Skeleton className="h-16 w-full rounded-none" />
+              <Skeleton className="h-16 w-full rounded-none" />
+              <Skeleton className="h-24 w-full rounded-none" />
+            </View>
+          ) : props.overview && (artists.length > 0 || decades.length > 0) ? (
+            <View className="gap-5">
+              <LibrarySpanLine
+                min={props.overview.taste.span_min}
+                max={props.overview.taste.span_max}
+              />
+              {artists.length > 0 ? (
+                <View className="gap-3">
+                  {artists.slice(0, 6).map((artist, index) => (
+                    <View
+                      key={artist.name}
+                      className="border-2 px-3 py-3"
+                      style={{ borderColor: editorialColors.ink }}
+                    >
+                      <View className="flex-row items-start gap-3">
+                        <Text
+                          className="w-9 font-mono-bold text-[11px] uppercase leading-5"
+                          style={{ color: editorialColors.muted, letterSpacing: tracking.label }}
+                        >
+                          {String(index + 1).padStart(2, '0')}
+                        </Text>
+                        <Text
+                          className="min-w-0 flex-1 font-prose-bold text-lg leading-6"
+                          style={{ color: editorialColors.ink }}
+                          numberOfLines={2}
+                        >
+                          {artist.name}
+                        </Text>
+                        <View className="min-w-[54px] items-end">
+                          <Text
+                            className="font-mono-bold text-[11px] uppercase leading-5"
+                            style={{ color: editorialColors.ink, letterSpacing: tracking.label }}
+                          >
+                            {artist.count}
+                          </Text>
+                          <Text
+                            className="font-mono text-[10px] uppercase leading-4"
+                            style={{ color: editorialColors.muted, letterSpacing: tracking.label }}
+                          >
+                            saves
+                          </Text>
+                        </View>
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              ) : null}
+              {decades.length > 0 ? (
+                <View className="gap-3">
+                  {decades.map((decade) => (
+                    <View key={decade.decade} className="gap-2">
+                      <View className="flex-row items-end justify-between gap-3">
+                        <Text
+                          className="font-mono-bold text-[11px] uppercase"
+                          style={{ color: editorialColors.ink, letterSpacing: tracking.label }}
+                        >
+                          {decade.decade}s
+                        </Text>
+                        <Text
+                          className="font-mono text-[11px] uppercase"
+                          style={{ color: editorialColors.muted, letterSpacing: tracking.label }}
+                        >
+                          {decade.count} albums
+                        </Text>
+                      </View>
+                      <View
+                        className="h-5 border-2 p-[2px]"
+                        style={{ borderColor: editorialColors.ink }}
+                      >
+                        <View
+                          className="h-full"
+                          style={{
+                            width: `${maxDecade ? Math.max(4, (decade.count / maxDecade) * 100) : 0}%`,
+                            backgroundColor: editorialColors.ink,
+                          }}
+                        />
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              ) : null}
+            </View>
+          ) : (
+            <Text className="font-prose text-sm leading-5" style={{ color: editorialColors.muted }}>
+              As soon as your library finishes importing, your top artists and eras show up here.
+            </Text>
+          )}
+        </View>
+
+        <View className="gap-4">
+          <EditorialSectionRule title="Listening" aside="private journal" major />
+          {props.overviewLoading ? (
+            <View className="gap-3">
+              <Skeleton className="h-16 w-full rounded-none" />
+              <Skeleton className="h-12 w-full rounded-none" />
+            </View>
+          ) : listening?.total_rated ? (
+            <View className="gap-3">
+              <View className="border-2 p-3" style={{ borderColor: editorialColors.ink }}>
+                <Text
+                  className="font-mono-bold text-[11px] uppercase leading-4"
+                  style={{ color: editorialColors.muted, letterSpacing: tracking.label }}
+                >
+                  Current journal mood
+                </Text>
+                <Text
+                  className="mt-2 font-display text-3xl uppercase leading-8"
+                  style={{ color: editorialColors.ink, letterSpacing: 0 }}
+                >
+                  {listeningMoodLabel(listening.avg_score)}
+                </Text>
+              </View>
+              <View className="flex-row gap-3">
+                <LedgerStat value={String(listening.rated_this_month)} label="rated this month" />
+                <LedgerStat value={String(listening.loved_count)} label="loved" />
+              </View>
+              <EditorialArchiveLink onPress={props.onOpenRatedDiscoveries} />
+            </View>
+          ) : (
+            <Text className="font-prose text-sm leading-5" style={{ color: editorialColors.muted }}>
+              Rate a discovery and this becomes your private listening ledger.
+            </Text>
+          )}
+        </View>
+
+        <View className="gap-4 pt-2">
+          <EditorialSectionRule title="Production notes" aside="library" major />
+          <Text
+            className="font-mono text-[11px] uppercase leading-5"
+            style={{ color: editorialColors.muted, letterSpacing: tracking.label }}
+          >
+            {props.libraryStatsLoading
+              ? 'Loading...'
+              : props.libraryStats?.albumsTracked == null
+                ? 'Not synced yet'
+                : `${props.libraryStats.albumsTracked} albums tracked`}
+            {props.libraryStats?.lastSyncedAt
+              ? ` / synced ${relativeTime(props.libraryStats.lastSyncedAt)}`
+              : ''}
+          </Text>
+          <EditorialSyncBanner status={props.syncStatus} />
+          <EditorialActionButton
+            disabled={props.isSyncing}
+            loading={props.isSyncing}
+            onPress={props.onSyncNow}
+            title={props.isSyncing ? 'Syncing...' : 'Sync library now'}
+            tone="paper"
+          />
+        </View>
+
+        <View className="gap-4">
+          <EditorialSectionRule title="Connections" aside="spotify" major />
+          <Text className="font-prose text-base leading-6" style={{ color: editorialColors.ink }}>
+            {props.connection
+              ? `Spotify connected${props.profile?.display_name ? ` as ${props.profile.display_name}` : ''}`
+              : 'No Spotify connection yet'}
+          </Text>
+          {props.connection?.connected_at ? (
+            <Text
+              className="font-mono text-[11px] uppercase leading-4"
+              style={{ color: editorialColors.muted, letterSpacing: tracking.label }}
+            >
+              Connected {relativeTime(props.connection.connected_at)}
+            </Text>
+          ) : null}
+        </View>
+
+        <View className="mt-3 border-t-2 pt-6" style={{ borderColor: editorialColors.ink }}>
+          <EditorialActionButton title="Log out" tone="red" onPress={props.onSignOut} />
+        </View>
+      </ScrollView>
+      <PaperGrain />
+    </View>
   );
 }
 
@@ -1190,6 +1195,7 @@ function EditorialSignInView({ loading, onSignIn }: Parameters<SkinComponentSet[
           private.
         </Text>
       </View>
+      <PaperGrain />
     </View>
   );
 }
@@ -1245,6 +1251,7 @@ function EditorialInitialSyncingView(props: Parameters<SkinComponentSet['Initial
       ) : (
         <ActivityIndicator color={editorialColors.accentStatic} />
       )}
+      <PaperGrain />
     </View>
   );
 }
@@ -1317,6 +1324,7 @@ function EditorialShareCard({ album }: { album: AlbumDiscovery }) {
       >
         {spotifyAlbumUrl(album.album_spotify_id)}
       </Text>
+      <PaperGrain opacity={0.06} />
     </View>
   );
 }
