@@ -522,6 +522,51 @@ function ListSkeleton() {
   );
 }
 
+type ArchiveListItem =
+  | { kind: 'header'; key: string; label: string }
+  | { kind: 'row'; key: string; album: AlbumDiscovery; firstInGroup: boolean; isLast: boolean };
+
+function monthLabel(pickDate: string) {
+  return new Date(`${pickDate}T12:00:00`)
+    .toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+    .toUpperCase();
+}
+
+function buildArchiveItems(albums: AlbumDiscovery[]): ArchiveListItem[] {
+  const items: ArchiveListItem[] = [];
+  let currentMonth: string | null = null;
+  albums.forEach((album, index) => {
+    const label = monthLabel(album.pick_date);
+    const firstInGroup = label !== currentMonth;
+    if (firstInGroup) {
+      currentMonth = label;
+      items.push({ kind: 'header', key: `month-${label}`, label });
+    }
+    items.push({
+      kind: 'row',
+      key: album.aotd_id,
+      album,
+      firstInGroup,
+      isLast: index === albums.length - 1,
+    });
+  });
+  return items;
+}
+
+function EditorialArchiveMonthHeader({ label }: { label: string }) {
+  return (
+    <View className="flex-row items-center gap-3 pb-2 pt-5">
+      <Text
+        className="font-mono-bold text-[11px] uppercase leading-4"
+        style={{ color: editorialColors.muted, letterSpacing: tracking.label }}
+      >
+        {label}
+      </Text>
+      <View className="h-[2px] flex-1" style={{ backgroundColor: editorialColors.ink }} />
+    </View>
+  );
+}
+
 function ArchiveFilterTab({
   label,
   selected,
@@ -564,6 +609,7 @@ function ArchiveFilterTab({
 function EditorialDiscoveriesView(props: Parameters<SkinComponentSet['DiscoveriesView']>[0]) {
   const insets = useSafeAreaInsets();
   const bottomPadding = getTabContentBottomPadding(insets.bottom);
+  const items = React.useMemo(() => buildArchiveItems(props.filtered), [props.filtered]);
 
   return (
     <View className="flex-1" style={{ backgroundColor: editorialColors.paper }}>
@@ -628,10 +674,10 @@ function EditorialDiscoveriesView(props: Parameters<SkinComponentSet['Discoverie
             })}
           </View>
         ) : (
-          <Animated.FlatList
-            className="mt-5 flex-1"
+          <Animated.FlatList<ArchiveListItem>
+            className="mt-1 flex-1"
             contentContainerStyle={
-              props.filtered.length
+              items.length
                 ? { paddingBottom: bottomPadding }
                 : { flex: 1, paddingBottom: bottomPadding }
             }
@@ -643,17 +689,21 @@ function EditorialDiscoveriesView(props: Parameters<SkinComponentSet['Discoverie
                 colors={[editorialColors.ink]}
               />
             }
-            data={props.filtered}
-            keyExtractor={(item) => item.aotd_id}
-            renderItem={({ item, index }) => (
-              <EditorialDiscoveryRow
-                album={item}
-                index={index}
-                isFirst={index === 0}
-                isLast={index === props.filtered.length - 1}
-                onPress={() => props.onOpenDiscovery(item)}
-              />
-            )}
+            data={items}
+            keyExtractor={(item) => item.key}
+            renderItem={({ item, index }: { item: ArchiveListItem; index: number }) =>
+              item.kind === 'header' ? (
+                <EditorialArchiveMonthHeader label={item.label} />
+              ) : (
+                <EditorialDiscoveryRow
+                  album={item.album}
+                  index={index}
+                  firstInGroup={item.firstInGroup}
+                  isLast={item.isLast}
+                  onPress={() => props.onOpenDiscovery(item.album)}
+                />
+              )
+            }
             ListEmptyComponent={() => (
               <EditorialArchiveEmptyState title={props.emptyTitle} subtitle={props.emptySubtitle} />
             )}
@@ -739,13 +789,13 @@ function archiveStatus(album: AlbumDiscovery): {
 function EditorialDiscoveryRow({
   album,
   index,
-  isFirst,
+  firstInGroup,
   isLast,
   onPress,
 }: {
   album: AlbumDiscovery;
   index: number;
-  isFirst: boolean;
+  firstInGroup: boolean;
   isLast: boolean;
   onPress: () => void;
 }) {
@@ -768,7 +818,7 @@ function EditorialDiscoveryRow({
       className="min-h-[100px] flex-row gap-3 py-3 active:opacity-80"
       style={{
         borderColor: editorialColors.ink,
-        borderTopWidth: isFirst ? 2 : 1,
+        borderTopWidth: firstInGroup ? 0 : 1,
         borderBottomWidth: isLast ? 2 : 0,
       }}
     >
