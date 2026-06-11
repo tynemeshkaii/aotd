@@ -29,6 +29,7 @@ export function EditorialAlbumActions({ opening, sharing, onOpen, onShare }: Pro
         onPressIn={() => setPressed(true)}
         onPressOut={() => setPressed(false)}
         onPress={() => {
+          setPressed(false);
           haptics.impactLight();
           onOpen();
         }}

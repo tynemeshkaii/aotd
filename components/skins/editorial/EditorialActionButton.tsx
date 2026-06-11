@@ -50,6 +50,7 @@ export function EditorialActionButton({
       onPressIn={() => setPressed(true)}
       onPressOut={() => setPressed(false)}
       onPress={() => {
+        setPressed(false);
         haptics.impactLight();
         onPress();
       }}

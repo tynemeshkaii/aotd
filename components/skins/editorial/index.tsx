@@ -833,6 +833,7 @@ function EditorialArchiveLink({ onPress }: { onPress: () => void }) {
       onPressIn={() => setPressed(true)}
       onPressOut={() => setPressed(false)}
       onPress={() => {
+        setPressed(false);
         haptics.impactLight();
         onPress();
       }}
