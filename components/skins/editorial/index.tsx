@@ -24,7 +24,7 @@ import { EditorialAlbumActions } from '@/components/skins/editorial/EditorialAlb
 import { EditorialMarker } from '@/components/skins/editorial/EditorialMarker';
 import { EditorialSectionRule } from '@/components/skins/editorial/EditorialSectionRule';
 import { EditorialSpecLine } from '@/components/skins/editorial/EditorialSpecLine';
-import { editorialColors, ratingTone } from '@/components/skins/shared/skinStyles';
+import { editorialColors, ratingTone, space, tracking } from '@/components/skins/shared/skinStyles';
 import { Avatar } from '@/components/ui/Avatar';
 import { CoverImage } from '@/components/ui/CoverImage';
 import { ProgressBar } from '@/components/ui/ProgressBar';
@@ -70,13 +70,13 @@ const type = {
     fontFamily: 'SpaceMono_400Regular',
     fontSize: 11,
     lineHeight: 15,
-    letterSpacing: 1.43,
+    letterSpacing: tracking.kicker,
   },
   monoLabel: {
     fontFamily: 'SpaceMono_700Bold',
     fontSize: 11,
     lineHeight: 14,
-    letterSpacing: 1.32,
+    letterSpacing: tracking.kicker,
   },
   proseReason: {
     fontFamily: 'SpaceGrotesk_400Regular',
@@ -104,7 +104,7 @@ const type = {
     fontFamily: 'SpaceMono_700Bold',
     fontSize: 11,
     lineHeight: 14,
-    letterSpacing: 1.1,
+    letterSpacing: tracking.micro,
   },
   archiveTitle: {
     fontFamily: 'Archivo_800ExtraBold',
@@ -116,7 +116,7 @@ const type = {
     fontFamily: 'SpaceMono_400Regular',
     fontSize: 10,
     lineHeight: 14,
-    letterSpacing: 0.95,
+    letterSpacing: tracking.micro,
   },
 } satisfies Record<string, TextStyle>;
 
@@ -192,7 +192,7 @@ function EditorialActionButton({
         className="font-mono-bold text-xs uppercase leading-4"
         style={{
           color: foregroundColor,
-          letterSpacing: 0.8,
+          letterSpacing: tracking.label,
         }}
       >
         {title}
@@ -229,7 +229,12 @@ function EditorialRatingEditor({ album }: { album: AlbumDiscovery }) {
         className="uppercase"
         style={[
           type.monoKicker,
-          { color: editorialColors.muted, fontSize: 10, lineHeight: 16, letterSpacing: 0.9 },
+          {
+            color: editorialColors.muted,
+            fontSize: 10,
+            lineHeight: 16,
+            letterSpacing: tracking.label,
+          },
         ]}
       >
         Private journal only · does not tune tomorrow's pick
@@ -258,7 +263,7 @@ function EditorialRatingEditor({ album }: { album: AlbumDiscovery }) {
                 className="w-8 font-mono-bold text-xs uppercase"
                 style={{
                   color: selected ? ratingTone[option.score] : editorialColors.muted,
-                  letterSpacing: 0.8,
+                  letterSpacing: tracking.label,
                 }}
               >
                 {selected ? 'X' : `0${option.score}`}
@@ -370,7 +375,7 @@ function EditorialAlbumDetailView(props: Parameters<SkinComponentSet['AlbumDetai
             ) : null}
             {props.isToday ? (
               <Text
-                className="mt-[7px] lowercase"
+                className="mt-2 lowercase"
                 style={[type.display34, { color: editorialColors.ink }]}
                 maxFontSizeMultiplier={1.4}
               >
@@ -383,7 +388,7 @@ function EditorialAlbumDetailView(props: Parameters<SkinComponentSet['AlbumDetai
             <AccentRule thickness={3} style={{ marginTop: 12 }} />
           </View>
 
-          <View style={{ marginTop: 22 }}>
+          <View style={{ marginTop: space.s6 }}>
             <Text
               className="uppercase"
               style={[type.display34, { color: editorialColors.ink, zIndex: 2 }]}
@@ -423,18 +428,18 @@ function EditorialAlbumDetailView(props: Parameters<SkinComponentSet['AlbumDetai
             </View>
           </View>
 
-          <View style={{ marginTop: 14 }}>
+          <View style={{ marginTop: space.s4 }}>
             <EditorialSpecLine items={albumSpec(props.album)} />
           </View>
 
-          <View style={{ marginTop: 18 }}>
+          <View style={{ marginTop: space.s5 }}>
             <EditorialSectionRule title="Why this one?" weight="heavy" />
             <Text className="mt-3" style={[type.proseReason, { color: editorialColors.ink }]}>
               {formatSelectionReason(props.album.selection_reason)}
             </Text>
           </View>
 
-          <View style={{ marginTop: 22 }}>
+          <View style={{ marginTop: space.s6 }}>
             <EditorialAlbumActions
               opening={props.opening}
               sharing={props.sharing}
@@ -442,8 +447,8 @@ function EditorialAlbumDetailView(props: Parameters<SkinComponentSet['AlbumDetai
               onShare={props.onShare}
             />
             <Text
-              className="mt-2 font-mono text-[9px] uppercase leading-3"
-              style={{ color: editorialColors.muted, letterSpacing: 0.7 }}
+              className="mt-2 font-mono text-[10px] uppercase leading-4"
+              style={{ color: editorialColors.muted, letterSpacing: tracking.micro }}
             >
               Powered by Spotify
             </Text>
@@ -459,7 +464,7 @@ function EditorialAlbumDetailView(props: Parameters<SkinComponentSet['AlbumDetai
             >
               <Text
                 className="mb-1 font-mono-bold text-[10px] uppercase leading-4"
-                style={{ color: editorialColors.muted, letterSpacing: 0.9 }}
+                style={{ color: editorialColors.muted, letterSpacing: tracking.label }}
               >
                 Spotify Free
               </Text>
@@ -472,10 +477,10 @@ function EditorialAlbumDetailView(props: Parameters<SkinComponentSet['AlbumDetai
             </View>
           ) : null}
 
-          <View style={{ marginTop: props.isFreeSpotify ? 20 : 26 }}>
+          <View style={{ marginTop: props.isFreeSpotify ? space.s5 : space.s6 }}>
             <EditorialRatingEditor album={props.album} />
           </View>
-          {props.footer ? <View style={{ marginTop: 22 }}>{props.footer}</View> : null}
+          {props.footer ? <View style={{ marginTop: space.s6 }}>{props.footer}</View> : null}
         </View>
       </Animated.ScrollView>
     </View>
@@ -770,13 +775,13 @@ function EditorialDiscoveryRow({
           {album.album_title}
         </Text>
         <Text
-          className="mt-[5px] uppercase"
+          className="mt-1 uppercase"
           style={[type.archiveMeta, { color: editorialColors.muted }]}
           numberOfLines={1}
         >
           {album.album_primary_artist_name} / {date}
         </Text>
-        <View className="mt-[9px] self-start">
+        <View className="mt-2 self-start">
           <EditorialMarker label={status.visualLabel} tone={status.tone} style={status.style} />
         </View>
       </View>
@@ -822,7 +827,7 @@ function LedgerStat({
       )}
       <Text
         className="mt-1 font-mono text-[10px] uppercase leading-4"
-        style={{ color: editorialColors.muted, letterSpacing: 0.8 }}
+        style={{ color: editorialColors.muted, letterSpacing: tracking.label }}
       >
         {label}
       </Text>
@@ -845,7 +850,7 @@ function LibrarySpanLine({ min, max }: { min: number | null; max: number | null 
   return (
     <Text
       className="font-mono text-[11px] uppercase leading-5"
-      style={{ color: editorialColors.muted, letterSpacing: 0.8 }}
+      style={{ color: editorialColors.muted, letterSpacing: tracking.label }}
     >
       {copy.profile.librarySpan(min, max)}
     </Text>
@@ -865,7 +870,7 @@ function EditorialArchiveLink({ onPress }: { onPress: () => void }) {
     >
       <Text
         className="font-mono-bold text-xs uppercase leading-4"
-        style={{ color: editorialColors.ink, letterSpacing: 0.8 }}
+        style={{ color: editorialColors.ink, letterSpacing: tracking.label }}
       >
         Open rated archive
       </Text>
@@ -922,7 +927,7 @@ function EditorialProfileView(props: Parameters<SkinComponentSet['ProfileView']>
         <AccentRule />
         <Text
           className="font-mono text-[11px] uppercase leading-4"
-          style={{ color: editorialColors.muted, letterSpacing: 0.8 }}
+          style={{ color: editorialColors.muted, letterSpacing: tracking.label }}
         >
           LISTENING LEDGER / PRIVATE EDITION
         </Text>
@@ -945,7 +950,7 @@ function EditorialProfileView(props: Parameters<SkinComponentSet['ProfileView']>
           <View className="min-w-0 flex-1">
             <Text
               className="font-mono-bold text-[10px] uppercase leading-4"
-              style={{ color: editorialColors.muted, letterSpacing: 0.8 }}
+              style={{ color: editorialColors.muted, letterSpacing: tracking.label }}
             >
               PRIVATE LISTENING IDENTITY
             </Text>
@@ -1007,7 +1012,7 @@ function EditorialProfileView(props: Parameters<SkinComponentSet['ProfileView']>
                     <View className="flex-row items-start gap-3">
                       <Text
                         className="w-9 font-mono-bold text-[11px] uppercase leading-5"
-                        style={{ color: editorialColors.muted, letterSpacing: 0.8 }}
+                        style={{ color: editorialColors.muted, letterSpacing: tracking.label }}
                       >
                         {String(index + 1).padStart(2, '0')}
                       </Text>
@@ -1021,13 +1026,13 @@ function EditorialProfileView(props: Parameters<SkinComponentSet['ProfileView']>
                       <View className="min-w-[54px] items-end">
                         <Text
                           className="font-mono-bold text-[11px] uppercase leading-5"
-                          style={{ color: editorialColors.ink, letterSpacing: 0.8 }}
+                          style={{ color: editorialColors.ink, letterSpacing: tracking.label }}
                         >
                           {artist.count}
                         </Text>
                         <Text
                           className="font-mono text-[10px] uppercase leading-4"
-                          style={{ color: editorialColors.muted, letterSpacing: 0.8 }}
+                          style={{ color: editorialColors.muted, letterSpacing: tracking.label }}
                         >
                           saves
                         </Text>
@@ -1044,13 +1049,13 @@ function EditorialProfileView(props: Parameters<SkinComponentSet['ProfileView']>
                     <View className="flex-row items-end justify-between gap-3">
                       <Text
                         className="font-mono-bold text-[11px] uppercase"
-                        style={{ color: editorialColors.ink, letterSpacing: 0.8 }}
+                        style={{ color: editorialColors.ink, letterSpacing: tracking.label }}
                       >
                         {decade.decade}s
                       </Text>
                       <Text
                         className="font-mono text-[11px] uppercase"
-                        style={{ color: editorialColors.muted, letterSpacing: 0.8 }}
+                        style={{ color: editorialColors.muted, letterSpacing: tracking.label }}
                       >
                         {decade.count} albums
                       </Text>
@@ -1091,7 +1096,7 @@ function EditorialProfileView(props: Parameters<SkinComponentSet['ProfileView']>
             <View className="border-2 p-3" style={{ borderColor: editorialColors.ink }}>
               <Text
                 className="font-mono-bold text-[11px] uppercase leading-4"
-                style={{ color: editorialColors.muted, letterSpacing: 0.8 }}
+                style={{ color: editorialColors.muted, letterSpacing: tracking.label }}
               >
                 Current journal mood
               </Text>
@@ -1119,7 +1124,7 @@ function EditorialProfileView(props: Parameters<SkinComponentSet['ProfileView']>
         <EditorialSectionRule title="Production notes" aside="library" major />
         <Text
           className="font-mono text-[11px] uppercase leading-5"
-          style={{ color: editorialColors.muted, letterSpacing: 0.8 }}
+          style={{ color: editorialColors.muted, letterSpacing: tracking.label }}
         >
           {props.libraryStatsLoading
             ? 'Loading...'
@@ -1150,7 +1155,7 @@ function EditorialProfileView(props: Parameters<SkinComponentSet['ProfileView']>
         {props.connection?.connected_at ? (
           <Text
             className="font-mono text-[11px] uppercase leading-4"
-            style={{ color: editorialColors.muted, letterSpacing: 0.8 }}
+            style={{ color: editorialColors.muted, letterSpacing: tracking.label }}
           >
             Connected {relativeTime(props.connection.connected_at)}
           </Text>
@@ -1188,7 +1193,7 @@ function EditorialSignInView({ loading, onSignIn }: Parameters<SkinComponentSet[
         </Text>
         <Text
           className="font-mono text-[11px] uppercase leading-4"
-          style={{ color: editorialColors.muted, letterSpacing: 0.8 }}
+          style={{ color: editorialColors.muted, letterSpacing: tracking.label }}
         >
           ( private journal / no genre math / no skips )
         </Text>
@@ -1279,7 +1284,7 @@ function EditorialShareCard({ album }: { album: AlbumDiscovery }) {
           <View className="mt-5 h-2" style={{ backgroundColor: editorialColors.accentStatic }} />
           <Text
             className="mt-4 font-mono-bold text-2xl uppercase"
-            style={{ color: editorialColors.muted, letterSpacing: 1.2 }}
+            style={{ color: editorialColors.muted, letterSpacing: tracking.kicker }}
           >
             No. {issueNo(album)} / {formatIssueDate(album.pick_date)}
           </Text>
@@ -1299,7 +1304,7 @@ function EditorialShareCard({ album }: { album: AlbumDiscovery }) {
               <BrandMark size={108} muted />
               <Text
                 className="mt-8 font-mono-bold text-2xl uppercase"
-                style={{ color: editorialColors.muted, letterSpacing: 1.2 }}
+                style={{ color: editorialColors.muted, letterSpacing: tracking.kicker }}
               >
                 Artwork unavailable
               </Text>
@@ -1511,7 +1516,7 @@ function EditorialSyncBannerContent({ status }: { status: LibrarySyncStatus | nu
     >
       <Text
         className="mb-2 font-mono text-[11px] uppercase leading-4"
-        style={{ color: editorialColors.ink, letterSpacing: 0.8 }}
+        style={{ color: editorialColors.ink, letterSpacing: tracking.label }}
       >
         Importing your library... {processed} / {total || '?'}
       </Text>
