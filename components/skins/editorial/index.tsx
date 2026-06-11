@@ -201,17 +201,6 @@ function EditorialActionButton({
   );
 }
 
-function EditorialWhyRule() {
-  return (
-    <View className="flex-row items-center gap-[10px]">
-      <Text className="uppercase" style={[type.monoLabel, { color: editorialColors.ink }]}>
-        Why this one?
-      </Text>
-      <View className="h-[3px] flex-1" style={{ backgroundColor: editorialColors.ink }} />
-    </View>
-  );
-}
-
 function EditorialRatingEditor({ album }: { album: AlbumDiscovery }) {
   const [score, setScore] = React.useState<RatingScore | null>(album.rating_score);
   const [comment, setComment] = React.useState(album.rating_comment ?? '');
@@ -439,7 +428,7 @@ function EditorialAlbumDetailView(props: Parameters<SkinComponentSet['AlbumDetai
           </View>
 
           <View style={{ marginTop: 18 }}>
-            <EditorialWhyRule />
+            <EditorialSectionRule title="Why this one?" weight="heavy" />
             <Text className="mt-3" style={[type.proseReason, { color: editorialColors.ink }]}>
               {formatSelectionReason(props.album.selection_reason)}
             </Text>
