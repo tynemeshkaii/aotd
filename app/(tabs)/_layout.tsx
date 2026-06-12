@@ -37,7 +37,7 @@ function EditorialTabIcon({ focused, color, label, icon, focusedIcon }: Editoria
       style={{
         height: itemHeight,
         minWidth: 96,
-        paddingTop: 10,
+        paddingTop: 9,
         paddingBottom: 4,
       }}
     >
@@ -47,7 +47,7 @@ function EditorialTabIcon({ focused, color, label, icon, focusedIcon }: Editoria
             position: 'absolute',
             top: 0,
             alignSelf: 'center',
-            width: 48,
+            width: 52,
             height: 3,
             backgroundColor: tabBar.activeIndicatorColor,
           }}
@@ -87,7 +87,7 @@ function EditorialTabButton({ onPress, ...props }: BottomTabBarButtonProps) {
         haptics.selection();
         onPress?.(event);
       }}
-      pressOpacity={0.72}
+      pressOpacity={0.82}
     />
   );
 }
@@ -118,7 +118,7 @@ export default function TabsLayout() {
           paddingBottom: tabBarBottomPadding,
           backgroundColor: chrome.tabBar.backgroundColor,
           borderTopColor: chrome.tabBar.borderTopColor,
-          borderTopWidth: chrome.tabBar.borderTopWidth,
+          borderTopWidth: Math.max(3, chrome.tabBar.borderTopWidth),
         },
         tabBarItemStyle: {
           borderRadius: 0,

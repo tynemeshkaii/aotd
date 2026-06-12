@@ -27,7 +27,15 @@ import { EditorialMarker } from '@/components/skins/editorial/EditorialMarker';
 import { EditorialSectionRule } from '@/components/skins/editorial/EditorialSectionRule';
 import { EditorialSpecLine } from '@/components/skins/editorial/EditorialSpecLine';
 import { PaperGrain } from '@/components/skins/editorial/PaperGrain';
-import { editorialColors, ratingTone, space, tracking } from '@/components/skins/shared/skinStyles';
+import {
+  editorialColors,
+  editorialType,
+  ratingTone,
+  ruleWeight,
+  space,
+  tracking,
+  zIndex,
+} from '@/components/skins/shared/skinStyles';
 import { Avatar } from '@/components/ui/Avatar';
 import { CoverImage } from '@/components/ui/CoverImage';
 import { ProgressBar } from '@/components/ui/ProgressBar';
@@ -62,66 +70,7 @@ const filterLabels: Record<DiscoveryFilter, string> = {
 const skeletonRows = ['one', 'two', 'three', 'four', 'five', 'six'];
 const seenDiscoveryRows = new Set<string>();
 
-const type = {
-  display34: {
-    fontFamily: 'Archivo_800ExtraBold',
-    fontSize: 34,
-    lineHeight: 32,
-    letterSpacing: 0,
-  },
-  monoKicker: {
-    fontFamily: 'SpaceMono_400Regular',
-    fontSize: 11,
-    lineHeight: 15,
-    letterSpacing: tracking.kicker,
-  },
-  monoLabel: {
-    fontFamily: 'SpaceMono_700Bold',
-    fontSize: 11,
-    lineHeight: 14,
-    letterSpacing: tracking.kicker,
-  },
-  proseReason: {
-    fontFamily: 'SpaceGrotesk_400Regular',
-    fontSize: 17,
-    lineHeight: 25,
-  },
-  proseSmall: {
-    fontFamily: 'SpaceGrotesk_400Regular',
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  archiveMasthead: {
-    fontFamily: 'Archivo_800ExtraBold',
-    fontSize: 54,
-    lineHeight: 50,
-    letterSpacing: 0,
-  },
-  archiveContents: {
-    fontFamily: 'Archivo_800ExtraBold',
-    fontSize: 22,
-    lineHeight: 22,
-    letterSpacing: 0,
-  },
-  archiveIssue: {
-    fontFamily: 'SpaceMono_700Bold',
-    fontSize: 11,
-    lineHeight: 14,
-    letterSpacing: tracking.micro,
-  },
-  archiveTitle: {
-    fontFamily: 'Archivo_800ExtraBold',
-    fontSize: 22,
-    lineHeight: 23,
-    letterSpacing: 0,
-  },
-  archiveMeta: {
-    fontFamily: 'SpaceMono_400Regular',
-    fontSize: 10,
-    lineHeight: 14,
-    letterSpacing: tracking.micro,
-  },
-} satisfies Record<string, TextStyle>;
+const type = editorialType satisfies Record<string, TextStyle>;
 
 function formatIssueDate(date: string) {
   return new Date(`${date}T12:00:00`).toLocaleDateString('en-US', {
@@ -155,6 +104,16 @@ function EditorialRatingEditor({ album }: { album: AlbumDiscovery }) {
   const [score, setScore] = React.useState<RatingScore | null>(album.rating_score);
   const [comment, setComment] = React.useState(album.rating_comment ?? '');
   const saveRating = useSaveRating(album.aotd_id);
+  const dirty = score !== album.rating_score || comment !== (album.rating_comment ?? '');
+  const statusLabel = saveRating.isPending
+    ? 'Saving note...'
+    : saveRating.isError
+      ? 'Save failed. Try again.'
+      : album.rating_id && !dirty
+        ? 'Saved in your private journal'
+        : dirty
+          ? 'Unsaved changes'
+          : 'Ready when you are';
 
   React.useEffect(() => {
     setScore(album.rating_score);
@@ -229,19 +188,50 @@ function EditorialRatingEditor({ album }: { album: AlbumDiscovery }) {
           );
         })}
       </View>
-      <TextInput
-        accessibilityLabel="Private rating note"
-        multiline
-        value={comment}
-        onChangeText={setComment}
-        placeholder="Add a private note"
-        placeholderTextColor={editorialColors.muted}
-        textAlignVertical="top"
-        className="min-h-24 border-2 px-4 py-3 font-prose text-base leading-6"
-        style={{ borderColor: editorialColors.ink, color: editorialColors.ink }}
-      />
+      <View className="border-2" style={{ borderColor: editorialColors.ink }}>
+        <View
+          className="flex-row items-center justify-between gap-3 border-b px-3 py-2"
+          style={{ borderColor: editorialColors.ink, backgroundColor: editorialColors.paperAlt }}
+        >
+          <Text
+            className="font-mono-bold text-[10px] uppercase leading-4"
+            style={{ color: editorialColors.ink, letterSpacing: tracking.label }}
+          >
+            Private note
+          </Text>
+          <Text
+            className="shrink text-right font-mono text-[10px] uppercase leading-4"
+            style={{
+              color: saveRating.isError ? editorialColors.red : editorialColors.muted,
+              letterSpacing: tracking.label,
+            }}
+            numberOfLines={1}
+          >
+            {statusLabel}
+          </Text>
+        </View>
+        <TextInput
+          accessibilityLabel="Private rating note"
+          multiline
+          value={comment}
+          onChangeText={setComment}
+          placeholder="Add a private note"
+          placeholderTextColor={editorialColors.muted}
+          textAlignVertical="top"
+          className="min-h-28 px-4 py-3 font-prose text-base leading-6"
+          style={{ color: editorialColors.ink }}
+        />
+      </View>
       <EditorialActionButton
-        title={album.rating_id ? 'Update rating' : 'Save rating'}
+        title={
+          saveRating.isPending
+            ? 'Saving...'
+            : saveRating.isError
+              ? 'Retry save'
+              : album.rating_id
+                ? 'Update rating'
+                : 'Save rating'
+        }
         onPress={save}
         disabled={!score}
         loading={saveRating.isPending}
@@ -296,6 +286,126 @@ function ReasonParagraph({ text }: { text: string }) {
   );
 }
 
+function EditorialStateShell({ children }: { children: React.ReactNode }) {
+  return (
+    <View className="flex-1" style={{ backgroundColor: editorialColors.paper }}>
+      <View className="flex-1">{children}</View>
+      <PaperGrain />
+    </View>
+  );
+}
+
+function EditorialIssueFrame({
+  children,
+  padding = space.s3,
+}: {
+  children: React.ReactNode;
+  padding?: number;
+}) {
+  return (
+    <View style={{ padding }}>
+      <EditorialCropMarks />
+      <View
+        className="overflow-hidden border-2"
+        style={{ borderColor: editorialColors.ink, backgroundColor: editorialColors.paperAlt }}
+      >
+        {children}
+      </View>
+    </View>
+  );
+}
+
+function EditorialProofState({
+  label,
+  title,
+  subtitle,
+  actionTitle,
+  onAction,
+  retrying,
+  secondaryTitle,
+  onSecondary,
+}: {
+  label: string;
+  title: string;
+  subtitle?: string;
+  actionTitle?: string;
+  onAction?: () => void;
+  retrying?: boolean;
+  secondaryTitle?: string;
+  onSecondary?: () => void;
+}) {
+  return (
+    <EditorialStateShell>
+      <View className="flex-1 justify-center gap-4 py-12">
+        <EditorialSectionRule title={label} major />
+        <View className="border-2 p-4" style={{ borderColor: editorialColors.ink }}>
+          <Text
+            className="font-mono-bold text-[11px] uppercase leading-4"
+            style={{ color: editorialColors.muted, letterSpacing: tracking.label }}
+          >
+            AOTD proof sheet
+          </Text>
+          <Text
+            className="mt-3 font-display text-3xl uppercase leading-8"
+            style={{ color: editorialColors.ink, letterSpacing: 0 }}
+          >
+            {title}
+          </Text>
+          {subtitle ? (
+            <Text
+              className="mt-3 font-prose text-base leading-6"
+              style={{ color: editorialColors.muted }}
+            >
+              {subtitle}
+            </Text>
+          ) : null}
+        </View>
+        {actionTitle && onAction ? (
+          <EditorialActionButton
+            title={retrying ? 'Retrying...' : actionTitle}
+            loading={retrying}
+            onPress={onAction}
+          />
+        ) : null}
+        {secondaryTitle && onSecondary ? (
+          <EditorialActionButton title={secondaryTitle} tone="red" onPress={onSecondary} />
+        ) : null}
+      </View>
+    </EditorialStateShell>
+  );
+}
+
+function AlbumDetailProofSkeleton() {
+  return (
+    <EditorialStateShell>
+      <View className="gap-5" style={{ backgroundColor: editorialColors.paper }}>
+        <View>
+          <Skeleton className="h-4 w-40 rounded-none" />
+          <Skeleton className="mt-3 h-16 w-4/5 rounded-none" />
+          <View className="mt-3" style={{ height: ruleWeight.heavy }}>
+            <Skeleton className="h-full w-full rounded-none" />
+          </View>
+        </View>
+        <View>
+          <Skeleton className="h-10 w-11/12 rounded-none" />
+          <EditorialIssueFrame>
+            <Skeleton className="aspect-square w-full rounded-none" />
+          </EditorialIssueFrame>
+        </View>
+        <View className="gap-2">
+          <Skeleton className="h-8 w-full rounded-none" />
+          <Skeleton className="h-5 w-2/3 rounded-none" />
+        </View>
+        <View className="gap-3">
+          <Skeleton className="h-5 w-40 rounded-none" />
+          <Skeleton className="h-5 w-full rounded-none" />
+          <Skeleton className="h-5 w-5/6 rounded-none" />
+        </View>
+      </View>
+    </EditorialStateShell>
+  );
+}
+
 function EditorialAlbumDetailView(props: Parameters<SkinComponentSet['AlbumDetailView']>[0]) {
   const date = formatIssueDate(props.album.pick_date);
   const markers = albumCoverMarkers(props.album);
@@ -318,8 +428,12 @@ function EditorialAlbumDetailView(props: Parameters<SkinComponentSet['AlbumDetai
     <View className="flex-1" style={{ backgroundColor: editorialColors.paper }}>
       <View
         pointerEvents="none"
-        className="absolute left-0 right-0 top-0 z-10"
-        style={{ height: props.topInset, backgroundColor: editorialColors.paper }}
+        className="absolute left-0 right-0 top-0"
+        style={{
+          zIndex: zIndex.safeAreaPatch,
+          height: props.topInset,
+          backgroundColor: editorialColors.paper,
+        }}
       />
       <Animated.ScrollView
         onScroll={onScroll}
@@ -386,7 +500,7 @@ function EditorialAlbumDetailView(props: Parameters<SkinComponentSet['AlbumDetai
           </View>
 
           <View style={{ marginTop: space.s6 }}>
-            <View style={{ zIndex: 2 }}>
+            <View style={{ zIndex: zIndex.titleOverCover }}>
               <Text
                 className="uppercase"
                 style={[type.display34, { color: editorialColors.ink }]}
@@ -398,38 +512,36 @@ function EditorialAlbumDetailView(props: Parameters<SkinComponentSet['AlbumDetai
                 {props.album.album_title}
               </Text>
             </View>
-            <View style={{ marginTop: -14, zIndex: 1, padding: space.s3 }}>
-              <EditorialCropMarks />
-              <View
-                className="aspect-square w-full overflow-hidden border-2"
-                style={{
-                  borderColor: editorialColors.ink,
-                  backgroundColor: editorialColors.paperAlt,
-                }}
-              >
-                <Animated.View style={[{ flex: 1 }, coverStyle]}>
-                  {props.album.album_cover_url ? (
-                    <CoverImage uri={props.album.album_cover_url} className="h-full w-full" />
-                  ) : (
-                    <View className="h-full w-full items-center justify-center px-8">
-                      <BrandMark size={84} muted />
-                      <Text
-                        className="mt-5 text-center font-display text-3xl uppercase"
-                        style={{ color: editorialColors.muted }}
-                      >
-                        Cover unavailable
-                      </Text>
+            <View style={{ marginTop: -14, zIndex: zIndex.coverPlate }}>
+              <EditorialIssueFrame>
+                <View className="aspect-square w-full">
+                  <Animated.View style={[{ flex: 1 }, coverStyle]}>
+                    {props.album.album_cover_url ? (
+                      <CoverImage uri={props.album.album_cover_url} className="h-full w-full" />
+                    ) : (
+                      <View className="h-full w-full items-center justify-center px-8">
+                        <BrandMark size={84} muted />
+                        <Text
+                          className="mt-5 text-center font-display text-3xl uppercase"
+                          style={{ color: editorialColors.muted }}
+                        >
+                          Cover unavailable
+                        </Text>
+                      </View>
+                    )}
+                  </Animated.View>
+                  {markers.length > 0 ? (
+                    <View
+                      className="absolute bottom-2 right-2 flex-row gap-2"
+                      style={{ zIndex: zIndex.markers }}
+                    >
+                      {markers.map((marker) => (
+                        <EditorialMarker key={marker} label={marker} />
+                      ))}
                     </View>
-                  )}
-                </Animated.View>
-                {markers.length > 0 ? (
-                  <View className="absolute bottom-2 right-2 flex-row gap-2">
-                    {markers.map((marker) => (
-                      <EditorialMarker key={marker} label={marker} />
-                    ))}
-                  </View>
-                ) : null}
-              </View>
+                  ) : null}
+                </View>
+              </EditorialIssueFrame>
             </View>
           </View>
 
@@ -644,6 +756,21 @@ function EditorialDiscoveriesView(props: Parameters<SkinComponentSet['Discoverie
               {`${props.discoveries.length} issues`}
             </Text>
           </View>
+          <View className="mt-3 flex-row items-center gap-3">
+            <Text
+              className="font-mono-bold text-[10px] uppercase leading-4"
+              style={{ color: editorialColors.ink, letterSpacing: tracking.label }}
+            >
+              Daily records
+            </Text>
+            <View className="h-px flex-1" style={{ backgroundColor: editorialColors.ink }} />
+            <Text
+              className="font-mono text-[10px] uppercase leading-4"
+              style={{ color: editorialColors.muted, letterSpacing: tracking.label }}
+            >
+              all / waiting / rated
+            </Text>
+          </View>
           <AccentRule thickness={3} style={{ marginTop: 10 }} />
         </View>
 
@@ -815,14 +942,14 @@ function EditorialDiscoveryRow({
       accessibilityRole="button"
       accessibilityLabel={`${album.album_title} by ${album.album_primary_artist_name}, ${date}, ${status.accessibilityLabel}`}
       onPress={onPress}
-      className="min-h-[100px] flex-row gap-3 py-3 active:opacity-80"
+      className="min-h-[104px] flex-row gap-3 py-3 active:opacity-80"
       style={{
         borderColor: editorialColors.ink,
         borderTopWidth: firstInGroup ? 0 : 1,
         borderBottomWidth: isLast ? 2 : 0,
       }}
     >
-      <View className="w-11 pt-1">
+      <View className="w-12 pt-1">
         <Text className="uppercase" style={[type.archiveIssue, { color: editorialColors.muted }]}>
           No.
         </Text>
@@ -830,17 +957,18 @@ function EditorialDiscoveryRow({
           {String(issueNo(album)).padStart(3, '0')}
         </Text>
       </View>
-      <View
-        className="h-[72px] w-[72px] border-2"
-        style={{ borderColor: editorialColors.ink, backgroundColor: editorialColors.paperAlt }}
-      >
-        {album.album_cover_url ? (
-          <CoverImage uri={album.album_cover_url} className="h-full w-full" />
-        ) : (
-          <View className="h-full w-full items-center justify-center">
-            <BrandMark size={28} muted />
+      <View className="h-[78px] w-[78px]">
+        <EditorialIssueFrame padding={space.s1}>
+          <View className="h-[66px] w-[66px]">
+            {album.album_cover_url ? (
+              <CoverImage uri={album.album_cover_url} className="h-full w-full" />
+            ) : (
+              <View className="h-full w-full items-center justify-center">
+                <BrandMark size={28} muted />
+              </View>
+            )}
           </View>
-        )}
+        </EditorialIssueFrame>
       </View>
       <View className="min-w-0 flex-1 justify-center">
         <Text
@@ -1065,10 +1193,12 @@ function EditorialProfileView(props: Parameters<SkinComponentSet['ProfileView']>
           </View>
         </View>
 
-        <View className="flex-row gap-3">
-          <LedgerStat value={String(streak)} label="day streak" loading={props.overviewLoading} />
-          <LedgerStat value={String(discovered)} label="issues" loading={props.overviewLoading} />
-          <LedgerStat value={String(rated)} label="rated" loading={props.overviewLoading} />
+        <View className="border-b-2 pb-4" style={{ borderColor: editorialColors.ink }}>
+          <View className="flex-row gap-3">
+            <LedgerStat value={String(streak)} label="day streak" loading={props.overviewLoading} />
+            <LedgerStat value={String(discovered)} label="issues" loading={props.overviewLoading} />
+            <LedgerStat value={String(rated)} label="rated" loading={props.overviewLoading} />
+          </View>
         </View>
 
         <View className="gap-4">
@@ -1128,9 +1258,9 @@ function EditorialProfileView(props: Parameters<SkinComponentSet['ProfileView']>
                 </View>
               ) : null}
               {decades.length > 0 ? (
-                <View className="gap-3">
+                <View className="border-y-2 py-3" style={{ borderColor: editorialColors.ink }}>
                   {decades.map((decade) => (
-                    <View key={decade.decade} className="gap-2">
+                    <View key={decade.decade} className="gap-2 py-2">
                       <View className="flex-row items-end justify-between gap-3">
                         <Text
                           className="font-mono-bold text-[11px] uppercase"
@@ -1146,7 +1276,7 @@ function EditorialProfileView(props: Parameters<SkinComponentSet['ProfileView']>
                         </Text>
                       </View>
                       <View
-                        className="h-5 border-2 p-[2px]"
+                        className="h-6 flex-row items-center border-2 p-[2px]"
                         style={{ borderColor: editorialColors.ink }}
                       >
                         <View
@@ -1156,6 +1286,15 @@ function EditorialProfileView(props: Parameters<SkinComponentSet['ProfileView']>
                             backgroundColor: editorialColors.ink,
                           }}
                         />
+                        <View className="ml-1 h-full flex-1 flex-row gap-[3px]">
+                          {[0, 1, 2, 3].map((tick) => (
+                            <View
+                              key={tick}
+                              className="h-full flex-1"
+                              style={{ backgroundColor: editorialColors.paperAlt }}
+                            />
+                          ))}
+                        </View>
                       </View>
                     </View>
                   ))}
@@ -1205,7 +1344,7 @@ function EditorialProfileView(props: Parameters<SkinComponentSet['ProfileView']>
           )}
         </View>
 
-        <View className="gap-4 pt-2">
+        <View className="gap-4 border-t pt-5" style={{ borderColor: editorialColors.ink }}>
           <EditorialSectionRule title="Production notes" aside="library" major />
           <Text
             className="font-mono text-[11px] uppercase leading-5"
@@ -1230,7 +1369,7 @@ function EditorialProfileView(props: Parameters<SkinComponentSet['ProfileView']>
           />
         </View>
 
-        <View className="gap-4">
+        <View className="gap-4 border-t pt-5" style={{ borderColor: editorialColors.ink }}>
           <EditorialSectionRule title="Connections" aside="spotify" major />
           <Text className="font-prose text-base leading-6" style={{ color: editorialColors.ink }}>
             {props.connection
@@ -1434,7 +1573,9 @@ function EditorialShareCard({ album }: { album: AlbumDiscovery }) {
         <View>
           <Text
             numberOfLines={4}
-            className="font-display text-[64px] leading-[64px]"
+            adjustsFontSizeToFit
+            minimumFontScale={0.72}
+            className="font-display text-[62px] uppercase leading-[60px]"
             style={{ color: editorialColors.ink }}
           >
             {album.album_title}
@@ -1446,6 +1587,9 @@ function EditorialShareCard({ album }: { album: AlbumDiscovery }) {
           >
             {album.album_primary_artist_name}
           </Text>
+          <View className="mt-5">
+            <EditorialSpecLine items={albumSpec(album)} />
+          </View>
         </View>
       </View>
       <View className="flex-row items-end justify-between gap-8">
@@ -1478,23 +1622,13 @@ function EditorialEmptyState({
   onAction,
 }: Parameters<SkinComponentSet['States']['EmptyState']>[0]) {
   return (
-    <View className="flex-1 justify-center gap-4 py-12">
-      <EditorialSectionRule title="Blank page" major />
-      <Text
-        className="font-display text-3xl uppercase leading-8"
-        style={{ color: editorialColors.ink }}
-      >
-        {title}
-      </Text>
-      {subtitle ? (
-        <Text className="font-prose text-base leading-6" style={{ color: editorialColors.muted }}>
-          {subtitle}
-        </Text>
-      ) : null}
-      {actionTitle && onAction ? (
-        <EditorialActionButton title={actionTitle} onPress={onAction} />
-      ) : null}
-    </View>
+    <EditorialProofState
+      label="Blank page"
+      title={title}
+      subtitle={subtitle}
+      actionTitle={actionTitle}
+      onAction={onAction}
+    />
   );
 }
 
@@ -1506,28 +1640,16 @@ function EditorialErrorState({
   onSecondary,
 }: Parameters<SkinComponentSet['States']['ErrorState']>[0]) {
   return (
-    <View className="flex-1 justify-center gap-4 py-12">
-      <EditorialSectionRule title="Retry stamp" aside="network" major />
-      <Text
-        className="font-display text-3xl uppercase leading-8"
-        style={{ color: editorialColors.ink }}
-      >
-        {title}
-      </Text>
-      <Text className="font-prose text-base leading-6" style={{ color: editorialColors.muted }}>
-        The issue may exist, but the press room could not fetch it just now.
-      </Text>
-      {onRetry ? (
-        <EditorialActionButton
-          title={retrying ? 'Retrying...' : 'Try again'}
-          loading={retrying}
-          onPress={onRetry}
-        />
-      ) : null}
-      {secondaryTitle && onSecondary ? (
-        <EditorialActionButton title={secondaryTitle} tone="red" onPress={onSecondary} />
-      ) : null}
-    </View>
+    <EditorialProofState
+      label="Retry stamp"
+      title={title}
+      subtitle="The issue may exist, but the press room could not fetch it just now."
+      actionTitle={onRetry ? 'Try again' : undefined}
+      onAction={onRetry}
+      retrying={retrying}
+      secondaryTitle={secondaryTitle}
+      onSecondary={onSecondary}
+    />
   );
 }
 
@@ -1563,14 +1685,7 @@ export const editorialSkin: SkinComponentSet = {
   ShareCard: EditorialShareCard,
   SyncBanner: EditorialSyncBanner,
   States: {
-    AlbumDetailSkeleton: () => (
-      <View className="gap-4" style={{ backgroundColor: editorialColors.paper }}>
-        <Skeleton className="aspect-square w-full rounded-none" />
-        <Skeleton className="h-14 w-4/5 rounded-none" />
-        <Skeleton className="h-4 w-full rounded-none" />
-        <Skeleton className="h-4 w-2/3 rounded-none" />
-      </View>
-    ),
+    AlbumDetailSkeleton: AlbumDetailProofSkeleton,
     PickError: ({ onRetry, retrying }) => (
       <EditorialErrorState
         title="Could not check today's pick."

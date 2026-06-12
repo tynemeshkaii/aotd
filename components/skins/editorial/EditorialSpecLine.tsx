@@ -1,6 +1,6 @@
 import { View } from 'react-native';
 
-import { editorialColors } from '@/components/skins/shared/skinStyles';
+import { editorialColors, ruleWeight, tracking } from '@/components/skins/shared/skinStyles';
 import { Text } from '@/components/ui/Text';
 
 type Props = {
@@ -14,14 +14,14 @@ export function EditorialSpecLine({ items }: Props) {
     <View
       className="py-2"
       style={{
-        borderTopWidth: 2,
-        borderBottomWidth: 1,
+        borderTopWidth: ruleWeight.rule,
+        borderBottomWidth: ruleWeight.hairline,
         borderColor: editorialColors.ink,
       }}
     >
       <Text
         className="font-mono-bold text-[11px] uppercase leading-5"
-        style={{ color: editorialColors.ink, letterSpacing: 0.8 }}
+        style={{ color: editorialColors.ink, letterSpacing: tracking.label }}
       >
         {items.join(' · ')}
       </Text>

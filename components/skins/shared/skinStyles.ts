@@ -49,3 +49,76 @@ export const ruleWeight = {
   rule: 2,
   heavy: 3,
 } as const;
+
+export const editorialType = {
+  display34: {
+    fontFamily: 'Archivo_800ExtraBold',
+    fontSize: 34,
+    lineHeight: 32,
+    letterSpacing: 0,
+  },
+  monoKicker: {
+    fontFamily: 'SpaceMono_400Regular',
+    fontSize: 11,
+    lineHeight: 15,
+    letterSpacing: tracking.kicker,
+  },
+  monoLabel: {
+    fontFamily: 'SpaceMono_700Bold',
+    fontSize: 11,
+    lineHeight: 14,
+    letterSpacing: tracking.label,
+  },
+  proseReason: {
+    fontFamily: 'SpaceGrotesk_400Regular',
+    fontSize: 17,
+    lineHeight: 25,
+  },
+  proseSmall: {
+    fontFamily: 'SpaceGrotesk_400Regular',
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  archiveMasthead: {
+    fontFamily: 'Archivo_800ExtraBold',
+    fontSize: 54,
+    lineHeight: 50,
+    letterSpacing: 0,
+  },
+  archiveContents: {
+    fontFamily: 'Archivo_800ExtraBold',
+    fontSize: 22,
+    lineHeight: 22,
+    letterSpacing: 0,
+  },
+  archiveIssue: {
+    fontFamily: 'SpaceMono_700Bold',
+    fontSize: 11,
+    lineHeight: 14,
+    letterSpacing: tracking.micro,
+  },
+  archiveTitle: {
+    fontFamily: 'Archivo_800ExtraBold',
+    fontSize: 22,
+    lineHeight: 23,
+    letterSpacing: 0,
+  },
+  archiveMeta: {
+    fontFamily: 'SpaceMono_400Regular',
+    fontSize: 10,
+    lineHeight: 14,
+    letterSpacing: tracking.micro,
+  },
+} as const;
+
+export const zIndex = {
+  safeAreaPatch: 10,
+  coverPlate: 1,
+  titleOverCover: 2,
+  markers: 3,
+  grain: 20,
+} as const;
+
+export const touchTarget = {
+  min: 44,
+} as const;

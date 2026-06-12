@@ -1,6 +1,6 @@
 import { View, type ViewProps } from 'react-native';
 
-import { editorialColors } from '@/components/skins/shared/skinStyles';
+import { editorialColors, tracking } from '@/components/skins/shared/skinStyles';
 import { Text } from '@/components/ui/Text';
 
 type Props = ViewProps & {
@@ -23,7 +23,7 @@ export function EditorialMarker({ label, tone = 'ink', className, style, ...rest
     >
       <Text
         className="font-mono-bold text-[11px] uppercase leading-4"
-        style={{ color, letterSpacing: 0.8 }}
+        style={{ color, letterSpacing: tracking.label }}
       >
         {label}
       </Text>

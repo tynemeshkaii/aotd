@@ -1,9 +1,11 @@
 import { router } from 'expo-router';
 import type { ReactNode } from 'react';
+import * as React from 'react';
 import { Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AlbumDetail } from '@/components/album/AlbumDetail';
+import { tracking } from '@/components/skins/shared/skinStyles';
 import { Text } from '@/components/ui/Text';
 import { useLibrarySyncStatus } from '@/lib/hooks/useLibrarySyncStatus';
 import { useProfileOverview } from '@/lib/hooks/useProfileOverview';
@@ -30,9 +32,49 @@ function HomeStateShell({ children }: { children: ReactNode }) {
   );
 }
 
+function PendingArchiveNudge({ count, onPress }: { count: number; onPress: () => void }) {
+  const { chrome } = useSkinComponents();
+  const [pressed, setPressed] = React.useState(false);
+  const foreground = pressed ? chrome.rootBackground : chrome.text;
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      onPressIn={() => setPressed(true)}
+      onPressOut={() => setPressed(false)}
+      onPress={() => {
+        setPressed(false);
+        onPress();
+      }}
+      className="min-h-12 border-2 px-4 py-3"
+      style={{
+        borderColor: chrome.text,
+        backgroundColor: pressed ? chrome.text : chrome.rootBackground,
+      }}
+    >
+      <View className="flex-row items-center justify-between gap-3">
+        <Text
+          className="font-mono-bold text-[11px] uppercase leading-4"
+          style={{ color: foreground, letterSpacing: tracking.label }}
+        >
+          Archive nudge
+        </Text>
+        <Text
+          className="font-mono text-[11px] uppercase leading-4"
+          style={{ color: foreground, opacity: pressed ? 0.9 : 0.7, letterSpacing: tracking.label }}
+        >
+          {count} waiting
+        </Text>
+      </View>
+      <Text className="mt-2 font-prose text-sm leading-5" style={{ color: foreground }}>
+        A few past picks are still open issues. Review them in Discoveries.
+      </Text>
+    </Pressable>
+  );
+}
+
 export default function HomeScreen() {
   const components = useSkinComponents();
-  const { chrome } = components;
   const { data: pick, isError, isLoading, isRefetching, refetch } = useTodayPick();
   const { data: oldPendingCount = 0 } = useUnratedPastPickCount(pick?.aotd_id);
   const { status: syncStatus } = useLibrarySyncStatus();
@@ -71,18 +113,12 @@ export default function HomeScreen() {
   // Today's pick: full-bleed rich treatment.
   const footer =
     oldPendingCount > 0 ? (
-      <Pressable
-        accessibilityRole="button"
+      <PendingArchiveNudge
+        count={oldPendingCount}
         onPress={() => {
           router.push({ pathname: '/(tabs)/discoveries', params: { filter: 'pending' } });
         }}
-        className="border-2 px-4 py-3 active:opacity-80"
-        style={{ borderColor: chrome.text, backgroundColor: chrome.rootBackground }}
-      >
-        <Text className="font-prose text-sm leading-5" style={{ color: chrome.text }}>
-          A few past picks are still waiting whenever you are.
-        </Text>
-      </Pressable>
+      />
     ) : null;
 
   return (
