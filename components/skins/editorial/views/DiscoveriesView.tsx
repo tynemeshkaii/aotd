@@ -1,20 +1,18 @@
 import { MotiView } from 'moti';
 import * as React from 'react';
-import { Pressable, RefreshControl, View, type ViewStyle } from 'react-native';
+import { Pressable, RefreshControl, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { DiscoveryFilter } from '@/components/album/StatusTabs';
 import { BrandMark } from '@/components/brand/BrandMark';
 import { AccentRule } from '@/components/skins/editorial/accent/AccentRule';
-import { EditorialMarker } from '@/components/skins/editorial/EditorialMarker';
 import { EditorialMasthead } from '@/components/skins/editorial/EditorialMasthead';
 import { PaperGrain } from '@/components/skins/editorial/PaperGrain';
 import {
   editorialColors,
   editorialType,
   ratingTone,
-  space,
   tracking,
 } from '@/components/skins/shared/skinStyles';
 import { CoverImage } from '@/components/ui/CoverImage';
@@ -22,10 +20,13 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { Text } from '@/components/ui/Text';
 import { useReduceMotion } from '@/lib/hooks/useReduceMotion';
 import { getTabContentBottomPadding } from '@/lib/navigationChrome';
-import { type AlbumDiscovery, getDiscoveryStatusLabel } from '@/lib/recommendation';
+import {
+  type AlbumDiscovery,
+  getDiscoveryStatusLabel,
+  type RatingScore,
+} from '@/lib/recommendation';
 import type { SkinComponentSet } from '@/theme/skins/types';
 import { type ArchiveListItem, buildArchiveItems, filterLabels, issueNo } from '../lib';
-import { EditorialIssueFrame } from './shared';
 import { EditorialErrorState } from './states';
 
 const skeletonRows = ['one', 'two', 'three', 'four', 'five', 'six'];
@@ -38,23 +39,19 @@ function ListSkeleton() {
       {skeletonRows.map((row, index) => (
         <View
           key={row}
-          className="min-h-[98px] flex-row gap-3 py-3"
+          className="min-h-[76px] flex-row items-center gap-3 py-3"
           style={{
             borderColor: editorialColors.ink,
             borderTopWidth: index === 0 ? 2 : 1,
             borderBottomWidth: index === skeletonRows.length - 1 ? 2 : 0,
           }}
         >
-          <View className="w-11 pt-1">
-            <Skeleton className="h-3 w-8 rounded-none" />
-            <Skeleton className="mt-2 h-4 w-9 rounded-none" />
-          </View>
-          <Skeleton className="h-[72px] w-[72px] rounded-none" />
+          <Skeleton className="h-10 w-10 rounded-none" />
           <View className="flex-1 justify-center gap-2">
             <Skeleton className="h-5 w-3/4 rounded-none" />
             <Skeleton className="h-3 w-2/3 rounded-none" />
-            <Skeleton className="h-6 w-20 rounded-none" />
           </View>
+          <Skeleton className="h-8 w-14 rounded-none" />
         </View>
       ))}
     </View>
@@ -273,43 +270,56 @@ function EditorialArchiveEmptyState({ title, subtitle }: { title: string; subtit
 }
 
 function archiveStatus(album: AlbumDiscovery): {
-  visualLabel: string;
   accessibilityLabel: string;
-  tone: 'ink' | 'paper' | 'red';
-  style?: ViewStyle;
+  ratingScore: RatingScore | null;
 } {
   const accessibilityLabel = getDiscoveryStatusLabel(album);
 
   if (album.rating_score) {
     return {
-      visualLabel: `Rated 0${album.rating_score}`,
       accessibilityLabel,
-      tone: 'ink',
-      style: { borderColor: ratingTone[album.rating_score] },
-    };
-  }
-
-  if (album.status === 'rated') {
-    return {
-      visualLabel: 'Rated',
-      accessibilityLabel,
-      tone: 'ink',
-    };
-  }
-
-  if (album.status === 'opened') {
-    return {
-      visualLabel: 'Opened',
-      accessibilityLabel,
-      tone: 'red',
+      ratingScore: album.rating_score,
     };
   }
 
   return {
-    visualLabel: 'Waiting',
     accessibilityLabel,
-    tone: 'paper',
+    ratingScore: null,
   };
+}
+
+function ArchiveRowMark({ ratingScore }: { ratingScore: RatingScore | null }) {
+  if (ratingScore) {
+    return (
+      <View
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+        className="min-w-12 items-center border-2 px-2 py-1"
+        style={{ borderColor: editorialColors.accentStatic }}
+      >
+        <Text
+          className="font-mono-bold text-[11px] uppercase leading-4"
+          style={{ color: ratingTone[ratingScore], letterSpacing: tracking.label }}
+        >
+          {`0${ratingScore}`}
+        </Text>
+      </View>
+    );
+  }
+
+  return (
+    <View
+      className="min-w-16 items-center border px-2 py-1"
+      style={{ borderColor: editorialColors.ink }}
+    >
+      <Text
+        className="font-mono-bold text-[10px] uppercase leading-4"
+        style={{ color: editorialColors.muted, letterSpacing: tracking.label }}
+      >
+        Waiting
+      </Text>
+    </View>
+  );
 }
 
 function EditorialDiscoveryRow({
@@ -341,37 +351,31 @@ function EditorialDiscoveryRow({
       accessibilityRole="button"
       accessibilityLabel={`${album.album_title} by ${album.album_primary_artist_name}, ${date}, ${status.accessibilityLabel}`}
       onPress={onPress}
-      className="min-h-[104px] flex-row gap-3 py-3 active:opacity-80"
+      className="min-h-[76px] flex-row items-center gap-3 py-3 active:opacity-80"
       style={{
         borderColor: editorialColors.ink,
         borderTopWidth: firstInGroup ? 0 : 1,
         borderBottomWidth: isLast ? 2 : 0,
       }}
     >
-      <View className="w-12 pt-1">
-        <Text className="uppercase" style={[type.archiveIssue, { color: editorialColors.muted }]}>
-          No.
-        </Text>
-        <Text className="uppercase" style={[type.archiveIssue, { color: editorialColors.ink }]}>
-          {String(issueNo(album)).padStart(3, '0')}
-        </Text>
-      </View>
-      <View className="h-[78px] w-[78px]">
-        <EditorialIssueFrame padding={space.s1}>
-          <View className="h-[66px] w-[66px]">
-            {album.album_cover_url ? (
-              <CoverImage uri={album.album_cover_url} className="h-full w-full" />
-            ) : (
-              <View className="h-full w-full items-center justify-center">
-                <BrandMark size={28} muted />
-              </View>
-            )}
+      <View
+        className="h-10 w-10 overflow-hidden border"
+        style={{ borderColor: editorialColors.ink, backgroundColor: editorialColors.paperAlt }}
+      >
+        {album.album_cover_url ? (
+          <CoverImage uri={album.album_cover_url} className="h-full w-full" />
+        ) : (
+          <View className="h-full w-full items-center justify-center">
+            <BrandMark size={20} muted />
           </View>
-        </EditorialIssueFrame>
+        )}
       </View>
       <View className="min-w-0 flex-1 justify-center">
+        <Text className="uppercase" style={[type.archiveIssue, { color: editorialColors.muted }]}>
+          {`No. ${String(issueNo(album)).padStart(3, '0')}`}
+        </Text>
         <Text
-          className="uppercase"
+          className="mt-1 uppercase"
           style={[type.archiveTitle, { color: editorialColors.ink }]}
           numberOfLines={2}
         >
@@ -384,10 +388,8 @@ function EditorialDiscoveryRow({
         >
           {album.album_primary_artist_name} / {date}
         </Text>
-        <View className="mt-2 self-start">
-          <EditorialMarker label={status.visualLabel} tone={status.tone} style={status.style} />
-        </View>
       </View>
+      <ArchiveRowMark ratingScore={status.ratingScore} />
     </Pressable>
   );
 
