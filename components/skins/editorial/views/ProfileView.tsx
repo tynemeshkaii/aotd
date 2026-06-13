@@ -173,6 +173,52 @@ function EditorialArchiveLink({ onPress }: { onPress: () => void }) {
   );
 }
 
+function MonthlyRecapLink({ month, onPress }: { month: string; onPress: (month: string) => void }) {
+  const [pressed, setPressed] = React.useState(false);
+  const foreground = pressed ? editorialColors.paper : editorialColors.ink;
+  const label = new Date(`${month.slice(0, 10)}T12:00:00`).toLocaleDateString('en-US', {
+    month: 'long',
+    year: 'numeric',
+  });
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`Open ${label} monthly review`}
+      onPressIn={() => setPressed(true)}
+      onPressOut={() => setPressed(false)}
+      onPress={() => {
+        setPressed(false);
+        haptics.impactLight();
+        onPress(month);
+      }}
+      className="min-h-16 border-2 p-3"
+      style={{
+        borderColor: editorialColors.ink,
+        backgroundColor: pressed ? editorialColors.ink : editorialColors.paper,
+      }}
+    >
+      <View className="flex-row items-center justify-between gap-3">
+        <Text
+          className="font-mono-bold text-[10px] uppercase leading-4"
+          style={{ color: foreground, letterSpacing: tracking.label }}
+        >
+          This month in review
+        </Text>
+        <Text
+          className="font-mono text-[10px] uppercase leading-4"
+          style={{ color: foreground, opacity: pressed ? 0.9 : 0.7, letterSpacing: tracking.label }}
+        >
+          {label}
+        </Text>
+      </View>
+      <Text className="mt-2 font-prose text-sm leading-5" style={{ color: foreground }}>
+        Open the printed recap: issues, rating spread, top finding, and editor's note.
+      </Text>
+    </Pressable>
+  );
+}
+
 export function EditorialProfileView(props: Parameters<SkinComponentSet['ProfileView']>[0]) {
   const insets = useSafeAreaInsets();
   const bottomPadding = getTabContentBottomPadding(insets.bottom, 32);
@@ -318,6 +364,14 @@ export function EditorialProfileView(props: Parameters<SkinComponentSet['Profile
           <View className="mt-4">
             <SubscriptionRun summary={props.streakRun} />
           </View>
+          {props.latestRecapMonth ? (
+            <View className="mt-4">
+              <MonthlyRecapLink
+                month={props.latestRecapMonth.month}
+                onPress={props.onOpenMonthlyRecap}
+              />
+            </View>
+          ) : null}
         </View>
 
         <View className="gap-4">

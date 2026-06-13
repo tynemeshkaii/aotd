@@ -398,6 +398,8 @@ Current client RPCs and shapes:
 - `get_current_pick(p_user_id)` returns the shared `AlbumDiscovery` shape for today's local date, including rating fields and `album_artist_country`.
 - `get_discoveries(p_user_id, p_limit default 365, p_offset default 0)` returns the same shape, newest first. The client currently relies on defaults and has no pagination UI.
 - `get_discovery_detail(p_user_id, p_aotd_id)` returns one shared `AlbumDiscovery` row.
+- `get_recap_months(p_user_id)` returns JSONB `[{ month, issues }]`, newest first, for months with at least one pick. Authenticated-only execute grant.
+- `get_monthly_recap(p_user_id, p_month)` returns JSONB `{ month, issues_count, opened_count, rated_count, rating_spread, avg_score, top_finding, span_min, span_max }` for the requested month. It buckets by the pick's local `albums_of_the_day.date`, never `ratings.updated_at`, and has an authenticated-only execute grant. The client reads it through `lib/hooks/useMonthlyRecap.ts` keyed `['monthly-recap', userId, month]`; `lib/hooks/useRecapMonths.ts` uses `['recap-months', userId]`. Until DB types are regenerated, the new RPC calls cast name/args through `never`.
 - `save_album_rating(p_user_id, p_aotd_id, p_score, p_comment)` is the only client write path for ratings.
 - `get_profile_overview(p_user_id)` returns profile stats JSON for the Profile screen.
 - `safe_profile_timezone(text)` is callable by authenticated users and service role.
@@ -517,6 +519,7 @@ Discoveries:
 - `app/(tabs)/discoveries.tsx` renders `DiscoveriesController`.
 - Filters are All / Waiting / Rated in the editorial skin. The `pending` filter value means not rated, so it includes both `pending` and `opened` rows.
 - History detail lives at `app/discoveries/[aotdId].tsx` and uses `get_discovery_detail`.
+- Monthly recap detail lives at `app/discoveries/recap/[month].tsx` and renders `RecapController` plus the editorial Monthly Review view. The editor's note uses the five emotional rating labels and never a numeric-average headline or genre taxonomy. Empty, partial (picks but no ratings), and full months must stay visually honest.
 - Keep explicit error/retry states. Do not mask RPC/network failures as empty history or not found.
 - The archive list `RefreshControl` reuses the controller's `retrying`/`onRetry` (the `useDiscoveries` refetch) for pull-to-refresh.
 

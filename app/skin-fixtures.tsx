@@ -1,6 +1,7 @@
 import { ScrollView, View } from 'react-native';
 import { Text } from '@/components/ui/Text';
 import type { LibrarySyncStatus } from '@/lib/hooks/useLibrarySyncStatus';
+import type { MonthlyRecap } from '@/lib/hooks/useMonthlyRecap';
 import type { ProfileOverview } from '@/lib/hooks/useProfileOverview';
 import type { AlbumDiscovery, RatingScore } from '@/lib/recommendation';
 import { buildStreakSummary } from '@/lib/streak';
@@ -180,6 +181,8 @@ function profileFixtureProps(
     onRefresh: () => undefined,
     product: 'Premium',
     streakRun: buildStreakSummary(fixtures, '2026-05-31', overview?.streak ?? 0),
+    latestRecapMonth: { month: '2026-05-01', issues: 31 },
+    onOpenMonthlyRecap: () => undefined,
     heroSubtitle: overview
       ? `${overview.streak}-day streak / ${overview.total_discovered} albums discovered`
       : 'Your taste, one album at a time',
@@ -226,6 +229,30 @@ const profileFixtures = [
   },
 ];
 
+const recapTopFixture = fixtures[0] ?? fixture('recap-fallback', 'Fallback Recap Fixture', null, 5);
+
+const recapFixture: MonthlyRecap = {
+  month: '2026-05-01',
+  issues_count: 31,
+  opened_count: 24,
+  rated_count: 17,
+  rating_spread: { '1': 1, '2': 2, '3': 4, '4': 6, '5': 4 },
+  avg_score: 3.8,
+  top_finding: {
+    aotd_id: recapTopFixture.aotd_id,
+    issue_number: recapTopFixture.issue_number,
+    pick_date: recapTopFixture.pick_date,
+    status: recapTopFixture.status,
+    album_title: recapTopFixture.album_title,
+    album_primary_artist_name: recapTopFixture.album_primary_artist_name,
+    album_cover_url: recapTopFixture.album_cover_url,
+    album_spotify_id: recapTopFixture.album_spotify_id,
+    rating_score: 5,
+  },
+  span_min: 1968,
+  span_max: 2026,
+};
+
 export default function SkinFixturesScreen() {
   const components = useSkinComponents();
 
@@ -261,6 +288,25 @@ export default function SkinFixturesScreen() {
           </View>
         </View>
       ))}
+      <View className="gap-3">
+        <Text variant="caption">Recap / full month</Text>
+        <View
+          className="h-[760px] overflow-hidden border-2"
+          style={{ borderColor: components.chrome.text }}
+        >
+          <components.RecapView
+            month="2026-05-01"
+            months={[{ month: '2026-05-01', issues: 31 }]}
+            recap={recapFixture}
+            loading={false}
+            error={false}
+            retrying={false}
+            onRetry={() => undefined}
+            onMonthChange={() => undefined}
+            onOpenTopFinding={() => undefined}
+          />
+        </View>
+      </View>
       {fixtures.map((album, index) => (
         <View key={album.aotd_id}>
           <components.DiscoveriesView

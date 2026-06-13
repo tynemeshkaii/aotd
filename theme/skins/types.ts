@@ -5,7 +5,9 @@ import type { SharedValue } from 'react-native-reanimated';
 
 import type { DiscoveryFilter } from '@/components/album/StatusTabs';
 import type { LibrarySyncStatus } from '@/lib/hooks/useLibrarySyncStatus';
+import type { MonthlyRecap } from '@/lib/hooks/useMonthlyRecap';
 import type { ProfileOverview } from '@/lib/hooks/useProfileOverview';
+import type { RecapMonth } from '@/lib/hooks/useRecapMonths';
 import type { AlbumDiscovery } from '@/lib/recommendation';
 import type { StreakSummary } from '@/lib/streak';
 
@@ -94,6 +96,8 @@ export type ProfileViewProps = {
   product: string | null;
   heroSubtitle: string;
   streakRun?: StreakSummary | null;
+  latestRecapMonth?: RecapMonth | null;
+  onOpenMonthlyRecap: (month: string) => void;
   refreshing: boolean;
   onRefresh: () => void;
 };
@@ -133,6 +137,19 @@ export type SyncBannerProps = {
   status?: LibrarySyncStatus | null;
 };
 
+export type RecapViewProps = {
+  month: string | null;
+  months: RecapMonth[];
+  recap: MonthlyRecap | null;
+  loading: boolean;
+  error: boolean;
+  retrying: boolean;
+  header?: ReactNode;
+  onRetry: () => void;
+  onMonthChange: (month: string) => void;
+  onOpenTopFinding: (aotdId: string) => void;
+};
+
 export type StatesComponentSet = {
   AlbumDetailSkeleton: () => ReactNode;
   PickError: (props: { onRetry: () => void; retrying?: boolean }) => ReactNode;
@@ -167,6 +184,7 @@ export type SkinComponentSet = {
   InitialSyncingView: (props: InitialSyncingViewProps) => ReactNode;
   ShareCard: (props: ShareCardProps) => ReactNode;
   SyncBanner: (props: SyncBannerProps) => ReactNode;
+  RecapView: (props: RecapViewProps) => ReactNode;
   States: StatesComponentSet;
 };
 

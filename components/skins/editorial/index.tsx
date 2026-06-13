@@ -5,6 +5,7 @@ import { EditorialDiscoveriesView } from './views/DiscoveriesView';
 import { EditorialInitialSyncingView } from './views/InitialSyncingView';
 import { EditorialOnboardingView } from './views/OnboardingView';
 import { EditorialProfileView } from './views/ProfileView';
+import { EditorialRecapView } from './views/RecapView';
 import { EditorialShareCard } from './views/ShareCard';
 import { EditorialSignInView } from './views/SignInView';
 import { EditorialSyncBanner } from './views/SyncBanner';
@@ -42,6 +43,7 @@ export const editorialSkin: SkinComponentSet = {
   InitialSyncingView: EditorialInitialSyncingView,
   ShareCard: EditorialShareCard,
   SyncBanner: EditorialSyncBanner,
+  RecapView: EditorialRecapView,
   States: {
     AlbumDetailSkeleton: AlbumDetailProofSkeleton,
     PickError: ({ onRetry, retrying }) => (
