@@ -8,6 +8,7 @@ import type { DiscoveryFilter } from '@/components/album/StatusTabs';
 import { BrandMark } from '@/components/brand/BrandMark';
 import { AccentRule } from '@/components/skins/editorial/accent/AccentRule';
 import { EditorialMarker } from '@/components/skins/editorial/EditorialMarker';
+import { EditorialMasthead } from '@/components/skins/editorial/EditorialMasthead';
 import { PaperGrain } from '@/components/skins/editorial/PaperGrain';
 import {
   editorialColors,
@@ -129,8 +130,9 @@ export function EditorialDiscoveriesView(
       />
       <View className="flex-1 px-5" style={{ paddingTop: insets.top + 12 }}>
         <View>
+          <EditorialMasthead issueLabel={`${props.discoveries.length} issues`} />
           <Text
-            className="uppercase"
+            className="mt-3 uppercase"
             style={[type.archiveMasthead, { color: editorialColors.ink }]}
             maxFontSizeMultiplier={1.3}
             adjustsFontSizeToFit

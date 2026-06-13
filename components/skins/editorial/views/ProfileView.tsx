@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AccentRule } from '@/components/skins/editorial/accent/AccentRule';
 import { EditorialActionButton } from '@/components/skins/editorial/EditorialActionButton';
+import { EditorialMasthead } from '@/components/skins/editorial/EditorialMasthead';
 import { EditorialSectionRule } from '@/components/skins/editorial/EditorialSectionRule';
 import { PaperGrain } from '@/components/skins/editorial/PaperGrain';
 import { editorialColors, tracking } from '@/components/skins/shared/skinStyles';
@@ -140,6 +141,7 @@ export function EditorialProfileView(props: Parameters<SkinComponentSet['Profile
         }
       >
         <View className="gap-3">
+          <EditorialMasthead issueLabel="Private edition" />
           <Text
             className="font-display text-[54px] uppercase leading-[52px]"
             style={{ color: editorialColors.ink, letterSpacing: 0 }}

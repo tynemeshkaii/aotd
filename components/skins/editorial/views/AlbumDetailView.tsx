@@ -6,6 +6,7 @@ import { AccentRule } from '@/components/skins/editorial/accent/AccentRule';
 import { AccentText } from '@/components/skins/editorial/accent/AccentText';
 import { EditorialAlbumActions } from '@/components/skins/editorial/EditorialAlbumActions';
 import { EditorialMarker } from '@/components/skins/editorial/EditorialMarker';
+import { EditorialMasthead } from '@/components/skins/editorial/EditorialMasthead';
 import { EditorialSectionRule } from '@/components/skins/editorial/EditorialSectionRule';
 import { EditorialSpecLine } from '@/components/skins/editorial/EditorialSpecLine';
 import { PaperGrain } from '@/components/skins/editorial/PaperGrain';
@@ -32,7 +33,7 @@ export function EditorialAlbumDetailView(
 ) {
   const date = formatIssueDate(props.album.pick_date);
   const markers = albumCoverMarkers(props.album);
-  const showStandaloneKicker = props.isToday || !props.header;
+  const showStandaloneKicker = !props.isToday && !props.header;
   const bottomPadding = props.isToday
     ? getTabContentBottomPadding(props.bottomInset)
     : getPageBottomPadding(props.bottomInset);
@@ -83,6 +84,11 @@ export function EditorialAlbumDetailView(
         }}
       >
         <View>
+          {props.isToday ? (
+            <View style={{ marginBottom: space.s4 }}>
+              <EditorialMasthead issueLabel={`№${issueNo(props.album)}`} dateLabel={date} />
+            </View>
+          ) : null}
           {props.header && !props.isToday ? (
             <View className="flex-row items-center justify-between gap-4">
               {props.header}
