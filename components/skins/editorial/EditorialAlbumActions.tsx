@@ -5,6 +5,7 @@ import { EditorialActionButton } from '@/components/skins/editorial/EditorialAct
 import { editorialColors, space } from '@/components/skins/shared/skinStyles';
 import { Text } from '@/components/ui/Text';
 import { haptics } from '@/lib/haptics';
+import { useReduceMotion } from '@/lib/hooks/useReduceMotion';
 
 type Props = {
   opening: boolean;
@@ -15,9 +16,11 @@ type Props = {
 
 export function EditorialAlbumActions({ opening, sharing, onOpen, onShare }: Props) {
   const [pressed, setPressed] = React.useState(false);
+  const reduceMotion = useReduceMotion();
   const inverted = pressed && !opening;
   const surface = inverted ? 'transparent' : editorialColors.ink;
   const onSurface = inverted ? editorialColors.ink : editorialColors.paper;
+  const shouldScale = pressed && !opening && !reduceMotion;
 
   return (
     <View style={{ gap: space.s3 }}>
@@ -34,7 +37,11 @@ export function EditorialAlbumActions({ opening, sharing, onOpen, onShare }: Pro
           onOpen();
         }}
         className="border-2 p-3"
-        style={{ borderColor: editorialColors.ink, backgroundColor: surface }}
+        style={{
+          borderColor: editorialColors.ink,
+          backgroundColor: surface,
+          transform: [{ scale: shouldScale ? 0.98 : 1 }],
+        }}
       >
         <View
           className="absolute left-0 right-0 top-0 h-[3px]"
