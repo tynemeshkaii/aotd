@@ -37,7 +37,16 @@ function EditorialSyncBannerContent({ status }: { status: LibrarySyncStatus | nu
 
   if (status.status === 'failed' || isStale) {
     return (
-      <View className="border-2 px-4 py-3" style={{ borderColor: editorialColors.red }}>
+      <View
+        className="border-2 px-4 py-3"
+        style={{ borderColor: editorialColors.red, backgroundColor: editorialColors.paper }}
+      >
+        <Text
+          className="mb-2 font-mono-bold text-[10px] uppercase leading-4"
+          style={{ color: editorialColors.red, letterSpacing: tracking.label }}
+        >
+          Sync notice
+        </Text>
         <Text className="font-prose text-sm leading-5" style={{ color: editorialColors.ink }}>
           {isStale
             ? 'Sync is taking longer than expected. You can try again now.'
@@ -56,6 +65,12 @@ function EditorialSyncBannerContent({ status }: { status: LibrarySyncStatus | nu
       className="border-2 px-4 py-3"
       style={{ borderColor: editorialColors.ink, backgroundColor: editorialColors.paperAlt }}
     >
+      <Text
+        className="mb-1 font-mono-bold text-[10px] uppercase leading-4"
+        style={{ color: editorialColors.muted, letterSpacing: tracking.label }}
+      >
+        Library import
+      </Text>
       <Text
         className="mb-2 font-mono text-[11px] uppercase leading-4"
         style={{ color: editorialColors.ink, letterSpacing: tracking.label }}

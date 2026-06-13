@@ -2,6 +2,7 @@ import { ActivityIndicator, View } from 'react-native';
 
 import { BrandMark } from '@/components/brand/BrandMark';
 import { EditorialActionButton } from '@/components/skins/editorial/EditorialActionButton';
+import { EditorialSectionRule } from '@/components/skins/editorial/EditorialSectionRule';
 import { PaperGrain } from '@/components/skins/editorial/PaperGrain';
 import { editorialColors } from '@/components/skins/shared/skinStyles';
 import { ProgressBar } from '@/components/ui/ProgressBar';
@@ -16,6 +17,9 @@ export function EditorialInitialSyncingView(
       className="flex-1 items-center justify-center px-8"
       style={{ backgroundColor: editorialColors.paper }}
     >
+      <View className="mb-6 w-full">
+        <EditorialSectionRule title="Initial press run" major />
+      </View>
       <View className="mb-8 border-2 p-6" style={{ borderColor: editorialColors.ink }}>
         <BrandMark size={72} muted />
       </View>

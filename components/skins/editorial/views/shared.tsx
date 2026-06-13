@@ -111,7 +111,7 @@ export function EditorialProofState({
 }) {
   return (
     <EditorialStateShell>
-      <View className="flex-1 justify-center gap-4 py-12">
+      <View className="flex-1 justify-center gap-4 px-5 py-12">
         <EditorialSectionRule title={label} major />
         <View className="border-2 p-4" style={{ borderColor: editorialColors.ink }}>
           <Text
