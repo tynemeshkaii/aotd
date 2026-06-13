@@ -24,11 +24,12 @@ export function issueNo(album: AlbumDiscovery) {
 }
 
 export function albumSpec(album: AlbumDiscovery) {
-  // Year + country live on the cover chips; the spec line stays artist/tracks/duration.
   return [
+    album.album_release_year?.toString(),
     album.album_primary_artist_name,
     album.album_total_tracks ? `${album.album_total_tracks} tracks` : null,
     formatAlbumDuration(album.album_duration_ms),
+    formatArtistCountry(album.album_artist_country),
   ].filter((item): item is string => Boolean(item));
 }
 

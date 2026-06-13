@@ -54,7 +54,7 @@ export const editorialType = {
   display34: {
     fontFamily: 'Archivo_800ExtraBold',
     fontSize: 34,
-    lineHeight: 32,
+    lineHeight: 34,
     letterSpacing: 0,
   },
   monoKicker: {

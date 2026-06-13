@@ -49,8 +49,8 @@ export function ReasonParagraph({ text }: { text: string }) {
       <Text
         style={{
           fontFamily: 'Archivo_800ExtraBold',
-          fontSize: 27,
-          lineHeight: 27,
+          fontSize: 24,
+          lineHeight: 24,
           color: editorialColors.ink,
         }}
       >
