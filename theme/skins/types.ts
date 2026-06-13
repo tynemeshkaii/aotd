@@ -7,6 +7,7 @@ import type { DiscoveryFilter } from '@/components/album/StatusTabs';
 import type { LibrarySyncStatus } from '@/lib/hooks/useLibrarySyncStatus';
 import type { ProfileOverview } from '@/lib/hooks/useProfileOverview';
 import type { AlbumDiscovery } from '@/lib/recommendation';
+import type { StreakSummary } from '@/lib/streak';
 
 export type SkinId = 'editorial';
 
@@ -90,6 +91,7 @@ export type ProfileViewProps = {
   onOpenRatedDiscoveries: () => void;
   product: string | null;
   heroSubtitle: string;
+  streakRun?: StreakSummary | null;
   refreshing: boolean;
   onRefresh: () => void;
 };

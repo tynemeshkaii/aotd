@@ -3,12 +3,14 @@ import { Alert } from 'react-native';
 
 import { signOut } from '@/lib/auth';
 import { copy } from '@/lib/copy';
+import { useDiscoveries } from '@/lib/hooks/useDiscoveries';
 import { useLibrarySyncStatus } from '@/lib/hooks/useLibrarySyncStatus';
 import { useProfileIdentity } from '@/lib/hooks/useProfileIdentity';
 import { useProfileOverview } from '@/lib/hooks/useProfileOverview';
 import { useSpotifyConnection } from '@/lib/hooks/useSpotifyConnection';
 import { useTriggerLibrarySync } from '@/lib/hooks/useTriggerLibrarySync';
 import { isActiveLibrarySync, isStaleLibrarySync } from '@/lib/library';
+import { buildStreakSummary } from '@/lib/streak';
 import { useAccentFlowFocus } from '@/theme/skins/AccentFlowProvider';
 import { useSkinComponents } from '@/theme/skins/registry';
 
@@ -30,6 +32,7 @@ export function ProfileController() {
   } = useProfileIdentity();
 
   const { data: connection, refetch: refetchConnection } = useSpotifyConnection();
+  const { data: discoveries = [] } = useDiscoveries({ limit: 60 });
 
   const {
     data: overview,
@@ -94,6 +97,7 @@ export function ProfileController() {
       }
       product={productLabel(connection?.spotify_product)}
       heroSubtitle={heroSubtitle}
+      streakRun={buildStreakSummary(discoveries, discoveries[0]?.pick_date, overview?.streak ?? 0)}
       refreshing={overviewRefetching}
       onRefresh={handleRefresh}
     />

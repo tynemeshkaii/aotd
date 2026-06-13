@@ -5,14 +5,17 @@ import { Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AlbumDetail } from '@/components/album/AlbumDetail';
+import { SubscriptionRun } from '@/components/skins/editorial/SubscriptionRun';
 import { tracking } from '@/components/skins/shared/skinStyles';
 import { Text } from '@/components/ui/Text';
+import { useDiscoveries } from '@/lib/hooks/useDiscoveries';
 import { useLibrarySyncStatus } from '@/lib/hooks/useLibrarySyncStatus';
 import { useProfileOverview } from '@/lib/hooks/useProfileOverview';
 import { useTodayPick } from '@/lib/hooks/useTodayPick';
 import { useUnratedPastPickCount } from '@/lib/hooks/useUnratedPastPickCount';
 import { hasCompletedLibrarySync } from '@/lib/library';
 import { useTabContentBottomPadding } from '@/lib/navigationChrome';
+import { buildStreakSummary } from '@/lib/streak';
 import { useSkinComponents } from '@/theme/skins/registry';
 
 function HomeStateShell({ children }: { children: ReactNode }) {
@@ -79,6 +82,7 @@ export default function HomeScreen() {
   const { data: oldPendingCount = 0 } = useUnratedPastPickCount(pick?.aotd_id);
   const { status: syncStatus } = useLibrarySyncStatus();
   const { data: overview } = useProfileOverview();
+  const { data: discoveries = [] } = useDiscoveries({ limit: 60 });
 
   // Loading: pick skeleton (not a blank screen).
   if (isLoading) {
@@ -111,14 +115,20 @@ export default function HomeScreen() {
   }
 
   // Today's pick: full-bleed rich treatment.
+  const streakRun = buildStreakSummary(discoveries, pick.pick_date, overview?.streak ?? 0);
   const footer =
-    oldPendingCount > 0 ? (
-      <PendingArchiveNudge
-        count={oldPendingCount}
-        onPress={() => {
-          router.push({ pathname: '/(tabs)/discoveries', params: { filter: 'pending' } });
-        }}
-      />
+    streakRun.days.length > 0 || oldPendingCount > 0 ? (
+      <View className="gap-4">
+        <SubscriptionRun summary={streakRun} compact />
+        {oldPendingCount > 0 ? (
+          <PendingArchiveNudge
+            count={oldPendingCount}
+            onPress={() => {
+              router.push({ pathname: '/(tabs)/discoveries', params: { filter: 'pending' } });
+            }}
+          />
+        ) : null}
+      </View>
     ) : null;
 
   return (

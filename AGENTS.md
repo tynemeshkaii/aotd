@@ -222,6 +222,7 @@ Editorial design contracts:
 - `EditorialActionButton` (in `components/skins/editorial/EditorialActionButton.tsx`) preserves its provided `title` while loading, so callers should pass specific loading copy such as `Syncing...`, `Retrying...`, or `Saving...`. Its disabled state keeps the resting palette at reduced opacity and never inverts.
 - Country chip renders only when `album_artist_country` is present; `GB` displays as `UK`. Hide the chip when country is null.
 - The spec line should not add genres. The product does not explain picks by genre.
+- The subscription run / `VOL.` streak surface is client-derived by `lib/streak.ts` from `useDiscoveries()` `pick_date` values plus `overview.streak`. It operates on the pick's local `YYYY-MM-DD` calendar date strings and must not introduce UTC day-boundary conversions. Home renders a compact standing-order strip below the ballot and before any archive nudge; Profile renders the expanded strip in the identity/stat area. Copy stays gentle and low-pressure.
 - Do not use negative `letterSpacing`. It causes text clipping at large accessibility text sizes. Positive tracking values (0.8, 1.2, etc.) for mono/kicker labels are intentional editorial tracking.
 - Flowing accent is scarce: masthead `day`, hairline rules, and CTA arrow. Do not animate album titles, metadata, rows, body copy, skeletons, errors, or lists.
 

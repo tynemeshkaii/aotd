@@ -8,6 +8,7 @@ import { EditorialActionButton } from '@/components/skins/editorial/EditorialAct
 import { EditorialMasthead } from '@/components/skins/editorial/EditorialMasthead';
 import { EditorialSectionRule } from '@/components/skins/editorial/EditorialSectionRule';
 import { PaperGrain } from '@/components/skins/editorial/PaperGrain';
+import { SubscriptionRun } from '@/components/skins/editorial/SubscriptionRun';
 import { editorialColors, tracking } from '@/components/skins/shared/skinStyles';
 import { Avatar } from '@/components/ui/Avatar';
 import { Skeleton } from '@/components/ui/Skeleton';
@@ -16,6 +17,7 @@ import { copy } from '@/lib/copy';
 import { relativeTime } from '@/lib/format';
 import { haptics } from '@/lib/haptics';
 import { getTabContentBottomPadding } from '@/lib/navigationChrome';
+import { romanNumeral } from '@/lib/streak';
 import type { SkinComponentSet } from '@/theme/skins/types';
 import { EditorialSyncBanner } from './SyncBanner';
 
@@ -51,27 +53,6 @@ function LedgerStat({
       </Text>
     </View>
   );
-}
-
-function romanNumeral(value: number) {
-  const numerals: [number, string][] = [
-    [50, 'L'],
-    [40, 'XL'],
-    [10, 'X'],
-    [9, 'IX'],
-    [5, 'V'],
-    [4, 'IV'],
-    [1, 'I'],
-  ];
-  let remaining = Math.min(99, Math.max(0, Math.floor(value)));
-  let result = '';
-  for (const [amount, numeral] of numerals) {
-    while (remaining >= amount) {
-      result += numeral;
-      remaining -= amount;
-    }
-  }
-  return result;
 }
 
 function formatSubscriberSince(value?: string | null) {
@@ -334,6 +315,9 @@ export function EditorialProfileView(props: Parameters<SkinComponentSet['Profile
               { value: String(rated), label: 'rated' },
             ]}
           />
+          <View className="mt-4">
+            <SubscriptionRun summary={props.streakRun} />
+          </View>
         </View>
 
         <View className="gap-4">

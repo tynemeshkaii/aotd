@@ -3,6 +3,7 @@ import { Text } from '@/components/ui/Text';
 import type { LibrarySyncStatus } from '@/lib/hooks/useLibrarySyncStatus';
 import type { ProfileOverview } from '@/lib/hooks/useProfileOverview';
 import type { AlbumDiscovery, RatingScore } from '@/lib/recommendation';
+import { buildStreakSummary } from '@/lib/streak';
 import { useSkinComponents } from '@/theme/skins/registry';
 import type { ProfileViewProps } from '@/theme/skins/types';
 
@@ -178,6 +179,7 @@ function profileFixtureProps(
     refreshing: false,
     onRefresh: () => undefined,
     product: 'Premium',
+    streakRun: buildStreakSummary(fixtures, '2026-05-31', overview?.streak ?? 0),
     heroSubtitle: overview
       ? `${overview.streak}-day streak / ${overview.total_discovered} albums discovered`
       : 'Your taste, one album at a time',
