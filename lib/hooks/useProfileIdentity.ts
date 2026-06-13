@@ -15,7 +15,7 @@ export function useProfileIdentity() {
 
       const { data, error } = await supabase
         .from('profiles')
-        .select('display_name, avatar_url')
+        .select('display_name, avatar_url, created_at')
         .eq('id', userId)
         .single();
 

@@ -158,6 +158,7 @@ function profileFixtureProps(
     profile: {
       display_name: name,
       avatar_url: covers.bright,
+      created_at: '2026-01-14T09:00:00.000Z',
     },
     profileLoading: false,
     connection: {
@@ -195,7 +196,7 @@ const profileFixtures = [
   {
     title: 'Profile / empty low data',
     props: profileFixtureProps('Spotify listener', emptyOverview, {
-      profile: { display_name: null, avatar_url: null },
+      profile: { display_name: null, avatar_url: null, created_at: '2026-05-28T09:00:00.000Z' },
       libraryStats: { albumsTracked: 8, lastSyncedAt: '2026-06-01T18:20:00.000Z' },
     }),
   },

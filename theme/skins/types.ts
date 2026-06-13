@@ -68,7 +68,11 @@ export type DiscoveriesViewProps = {
 };
 
 export type ProfileViewProps = {
-  profile?: { display_name: string | null; avatar_url: string | null } | null;
+  profile?: {
+    display_name: string | null;
+    avatar_url: string | null;
+    created_at?: string | null;
+  } | null;
   profileLoading: boolean;
   connection?: {
     provider: string | null;

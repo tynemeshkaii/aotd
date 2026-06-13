@@ -53,6 +53,93 @@ function LedgerStat({
   );
 }
 
+function romanNumeral(value: number) {
+  const numerals: [number, string][] = [
+    [50, 'L'],
+    [40, 'XL'],
+    [10, 'X'],
+    [9, 'IX'],
+    [5, 'V'],
+    [4, 'IV'],
+    [1, 'I'],
+  ];
+  let remaining = Math.min(99, Math.max(0, Math.floor(value)));
+  let result = '';
+  for (const [amount, numeral] of numerals) {
+    while (remaining >= amount) {
+      result += numeral;
+      remaining -= amount;
+    }
+  }
+  return result;
+}
+
+function formatSubscriberSince(value?: string | null) {
+  if (!value) return null;
+  return new Date(value).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+}
+
+function StatStripCell({
+  value,
+  label,
+  loading,
+  isFirst,
+}: {
+  value: string;
+  label: string;
+  loading?: boolean;
+  isFirst: boolean;
+}) {
+  return (
+    <View
+      className="flex-1 px-3 py-3"
+      style={{ borderLeftWidth: isFirst ? 0 : 1, borderLeftColor: editorialColors.ink }}
+    >
+      {loading ? (
+        <Skeleton className="h-[38px] w-4/5 rounded-none" />
+      ) : (
+        <Text
+          className="font-display text-[38px] uppercase leading-[38px]"
+          style={{ color: editorialColors.ink, letterSpacing: 0 }}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.72}
+        >
+          {value}
+        </Text>
+      )}
+      <Text
+        className="mt-1 font-mono text-[10px] uppercase leading-4"
+        style={{ color: editorialColors.muted, letterSpacing: tracking.label }}
+      >
+        {label}
+      </Text>
+    </View>
+  );
+}
+
+function StatStrip({
+  stats,
+  loading,
+}: {
+  stats: { value: string; label: string }[];
+  loading?: boolean;
+}) {
+  return (
+    <View className="flex-row border-2" style={{ borderColor: editorialColors.ink }}>
+      {stats.map((stat, index) => (
+        <StatStripCell
+          key={stat.label}
+          value={stat.value}
+          label={stat.label}
+          loading={loading}
+          isFirst={index === 0}
+        />
+      ))}
+    </View>
+  );
+}
+
 function listeningMoodLabel(avgScore: number | null | undefined) {
   if (avgScore == null) return 'No mood yet';
   if (avgScore >= 4.5) return 'Loved it';
@@ -118,6 +205,8 @@ export function EditorialProfileView(props: Parameters<SkinComponentSet['Profile
     ? 'Reading your private listening record'
     : props.heroSubtitle;
   const listening = props.overview?.listening;
+  const subscriberSince = formatSubscriberSince(props.profile?.created_at);
+  const volumeLabel = streak > 0 ? romanNumeral(streak) : null;
 
   return (
     <View className="flex-1" style={{ backgroundColor: editorialColors.paper }}>
@@ -202,6 +291,34 @@ export function EditorialProfileView(props: Parameters<SkinComponentSet['Profile
                   >
                     {heroSubtitle}
                   </Text>
+                  {subscriberSince || volumeLabel ? (
+                    <View className="mt-3 flex-row flex-wrap items-center gap-2">
+                      {subscriberSince ? (
+                        <Text
+                          className="font-mono-bold text-[10px] uppercase leading-4"
+                          style={{ color: editorialColors.muted, letterSpacing: tracking.label }}
+                        >
+                          Subscriber since {subscriberSince}
+                        </Text>
+                      ) : null}
+                      {volumeLabel ? (
+                        <View
+                          className="border-2 px-2 py-1"
+                          style={{ borderColor: editorialColors.accentStatic }}
+                        >
+                          <Text
+                            className="font-mono-bold text-[10px] uppercase leading-4"
+                            style={{
+                              color: editorialColors.accentStatic,
+                              letterSpacing: tracking.label,
+                            }}
+                          >
+                            {`Vol. ${volumeLabel}`}
+                          </Text>
+                        </View>
+                      ) : null}
+                    </View>
+                  ) : null}
                 </>
               )}
             </View>
@@ -209,11 +326,14 @@ export function EditorialProfileView(props: Parameters<SkinComponentSet['Profile
         </View>
 
         <View className="border-b-2 pb-4" style={{ borderColor: editorialColors.ink }}>
-          <View className="flex-row gap-3">
-            <LedgerStat value={String(streak)} label="day streak" loading={props.overviewLoading} />
-            <LedgerStat value={String(discovered)} label="issues" loading={props.overviewLoading} />
-            <LedgerStat value={String(rated)} label="rated" loading={props.overviewLoading} />
-          </View>
+          <StatStrip
+            loading={props.overviewLoading}
+            stats={[
+              { value: String(streak), label: 'day streak' },
+              { value: String(discovered), label: 'issues' },
+              { value: String(rated), label: 'rated' },
+            ]}
+          />
         </View>
 
         <View className="gap-4">

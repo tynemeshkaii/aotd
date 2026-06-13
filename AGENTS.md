@@ -210,7 +210,7 @@ Editorial design contracts:
 - Do not reintroduce the old glass/rounded/dark SaaS look as the default.
 - The album cover is the dominant visual surface. Avoid generic decorative blobs/orbs.
 - Tags/chips are static ink/paper markers, not flowing accent.
-- Editorial Profile is a listening identity page first, not a settings ledger. Keep identity, Taste map, and Listening visually strongest; Production notes, Connections, and Log out should stay quieter.
+- Editorial Profile is a listening identity page first, not a settings ledger. Keep identity, Taste map, and Listening visually strongest; Production notes, Connections, and Log out should stay quieter. The identity block may show `SUBSCRIBER SINCE <month year>` from `profiles.created_at` when available and a coral `VOL.` chip for a positive streak; the top streak/issues/rated metrics render as one printed stat strip with internal dividers.
 - Profile loading must be honest: do not render placeholder zero metrics while `overviewLoading` is true. Use skeleton/loading treatments and only show empty states after overview data has finished loading.
 - Profile uses safe-area-aware top padding via `useSafeAreaInsets()` and tab-aware bottom padding via `lib/navigationChrome.ts`, accounting for notched iPhones, the tab bar, and the home indicator.
 - Profile Spotify Free/Premium markers use ink/paper editorial styling. Do not use Spotify green for Profile badges; reserve Spotify green for Spotify-branded sign-in/opening UI.
