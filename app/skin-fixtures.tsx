@@ -277,8 +277,19 @@ export default function SkinFixturesScreen() {
             emptySubtitle="Fixture suite"
           />
           {index === 0 ? (
-            <View className="mt-4 overflow-hidden rounded-xl" style={{ height: 360 }}>
-              <components.ShareCard album={album} />
+            <View className="mt-4 gap-3">
+              <Text variant="caption">Share / square</Text>
+              <View className="overflow-hidden rounded-xl" style={{ height: 360 }}>
+                <components.ShareCard album={album} format="square" />
+              </View>
+              <Text variant="caption">Share / story</Text>
+              <View className="overflow-hidden rounded-xl" style={{ height: 480 }}>
+                <components.ShareCard album={album} format="story" />
+              </View>
+              <Text variant="caption">Share / minimal</Text>
+              <View className="overflow-hidden rounded-xl" style={{ height: 360 }}>
+                <components.ShareCard album={album} format="minimal" />
+              </View>
             </View>
           ) : null}
         </View>

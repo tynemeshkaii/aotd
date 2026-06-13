@@ -46,8 +46,10 @@ export type AlbumDetailViewProps = {
   bottomInset: number;
   opening: boolean;
   sharing: boolean;
+  shareFormat: ShareFormat;
   onOpen: () => void;
   onShare: () => void;
+  onShareFormatChange: (format: ShareFormat) => void;
   isFreeSpotify: boolean;
   /** Pull-to-refresh: only wired for today's Home pick. */
   refreshing?: boolean;
@@ -121,7 +123,10 @@ export type InitialSyncingViewProps = {
 
 export type ShareCardProps = {
   album: AlbumDiscovery;
+  format?: ShareFormat;
 };
+
+export type ShareFormat = 'square' | 'story' | 'minimal';
 
 export type SyncBannerProps = {
   style?: StyleProp<ViewStyle>;

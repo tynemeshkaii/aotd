@@ -189,8 +189,10 @@ export function EditorialAlbumDetailView(
             <EditorialAlbumActions
               opening={props.opening}
               sharing={props.sharing}
+              shareFormat={props.shareFormat}
               onOpen={props.onOpen}
               onShare={props.onShare}
+              onShareFormatChange={props.onShareFormatChange}
             />
             <Text
               className="mt-2 font-mono text-[10px] uppercase leading-4"
