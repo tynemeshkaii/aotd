@@ -3,6 +3,7 @@ import type { SkinComponentSet } from '@/theme/skins/types';
 import { EditorialAlbumDetailView } from './views/AlbumDetailView';
 import { EditorialDiscoveriesView } from './views/DiscoveriesView';
 import { EditorialInitialSyncingView } from './views/InitialSyncingView';
+import { EditorialOnboardingView } from './views/OnboardingView';
 import { EditorialProfileView } from './views/ProfileView';
 import { EditorialShareCard } from './views/ShareCard';
 import { EditorialSignInView } from './views/SignInView';
@@ -37,6 +38,7 @@ export const editorialSkin: SkinComponentSet = {
   DiscoveriesView: EditorialDiscoveriesView,
   ProfileView: EditorialProfileView,
   SignInView: EditorialSignInView,
+  OnboardingView: EditorialOnboardingView,
   InitialSyncingView: EditorialInitialSyncingView,
   ShareCard: EditorialShareCard,
   SyncBanner: EditorialSyncBanner,

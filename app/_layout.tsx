@@ -3,13 +3,14 @@ import '../global.css';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AuthProvider, useSession } from '@/components/auth/AuthProvider';
 import { BrandMark } from '@/components/brand/BrandMark';
 import { InitialSyncingScreen } from '@/components/onboarding/InitialSyncingScreen';
+import { hasSeenOnboarding } from '@/components/skins/shared/OnboardingController';
 import { Text } from '@/components/ui/Text';
 import { useLibrarySyncStatus } from '@/lib/hooks/useLibrarySyncStatus';
 import { hasCompletedLibrarySync } from '@/lib/library';
@@ -74,25 +75,45 @@ function RouterGuard() {
   const { status: syncStatus, loading: syncStatusLoading } = useLibrarySyncStatus();
   const segments = useSegments();
   const router = useRouter();
+  const [onboardingSeen, setOnboardingSeen] = useState<boolean | null>(null);
 
   useEffect(() => {
-    if (loading) {
+    if (loading || session) {
+      setOnboardingSeen(true);
+      return;
+    }
+
+    let active = true;
+    hasSeenOnboarding().then((seen) => {
+      if (active) {
+        setOnboardingSeen(seen);
+      }
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [loading, session]);
+
+  useEffect(() => {
+    if (loading || onboardingSeen == null) {
       return;
     }
 
     const inSignInGroup = segments[0] === '(auth)';
+    const inOnboardingGroup = String(segments[0]) === '(onboarding)';
     const inOAuthCallback = segments[0] === 'auth';
 
-    if (!session && !inSignInGroup && !inOAuthCallback) {
-      router.replace('/(auth)/sign-in');
+    if (!session && !inSignInGroup && !inOnboardingGroup && !inOAuthCallback) {
+      router.replace(onboardingSeen ? '/(auth)/sign-in' : ('/(onboarding)' as never));
     }
 
-    if (session && inSignInGroup) {
+    if (session && (inSignInGroup || inOnboardingGroup)) {
       router.replace('/(tabs)');
     }
-  }, [loading, router, segments, session]);
+  }, [loading, onboardingSeen, router, segments, session]);
 
-  if (loading) {
+  if (loading || onboardingSeen == null) {
     return <BootSplash label="Loading session" />;
   }
 

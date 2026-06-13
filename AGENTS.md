@@ -264,6 +264,7 @@ Spotify OAuth:
 - Callback parsing must accept OAuth params from both query strings and hash fragments.
 - Dev logs may print callback param keys, never OAuth codes, provider tokens, access tokens, refresh tokens, or auth headers.
 - Keep the explicit `albumoftheday://auth/callback` route and `app/auth/callback.tsx`.
+- First-run signed-out users see the editorial `app/(onboarding)` Issue №0 flow before sign-in, gated by a best-effort SecureStore `onboarding_seen` flag. Returning or signed-in users skip it. The connect step reuses the shared Spotify sign-in/bootstrap handler from `SignInController`/`lib/auth.ts`; do not fork OAuth or duplicate `bootstrapSpotifySession`.
 - `bootstrapSpotifySession(session)` must dedupe per user for the JS-context lifetime. Both sign-in and callback can resolve the same OAuth session; without dedupe the app can double-hit Spotify `/me` and trigger Development Mode 429 cascades.
 - A failed bootstrap clears its dedupe entry so a retry is possible. `signOut()` clears all bootstrap dedupe state.
 - Spotify scopes currently include `user-library-read`, `user-top-read`, `user-read-private`, and

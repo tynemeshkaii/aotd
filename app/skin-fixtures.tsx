@@ -235,6 +235,19 @@ export default function SkinFixturesScreen() {
     >
       <Text variant="screenTitle">Editorial Fixtures</Text>
       <Text variant="caption">Temporary gallery for editorial QA.</Text>
+      <View className="gap-3">
+        <Text variant="caption">Onboarding / Issue №0</Text>
+        <View
+          className="h-[760px] overflow-hidden border-2"
+          style={{ borderColor: components.chrome.text }}
+        >
+          <components.OnboardingView
+            loading={false}
+            onConnect={() => undefined}
+            onExistingSignIn={() => undefined}
+          />
+        </View>
+      </View>
       {profileFixtures.map((fixtureItem) => (
         <View key={fixtureItem.title} className="gap-3">
           <Text variant="caption">{fixtureItem.title}</Text>

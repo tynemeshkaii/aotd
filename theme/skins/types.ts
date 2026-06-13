@@ -99,6 +99,12 @@ export type SignInViewProps = {
   onSignIn: () => void;
 };
 
+export type OnboardingViewProps = {
+  loading: boolean;
+  onConnect: () => void;
+  onExistingSignIn: () => void;
+};
+
 export type InitialSyncingViewProps = {
   isFailed: boolean;
   isStale: boolean;
@@ -150,6 +156,7 @@ export type SkinComponentSet = {
   DiscoveriesView: (props: DiscoveriesViewProps) => ReactNode;
   ProfileView: (props: ProfileViewProps) => ReactNode;
   SignInView: (props: SignInViewProps) => ReactNode;
+  OnboardingView: (props: OnboardingViewProps) => ReactNode;
   InitialSyncingView: (props: InitialSyncingViewProps) => ReactNode;
   ShareCard: (props: ShareCardProps) => ReactNode;
   SyncBanner: (props: SyncBannerProps) => ReactNode;
