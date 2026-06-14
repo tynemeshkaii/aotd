@@ -1,6 +1,19 @@
 import type { RatingScore } from '@/lib/recommendation';
 
-export const editorialColors = {
+export type Palette = {
+  paper: string;
+  paperAlt: string;
+  ink: string;
+  muted: string;
+  rule: string;
+  accentStatic: string;
+  accent: string;
+  primary: string;
+  onPrimary: string;
+  red: string;
+};
+
+export const dayPalette: Palette = {
   paper: '#f4ebe0',
   paperAlt: '#eadcc9',
   ink: '#1d1511',
@@ -13,6 +26,22 @@ export const editorialColors = {
   red: '#9f2637',
 };
 
+export const nightPalette: Palette = {
+  paper: '#17120f',
+  paperAlt: '#221a14',
+  ink: '#f0e6d8',
+  muted: '#9a8a7a',
+  rule: '#f0e6d8',
+  accentStatic: '#ff5a3c',
+  accent: '#ff5a3c',
+  primary: '#b8485c',
+  onPrimary: '#fff6e8',
+  red: '#cf5b6d',
+};
+
+// Back-compat alias: unmigrated files continue to compile against the day palette.
+export const editorialColors = dayPalette;
+
 export const accentFlow = ['#ff4a2e', '#ff2e8b', '#7b3ff2', '#d9a441', '#ff4a2e'] as const;
 
 export const ratingTone: Record<RatingScore, string> = {
@@ -21,6 +50,14 @@ export const ratingTone: Record<RatingScore, string> = {
   3: '#9c8b86',
   2: '#a8636b',
   1: '#8e3b46',
+};
+
+export const ratingToneNight: Record<RatingScore, string> = {
+  5: '#e8b84d',
+  4: '#d99a4a',
+  3: '#b0a098',
+  2: '#c0757d',
+  1: '#a84d5a',
 };
 
 // 4pt spacing scale. Use these for editorial margins/gaps instead of ad-hoc

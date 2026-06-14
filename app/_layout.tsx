@@ -17,6 +17,7 @@ import { hasCompletedLibrarySync } from '@/lib/library';
 import { queryClient } from '@/lib/queryClient';
 import { initSentry } from '@/lib/sentry';
 import { AccentFlowProvider } from '@/theme/skins/AccentFlowProvider';
+import { EditorialThemeProvider } from '@/theme/skins/EditorialThemeProvider';
 import { useSkinFonts } from '@/theme/skins/fonts';
 import { useSkinComponents } from '@/theme/skins/registry';
 
@@ -58,15 +59,11 @@ function SkinGate() {
   const [fontsLoaded] = useSkinFonts();
   const components = useSkinComponents();
 
-  if (!fontsLoaded) {
-    return <BootSplash label="Loading" />;
-  }
-
   return (
-    <>
+    <EditorialThemeProvider>
       <StatusBar style={components.chrome.statusBarStyle} />
-      <RouterGuard />
-    </>
+      {fontsLoaded ? <RouterGuard /> : <BootSplash label="Loading" />}
+    </EditorialThemeProvider>
   );
 }
 
