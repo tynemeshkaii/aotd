@@ -12,6 +12,7 @@ import { EditorialSectionRule } from '@/components/skins/editorial/EditorialSect
 import { EditorialSpecLine } from '@/components/skins/editorial/EditorialSpecLine';
 import { PaperGrain } from '@/components/skins/editorial/PaperGrain';
 import { HalftoneOverlay } from '@/components/skins/editorial/skia/HalftoneOverlay';
+import { SkiaErrorBoundary } from '@/components/skins/editorial/skia/SkiaErrorBoundary';
 import { editorialType, space, tracking, zIndex } from '@/components/skins/shared/skinStyles';
 import { CoverImage } from '@/components/ui/CoverImage';
 import { Text } from '@/components/ui/Text';
@@ -161,7 +162,9 @@ export function EditorialAlbumDetailView(
                     )}
                   </Animated.View>
                   {props.album.album_cover_url && coverSide > 0 ? (
-                    <HalftoneOverlay size={coverSide} tint={palette.ink} />
+                    <SkiaErrorBoundary>
+                      <HalftoneOverlay size={coverSide} tint={palette.ink} />
+                    </SkiaErrorBoundary>
                   ) : null}
                   {markers.length > 0 ? (
                     <View

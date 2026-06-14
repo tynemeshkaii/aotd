@@ -64,8 +64,16 @@ export function HalftoneOverlay({ size, tint, opacity = 0.08 }: Props) {
   }, [progress, reduceMotion]);
 
   const effect = useMemo(() => {
-    if (!Skia) return null;
-    return Skia.Skia.RuntimeEffect.Make(HALFTONE_SOURCE);
+    // RuntimeEffect.Make is a native call. In a runtime where the Skia JS package
+    // resolves but the native module is absent (e.g. Expo Go), it can throw — and
+    // this runs in the render body, ahead of the SkiaErrorBoundary below. Guard it
+    // so the overlay degrades to nothing instead of taking down the cover subtree.
+    if (!skiaAvailable || !Skia) return null;
+    try {
+      return Skia.Skia.RuntimeEffect.Make(HALFTONE_SOURCE);
+    } catch {
+      return null;
+    }
   }, []);
 
   const uniforms = useMemo(() => {
