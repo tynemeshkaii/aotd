@@ -1,10 +1,11 @@
 import { View } from 'react-native';
 
-import { editorialColors, tracking } from '@/components/skins/shared/skinStyles';
+import { tracking } from '@/components/skins/shared/skinStyles';
 import { ProgressBar } from '@/components/ui/ProgressBar';
 import { Text } from '@/components/ui/Text';
 import { type LibrarySyncStatus, useLibrarySyncStatus } from '@/lib/hooks/useLibrarySyncStatus';
 import { isStaleLibrarySync } from '@/lib/library';
+import { useEditorialPalette } from '@/theme/skins/EditorialThemeProvider';
 import type { SkinComponentSet } from '@/theme/skins/types';
 
 function syncFailureCopy(status: LibrarySyncStatus) {
@@ -32,6 +33,7 @@ function EditorialLiveSyncBanner() {
 }
 
 function EditorialSyncBannerContent({ status }: { status: LibrarySyncStatus | null }) {
+  const palette = useEditorialPalette();
   if (!status || status.status === 'idle' || status.status === 'completed') return null;
   const isStale = isStaleLibrarySync(status);
 
@@ -39,15 +41,15 @@ function EditorialSyncBannerContent({ status }: { status: LibrarySyncStatus | nu
     return (
       <View
         className="border-2 px-4 py-3"
-        style={{ borderColor: editorialColors.red, backgroundColor: editorialColors.paper }}
+        style={{ borderColor: palette.red, backgroundColor: palette.paper }}
       >
         <Text
           className="mb-2 font-mono-bold text-[10px] uppercase leading-4"
-          style={{ color: editorialColors.red, letterSpacing: tracking.label }}
+          style={{ color: palette.red, letterSpacing: tracking.label }}
         >
           Sync notice
         </Text>
-        <Text className="font-prose text-sm leading-5" style={{ color: editorialColors.ink }}>
+        <Text className="font-prose text-sm leading-5" style={{ color: palette.ink }}>
           {isStale
             ? 'Sync is taking longer than expected. You can try again now.'
             : syncFailureCopy(status)}
@@ -63,17 +65,17 @@ function EditorialSyncBannerContent({ status }: { status: LibrarySyncStatus | nu
   return (
     <View
       className="border-2 px-4 py-3"
-      style={{ borderColor: editorialColors.ink, backgroundColor: editorialColors.paperAlt }}
+      style={{ borderColor: palette.ink, backgroundColor: palette.paperAlt }}
     >
       <Text
         className="mb-1 font-mono-bold text-[10px] uppercase leading-4"
-        style={{ color: editorialColors.muted, letterSpacing: tracking.label }}
+        style={{ color: palette.muted, letterSpacing: tracking.label }}
       >
         Library import
       </Text>
       <Text
         className="mb-2 font-mono text-[11px] uppercase leading-4"
-        style={{ color: editorialColors.ink, letterSpacing: tracking.label }}
+        style={{ color: palette.ink, letterSpacing: tracking.label }}
       >
         Importing your library... {processed} / {total || '?'}
       </Text>
@@ -81,9 +83,9 @@ function EditorialSyncBannerContent({ status }: { status: LibrarySyncStatus | nu
         ratio={ratio}
         height={8}
         bordered
-        trackColor={editorialColors.paper}
-        fillColor={editorialColors.accentStatic}
-        borderColor={editorialColors.ink}
+        trackColor={palette.paper}
+        fillColor={palette.accentStatic}
+        borderColor={palette.ink}
       />
     </View>
   );

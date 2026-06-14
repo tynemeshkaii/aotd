@@ -5,9 +5,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { SpotifyButton } from '@/components/auth/SpotifyButton';
 import { PaperGrain } from '@/components/skins/editorial/PaperGrain';
-import { editorialColors, ruleWeight, space, tracking } from '@/components/skins/shared/skinStyles';
+import { ruleWeight, space, tracking } from '@/components/skins/shared/skinStyles';
 import { Text } from '@/components/ui/Text';
 import { useReduceMotion } from '@/lib/hooks/useReduceMotion';
+import { useEditorialPalette } from '@/theme/skins/EditorialThemeProvider';
 import type { OnboardingViewProps } from '@/theme/skins/types';
 
 const BEATS = [
@@ -33,6 +34,7 @@ export function EditorialOnboardingView({
   onConnect,
   onExistingSignIn,
 }: OnboardingViewProps) {
+  const palette = useEditorialPalette();
   const insets = useSafeAreaInsets();
   const reduceMotion = useReduceMotion();
   const [index, setIndex] = useState(0);
@@ -46,7 +48,7 @@ export function EditorialOnboardingView({
     <View
       className="flex-1 px-5"
       style={{
-        backgroundColor: editorialColors.paper,
+        backgroundColor: palette.paper,
         paddingTop: insets.top + space.s6,
         paddingBottom: insets.bottom + space.s6,
       }}
@@ -55,22 +57,19 @@ export function EditorialOnboardingView({
         <Text
           className="font-mono-bold text-[11px] uppercase"
           maxFontSizeMultiplier={1.3}
-          style={{ color: editorialColors.ink, letterSpacing: tracking.label }}
+          style={{ color: palette.ink, letterSpacing: tracking.label }}
         >
           Album of the Day
         </Text>
         <Text
           className="font-mono text-[11px] uppercase"
           maxFontSizeMultiplier={1.3}
-          style={{ color: editorialColors.accentStatic, letterSpacing: tracking.label }}
+          style={{ color: palette.accentStatic, letterSpacing: tracking.label }}
         >
           {beat.label}
         </Text>
       </View>
-      <View
-        className="mt-3"
-        style={{ height: ruleWeight.rule, backgroundColor: editorialColors.ink }}
-      />
+      <View className="mt-3" style={{ height: ruleWeight.rule, backgroundColor: palette.ink }} />
 
       <View className="flex-1 justify-center">
         <Content key={beat.label} className="gap-5" {...contentProps}>
@@ -79,11 +78,11 @@ export function EditorialOnboardingView({
             maxFontSizeMultiplier={1.25}
             adjustsFontSizeToFit
             numberOfLines={3}
-            style={{ color: editorialColors.ink, letterSpacing: 0 }}
+            style={{ color: palette.ink, letterSpacing: 0 }}
           >
             {beat.title}
           </Text>
-          <Text className="font-prose text-lg leading-7" style={{ color: editorialColors.ink }}>
+          <Text className="font-prose text-lg leading-7" style={{ color: palette.ink }}>
             {beat.body}
           </Text>
         </Content>
@@ -96,15 +95,14 @@ export function EditorialOnboardingView({
               key={item.label}
               className="h-2 flex-1"
               style={{
-                backgroundColor:
-                  beatIndex <= index ? editorialColors.ink : editorialColors.paperAlt,
+                backgroundColor: beatIndex <= index ? palette.ink : palette.paperAlt,
               }}
             />
           ))}
         </View>
 
         {isLast ? (
-          <View className="gap-3 border-2 p-4" style={{ borderColor: editorialColors.ink }}>
+          <View className="gap-3 border-2 p-4" style={{ borderColor: palette.ink }}>
             <SpotifyButton disabled={loading} loading={loading} onPress={onConnect} />
             <Pressable
               accessibilityRole="button"
@@ -113,7 +111,7 @@ export function EditorialOnboardingView({
             >
               <Text
                 className="font-mono-bold text-[11px] uppercase"
-                style={{ color: editorialColors.muted, letterSpacing: tracking.label }}
+                style={{ color: palette.muted, letterSpacing: tracking.label }}
               >
                 I have already connected before
               </Text>
@@ -124,12 +122,12 @@ export function EditorialOnboardingView({
             accessibilityRole="button"
             accessibilityLabel="Continue onboarding"
             className="min-h-14 items-center justify-center border-2 px-5"
-            style={{ borderColor: editorialColors.ink, backgroundColor: editorialColors.ink }}
+            style={{ borderColor: palette.ink, backgroundColor: palette.ink }}
             onPress={() => setIndex((current) => Math.min(current + 1, BEATS.length - 1))}
           >
             <Text
               className="font-mono-bold text-sm uppercase"
-              style={{ color: editorialColors.paper, letterSpacing: tracking.label }}
+              style={{ color: palette.paper, letterSpacing: tracking.label }}
             >
               Continue
             </Text>

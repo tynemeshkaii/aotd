@@ -6,13 +6,14 @@ import { BrandMark } from '@/components/brand/BrandMark';
 import { EditorialMasthead } from '@/components/skins/editorial/EditorialMasthead';
 import { EditorialSectionRule } from '@/components/skins/editorial/EditorialSectionRule';
 import { PaperGrain } from '@/components/skins/editorial/PaperGrain';
-import { editorialColors, tracking } from '@/components/skins/shared/skinStyles';
+import { tracking } from '@/components/skins/shared/skinStyles';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { Text } from '@/components/ui/Text';
 import type { MonthlyRecap } from '@/lib/hooks/useMonthlyRecap';
 import type { RecapMonth } from '@/lib/hooks/useRecapMonths';
 import { getPageBottomPadding } from '@/lib/navigationChrome';
 import { getRatingLabel, type RatingScore } from '@/lib/recommendation';
+import { useEditorialPalette } from '@/theme/skins/EditorialThemeProvider';
 import type { SkinComponentSet } from '@/theme/skins/types';
 import { EditorialStamp } from './shared';
 
@@ -62,6 +63,7 @@ function MonthPicker({
   selected: string | null;
   onChange: (month: string) => void;
 }) {
+  const palette = useEditorialPalette();
   if (months.length <= 1) return null;
   return (
     <View className="flex-row flex-wrap gap-2">
@@ -74,15 +76,15 @@ function MonthPicker({
             accessibilityState={{ selected: active }}
             className="min-h-10 border-2 px-3 py-2"
             style={{
-              borderColor: editorialColors.ink,
-              backgroundColor: active ? editorialColors.ink : editorialColors.paper,
+              borderColor: palette.ink,
+              backgroundColor: active ? palette.ink : palette.paper,
             }}
             onPress={() => onChange(month.month)}
           >
             <Text
               className="font-mono-bold text-[10px] uppercase leading-4"
               style={{
-                color: active ? editorialColors.paper : editorialColors.ink,
+                color: active ? palette.paper : palette.ink,
                 letterSpacing: tracking.label,
               }}
             >
@@ -96,17 +98,18 @@ function MonthPicker({
 }
 
 function StatCell({ value, label }: { value: string; label: string }) {
+  const palette = useEditorialPalette();
   return (
-    <View className="flex-1 border-2 p-3" style={{ borderColor: editorialColors.ink }}>
+    <View className="flex-1 border-2 p-3" style={{ borderColor: palette.ink }}>
       <Text
         className="font-display text-[46px] uppercase leading-[44px]"
-        style={{ color: editorialColors.ink, letterSpacing: 0 }}
+        style={{ color: palette.ink, letterSpacing: 0 }}
       >
         {value}
       </Text>
       <Text
         className="mt-1 font-mono text-[10px] uppercase leading-4"
-        style={{ color: editorialColors.muted, letterSpacing: tracking.label }}
+        style={{ color: palette.muted, letterSpacing: tracking.label }}
       >
         {label}
       </Text>
@@ -115,6 +118,7 @@ function StatCell({ value, label }: { value: string; label: string }) {
 }
 
 function RatingSpread({ recap }: { recap: MonthlyRecap }) {
+  const palette = useEditorialPalette();
   const max = Math.max(...Object.values(recap.rating_spread), 1);
   const peak = modalScore(recap.rating_spread);
   return (
@@ -127,23 +131,22 @@ function RatingSpread({ recap }: { recap: MonthlyRecap }) {
             <View key={score} className="flex-row items-center gap-3">
               <Text
                 className="w-28 font-mono-bold text-[10px] uppercase leading-4"
-                style={{ color: editorialColors.muted, letterSpacing: tracking.label }}
+                style={{ color: palette.muted, letterSpacing: tracking.label }}
               >
                 {getRatingLabel(score)}
               </Text>
-              <View className="h-5 flex-1 border" style={{ borderColor: editorialColors.ink }}>
+              <View className="h-5 flex-1 border" style={{ borderColor: palette.ink }}>
                 <View
                   className="h-full"
                   style={{
                     width: `${Math.max(4, (count / max) * 100)}%`,
-                    backgroundColor:
-                      score === peak ? editorialColors.accentStatic : editorialColors.ink,
+                    backgroundColor: score === peak ? palette.accentStatic : palette.ink,
                   }}
                 />
               </View>
               <Text
                 className="w-8 text-right font-mono-bold text-[11px] uppercase"
-                style={{ color: editorialColors.ink, letterSpacing: tracking.label }}
+                style={{ color: palette.ink, letterSpacing: tracking.label }}
               >
                 {count}
               </Text>
@@ -156,9 +159,10 @@ function RatingSpread({ recap }: { recap: MonthlyRecap }) {
 }
 
 function TopFinding({ recap, onOpen }: { recap: MonthlyRecap; onOpen: (aotdId: string) => void }) {
+  const palette = useEditorialPalette();
   if (!recap.top_finding) {
     return (
-      <Text className="font-prose text-sm leading-5" style={{ color: editorialColors.muted }}>
+      <Text className="font-prose text-sm leading-5" style={{ color: palette.muted }}>
         {recap.issues_count > 0
           ? 'No top finding yet. Rate an issue from this month and it will appear here.'
           : 'No issues for this month yet.'}
@@ -172,10 +176,10 @@ function TopFinding({ recap, onOpen }: { recap: MonthlyRecap; onOpen: (aotdId: s
       accessibilityRole="button"
       accessibilityLabel={`Open ${finding.album_title}`}
       className="min-h-20 flex-row items-center gap-3 border-2 p-3"
-      style={{ borderColor: editorialColors.ink }}
+      style={{ borderColor: palette.ink }}
       onPress={() => onOpen(finding.aotd_id)}
     >
-      <View className="h-16 w-16 border-2" style={{ borderColor: editorialColors.ink }}>
+      <View className="h-16 w-16 border-2" style={{ borderColor: palette.ink }}>
         {finding.album_cover_url ? (
           <Image source={{ uri: finding.album_cover_url }} className="h-full w-full" />
         ) : (
@@ -188,14 +192,14 @@ function TopFinding({ recap, onOpen }: { recap: MonthlyRecap; onOpen: (aotdId: s
         <Text
           numberOfLines={2}
           className="font-prose-bold text-base leading-5"
-          style={{ color: editorialColors.ink }}
+          style={{ color: palette.ink }}
         >
           {finding.album_title}
         </Text>
         <Text
           numberOfLines={1}
           className="mt-1 font-mono text-[10px] uppercase leading-4"
-          style={{ color: editorialColors.muted, letterSpacing: tracking.label }}
+          style={{ color: palette.muted, letterSpacing: tracking.label }}
         >
           {finding.album_primary_artist_name}
         </Text>
@@ -206,9 +210,10 @@ function TopFinding({ recap, onOpen }: { recap: MonthlyRecap; onOpen: (aotdId: s
 }
 
 function Shell({ children }: { children: ReactNode }) {
+  const palette = useEditorialPalette();
   const insets = useSafeAreaInsets();
   return (
-    <View className="flex-1" style={{ backgroundColor: editorialColors.paper }}>
+    <View className="flex-1" style={{ backgroundColor: palette.paper }}>
       <ScrollView
         className="flex-1"
         contentContainerStyle={{
@@ -238,6 +243,7 @@ export function EditorialRecapView({
   onMonthChange,
   onOpenTopFinding,
 }: Props) {
+  const palette = useEditorialPalette();
   if (loading) {
     return (
       <Shell>
@@ -253,19 +259,19 @@ export function EditorialRecapView({
     return (
       <Shell>
         {header}
-        <Text className="font-display text-4xl uppercase" style={{ color: editorialColors.ink }}>
+        <Text className="font-display text-4xl uppercase" style={{ color: palette.ink }}>
           Could not load the monthly review.
         </Text>
         <Pressable
           accessibilityRole="button"
           disabled={retrying}
           className="min-h-12 items-center justify-center border-2 px-4"
-          style={{ borderColor: editorialColors.ink, opacity: retrying ? 0.6 : 1 }}
+          style={{ borderColor: palette.ink, opacity: retrying ? 0.6 : 1 }}
           onPress={onRetry}
         >
           <Text
             className="font-mono-bold text-[11px] uppercase"
-            style={{ color: editorialColors.ink, letterSpacing: tracking.label }}
+            style={{ color: palette.ink, letterSpacing: tracking.label }}
           >
             {retrying ? 'Retrying...' : 'Retry'}
           </Text>
@@ -281,7 +287,7 @@ export function EditorialRecapView({
         <EditorialMasthead issueLabel="Monthly review" dateLabel={monthLabel(month)} />
         <Text
           className="font-display text-[54px] uppercase leading-[52px]"
-          style={{ color: editorialColors.ink, letterSpacing: 0 }}
+          style={{ color: palette.ink, letterSpacing: 0 }}
           maxFontSizeMultiplier={1.3}
         >
           The Monthly Review
@@ -302,13 +308,13 @@ export function EditorialRecapView({
           </View>
           <View className="gap-3">
             <EditorialSectionRule title="Editor's note" />
-            <Text className="font-prose text-base leading-6" style={{ color: editorialColors.ink }}>
+            <Text className="font-prose text-base leading-6" style={{ color: palette.ink }}>
               {editorsNote(recap)}
             </Text>
             {recap.span_min && recap.span_max ? (
               <Text
                 className="font-mono text-[10px] uppercase leading-4"
-                style={{ color: editorialColors.muted, letterSpacing: tracking.label }}
+                style={{ color: palette.muted, letterSpacing: tracking.label }}
               >
                 Source shelf: {recap.span_min}-{recap.span_max}
               </Text>
@@ -316,7 +322,7 @@ export function EditorialRecapView({
           </View>
         </>
       ) : (
-        <Text className="font-prose text-base leading-6" style={{ color: editorialColors.muted }}>
+        <Text className="font-prose text-base leading-6" style={{ color: palette.muted }}>
           No monthly review is available yet.
         </Text>
       )}

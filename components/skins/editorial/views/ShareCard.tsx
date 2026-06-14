@@ -3,9 +3,10 @@ import { Image, View } from 'react-native';
 import { BrandMark } from '@/components/brand/BrandMark';
 import { EditorialSpecLine } from '@/components/skins/editorial/EditorialSpecLine';
 import { PaperGrain } from '@/components/skins/editorial/PaperGrain';
-import { editorialColors, tracking } from '@/components/skins/shared/skinStyles';
+import { tracking } from '@/components/skins/shared/skinStyles';
 import { Text } from '@/components/ui/Text';
 import { type AlbumDiscovery, spotifyAlbumUrl } from '@/lib/recommendation';
+import { EditorialThemeProvider, useEditorialPalette } from '@/theme/skins/EditorialThemeProvider';
 import type { ShareFormat } from '@/theme/skins/types';
 import { albumSpec, issueNo } from '../lib';
 
@@ -23,6 +24,7 @@ function barcodeWidths(seed: string) {
 }
 
 function EditorialBarcode({ seed, light }: { seed: string; light?: boolean }) {
+  const palette = useEditorialPalette();
   return (
     <View className="flex-row items-end" style={{ height: 56, gap: 3 }}>
       {barcodeWidths(seed).map((width, index) => (
@@ -32,7 +34,7 @@ function EditorialBarcode({ seed, light }: { seed: string; light?: boolean }) {
           style={{
             width,
             height: index % 5 === 0 ? 56 : 44,
-            backgroundColor: light ? editorialColors.paper : editorialColors.ink,
+            backgroundColor: light ? palette.paper : palette.ink,
           }}
         />
       ))}
@@ -41,14 +43,15 @@ function EditorialBarcode({ seed, light }: { seed: string; light?: boolean }) {
 }
 
 function Artwork({ album, size }: { album: AlbumDiscovery; size: number }) {
+  const palette = useEditorialPalette();
   return (
     <View
       className="border-4 p-3"
       style={{
         width: size,
         height: size,
-        borderColor: editorialColors.ink,
-        backgroundColor: editorialColors.paperAlt,
+        borderColor: palette.ink,
+        backgroundColor: palette.paperAlt,
       }}
     >
       {album.album_cover_url ? (
@@ -62,7 +65,7 @@ function Artwork({ album, size }: { album: AlbumDiscovery; size: number }) {
           <BrandMark size={108} muted />
           <Text
             className="mt-8 font-mono-bold text-2xl uppercase"
-            style={{ color: editorialColors.muted, letterSpacing: tracking.kicker }}
+            style={{ color: palette.muted, letterSpacing: tracking.kicker }}
           >
             Artwork unavailable
           </Text>
@@ -73,12 +76,13 @@ function Artwork({ album, size }: { album: AlbumDiscovery; size: number }) {
 }
 
 function RatingStamp({ score }: { score: AlbumDiscovery['rating_score'] }) {
+  const palette = useEditorialPalette();
   if (!score) return null;
   return (
-    <View className="border-4 px-5 py-3" style={{ borderColor: editorialColors.red }}>
+    <View className="border-4 px-5 py-3" style={{ borderColor: palette.red }}>
       <Text
         className="font-mono-bold text-3xl uppercase"
-        style={{ color: editorialColors.red, letterSpacing: tracking.label }}
+        style={{ color: palette.red, letterSpacing: tracking.label }}
       >
         Rated {String(score).padStart(2, '0')}
       </Text>
@@ -87,8 +91,9 @@ function RatingStamp({ score }: { score: AlbumDiscovery['rating_score'] }) {
 }
 
 function Footer({ album, light }: { album: AlbumDiscovery; light?: boolean }) {
-  const color = light ? editorialColors.paper : editorialColors.ink;
-  const muted = light ? editorialColors.paperAlt : editorialColors.muted;
+  const palette = useEditorialPalette();
+  const color = light ? palette.paper : palette.ink;
+  const muted = light ? palette.paperAlt : palette.muted;
   return (
     <View className="flex-row items-end justify-between gap-8">
       <EditorialBarcode seed={album.album_spotify_id} light={light} />
@@ -108,25 +113,26 @@ function Footer({ album, light }: { album: AlbumDiscovery; light?: boolean }) {
 }
 
 function SquareShareCard({ album }: { album: AlbumDiscovery }) {
+  const palette = useEditorialPalette();
   return (
     <View
       className="h-[1080px] w-[1080px] justify-between p-14"
-      style={{ backgroundColor: editorialColors.paper }}
+      style={{ backgroundColor: palette.paper }}
     >
       <View className="gap-7">
         <View className="flex-row items-start justify-between gap-8">
           <View className="min-w-0 flex-1">
             <Text
               className="font-display text-[72px] uppercase leading-[68px]"
-              style={{ color: editorialColors.ink }}
+              style={{ color: palette.ink }}
             >
               Album of{'\n'}the Day
             </Text>
-            <View className="mt-5 h-2" style={{ backgroundColor: editorialColors.accentStatic }} />
+            <View className="mt-5 h-2" style={{ backgroundColor: palette.accentStatic }} />
           </View>
           <Text
             className="font-mono-bold text-3xl uppercase"
-            style={{ color: editorialColors.accentStatic, letterSpacing: tracking.kicker }}
+            style={{ color: palette.accentStatic, letterSpacing: tracking.kicker }}
           >
             No. {issueNo(album)}
           </Text>
@@ -140,14 +146,14 @@ function SquareShareCard({ album }: { album: AlbumDiscovery }) {
             adjustsFontSizeToFit
             minimumFontScale={0.72}
             className="font-display text-[60px] uppercase leading-[58px]"
-            style={{ color: editorialColors.ink }}
+            style={{ color: palette.ink }}
           >
             {album.album_title}
           </Text>
           <Text
             numberOfLines={2}
             className="mt-4 font-prose-bold text-4xl leading-[42px]"
-            style={{ color: editorialColors.ink }}
+            style={{ color: palette.ink }}
           >
             {album.album_primary_artist_name}
           </Text>
@@ -163,8 +169,9 @@ function SquareShareCard({ album }: { album: AlbumDiscovery }) {
 }
 
 function StoryShareCard({ album }: { album: AlbumDiscovery }) {
+  const palette = useEditorialPalette();
   return (
-    <View className="h-[1920px] w-[1080px]" style={{ backgroundColor: editorialColors.ink }}>
+    <View className="h-[1920px] w-[1080px]" style={{ backgroundColor: palette.ink }}>
       {album.album_cover_url ? (
         <Image
           source={{ uri: album.album_cover_url }}
@@ -179,14 +186,11 @@ function StoryShareCard({ album }: { album: AlbumDiscovery }) {
         <View>
           <Text
             className="font-mono-bold text-2xl uppercase"
-            style={{ color: editorialColors.paper, letterSpacing: tracking.kicker }}
+            style={{ color: palette.paper, letterSpacing: tracking.kicker }}
           >
             Album of the Day / No. {issueNo(album)}
           </Text>
-          <View
-            className="mt-5 h-2 w-48"
-            style={{ backgroundColor: editorialColors.accentStatic }}
-          />
+          <View className="mt-5 h-2 w-48" style={{ backgroundColor: palette.accentStatic }} />
         </View>
         <View className="gap-5">
           <Text
@@ -194,14 +198,14 @@ function StoryShareCard({ album }: { album: AlbumDiscovery }) {
             adjustsFontSizeToFit
             minimumFontScale={0.65}
             className="font-display text-[92px] uppercase leading-[86px]"
-            style={{ color: editorialColors.paper }}
+            style={{ color: palette.paper }}
           >
             {album.album_title}
           </Text>
           <Text
             numberOfLines={2}
             className="font-prose-bold text-5xl leading-[56px]"
-            style={{ color: editorialColors.paper }}
+            style={{ color: palette.paper }}
           >
             {album.album_primary_artist_name}
           </Text>
@@ -214,25 +218,23 @@ function StoryShareCard({ album }: { album: AlbumDiscovery }) {
 }
 
 function MinimalShareCard({ album }: { album: AlbumDiscovery }) {
+  const palette = useEditorialPalette();
   return (
     <View
       className="h-[1200px] w-[900px] justify-between border-[10px] p-12"
-      style={{ borderColor: editorialColors.ink, backgroundColor: editorialColors.paper }}
+      style={{ borderColor: palette.ink, backgroundColor: palette.paper }}
     >
-      <View
-        className="flex-1 justify-between border-4 p-10"
-        style={{ borderColor: editorialColors.ink }}
-      >
+      <View className="flex-1 justify-between border-4 p-10" style={{ borderColor: palette.ink }}>
         <View>
           <Text
             className="font-mono-bold text-3xl uppercase"
-            style={{ color: editorialColors.muted, letterSpacing: tracking.kicker }}
+            style={{ color: palette.muted, letterSpacing: tracking.kicker }}
           >
             Album of the Day
           </Text>
           <Text
             className="mt-8 font-display text-[150px] uppercase leading-[138px]"
-            style={{ color: editorialColors.accentStatic }}
+            style={{ color: palette.accentStatic }}
           >
             № {issueNo(album)}
           </Text>
@@ -243,14 +245,14 @@ function MinimalShareCard({ album }: { album: AlbumDiscovery }) {
             adjustsFontSizeToFit
             minimumFontScale={0.62}
             className="font-display text-[76px] uppercase leading-[72px]"
-            style={{ color: editorialColors.ink }}
+            style={{ color: palette.ink }}
           >
             {album.album_title}
           </Text>
           <Text
             numberOfLines={2}
             className="font-prose-bold text-4xl leading-[42px]"
-            style={{ color: editorialColors.ink }}
+            style={{ color: palette.ink }}
           >
             {album.album_primary_artist_name}
           </Text>
@@ -269,7 +271,13 @@ export function EditorialShareCard({
   album: AlbumDiscovery;
   format?: ShareFormat;
 }) {
-  if (format === 'story') return <StoryShareCard album={album} />;
-  if (format === 'minimal') return <MinimalShareCard album={album} />;
-  return <SquareShareCard album={album} />;
+  // Shared PNGs live outside the app's dark context; capture them in the Day
+  // edition regardless of the in-app edition setting.
+  return (
+    <EditorialThemeProvider forcedEdition="day">
+      {format === 'story' ? <StoryShareCard album={album} /> : null}
+      {format === 'minimal' ? <MinimalShareCard album={album} /> : null}
+      {format !== 'story' && format !== 'minimal' ? <SquareShareCard album={album} /> : null}
+    </EditorialThemeProvider>
+  );
 }

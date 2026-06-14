@@ -30,12 +30,20 @@ function resolvePalette(edition: Edition, colorScheme: 'light' | 'dark' | null):
   return colorScheme === 'dark' ? nightPalette : dayPalette;
 }
 
-export function EditorialThemeProvider({ children }: { children: ReactNode }) {
+export function EditorialThemeProvider({
+  children,
+  forcedEdition,
+}: {
+  children: ReactNode;
+  forcedEdition?: Edition;
+}) {
   const colorScheme = useColorScheme();
-  const [edition, setEditionState] = useState<Edition>('day'); // render day until hydrated
-  const [hydrated, setHydrated] = useState(false);
+  const [edition, setEditionState] = useState<Edition>(forcedEdition ?? 'day');
+  const [hydrated, setHydrated] = useState(!!forcedEdition);
 
   useEffect(() => {
+    if (forcedEdition) return undefined;
+
     let active = true;
     AsyncStorage.getItem(STORAGE_KEY)
       .then((stored) => {
@@ -53,25 +61,30 @@ export function EditorialThemeProvider({ children }: { children: ReactNode }) {
     return () => {
       active = false;
     };
-  }, []);
+  }, [forcedEdition]);
 
-  const setEdition = useCallback(async (next: Edition) => {
-    setEditionState(next);
-    try {
-      await AsyncStorage.setItem(STORAGE_KEY, next);
-    } catch {
-      // Persistence is best-effort; the in-memory choice still applies.
-    }
-  }, []);
+  const setEdition = useCallback(
+    async (next: Edition) => {
+      if (forcedEdition) return;
+      setEditionState(next);
+      try {
+        await AsyncStorage.setItem(STORAGE_KEY, next);
+      } catch {
+        // Persistence is best-effort; the in-memory choice still applies.
+      }
+    },
+    [forcedEdition],
+  );
 
+  const activeEdition = forcedEdition ?? edition;
   const palette = useMemo(
-    () => resolvePalette(edition, colorScheme ?? null),
-    [edition, colorScheme],
+    () => resolvePalette(activeEdition, colorScheme ?? null),
+    [activeEdition, colorScheme],
   );
 
   const value = useMemo(
-    () => ({ edition: hydrated ? edition : 'day', palette, setEdition }),
-    [edition, hydrated, palette, setEdition],
+    () => ({ edition: hydrated ? activeEdition : 'day', palette, setEdition }),
+    [activeEdition, hydrated, palette, setEdition],
   );
 
   return <EditorialThemeContext.Provider value={value}>{children}</EditorialThemeContext.Provider>;
@@ -83,6 +96,12 @@ export function useEditorialPalette(): Palette {
     throw new Error('useEditorialPalette must be used inside EditorialThemeProvider');
   }
   return value.palette;
+}
+
+/** Non-throwing variant for generic UI primitives that may render outside the editorial tree. */
+export function useOptionalEditorialPalette(): Palette | null {
+  const value = useContext(EditorialThemeContext);
+  return value?.palette ?? null;
 }
 
 export function useEdition(): Pick<EditorialThemeContextValue, 'edition' | 'setEdition'> {

@@ -1,14 +1,16 @@
 import { View } from 'react-native';
 
-import { editorialColors, ruleWeight } from '@/components/skins/shared/skinStyles';
+import { ruleWeight } from '@/components/skins/shared/skinStyles';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { useEditorialPalette } from '@/theme/skins/EditorialThemeProvider';
 import type { SkinComponentSet } from '@/theme/skins/types';
 import { EditorialIssueFrame, EditorialProofState, EditorialStateShell } from './shared';
 
 export function AlbumDetailProofSkeleton() {
+  const palette = useEditorialPalette();
   return (
     <EditorialStateShell>
-      <View className="gap-5" style={{ backgroundColor: editorialColors.paper }}>
+      <View className="gap-5" style={{ backgroundColor: palette.paper }}>
         <View>
           <Skeleton className="h-4 w-40 rounded-none" />
           <Skeleton className="mt-3 h-16 w-4/5 rounded-none" />
