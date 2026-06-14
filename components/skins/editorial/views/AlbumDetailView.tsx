@@ -85,7 +85,7 @@ export function EditorialAlbumDetailView(
         <View>
           {props.isToday ? (
             <View style={{ marginBottom: space.s4 }}>
-              <EditorialMasthead issueLabel={`№${issueNo(props.album)}`} dateLabel={date} />
+              <EditorialMasthead issueLabel={`№${issueNo(props.album)}`} dateLabel={date} reveal />
             </View>
           ) : null}
           {props.header && !props.isToday ? (
