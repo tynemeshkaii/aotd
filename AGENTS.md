@@ -112,6 +112,7 @@ Hard dependency rules:
 - When bumping Expo SDK, first check the installed App Store Expo Go app: Profile -> Supported SDK. Keep the project on an SDK supported by the user's device Expo Go.
 - For SDK 54, `expo-auth-session` is `~7.0.11`.
 - Reanimated 4 needs `react-native-worklets` installed explicitly.
+- `@shopify/react-native-skia` and `lottie-react-native` power the editorial press motion (C2). Skia is a third-party native module: it is NOT in Expo Go and requires a custom dev/release build (`npx expo run:ios` or an EAS dev build). All Skia use goes through `components/skins/editorial/skia/skiaRuntime.ts` (guarded `require`, `skiaAvailable` flag) wrapped in `SkiaErrorBoundary`, and every effect must keep a non-Skia fallback so the app degrades gracefully in Expo Go. Skia effects must never gate primary content (e.g. the album cover) from rendering. Install with `npx expo install @shopify/react-native-skia lottie-react-native` (fallback `--legacy-peer-deps` + `npx expo install --check`).
 - If `npx` or nested npm is missing in Codex desktop, run commands with `PATH=/opt/homebrew/bin:$PATH`.
 - `postcss` has an npm override (`"postcss": ">=8.5.10"`) to resolve GHSA-qx2v-qp2m-jg93 while `@expo/metro-config@54` pins `~8.4.32`. Do not remove the override until Expo upgrades its metro-config postcss constraint past 8.5.10.
 - The remaining `uuid` 7.x advisory (GHSA-w5hq-g745-h8pq, 13 paths via `xcode`) is accepted: `xcode` calls only `uuid.v4()` without a `buf` argument, so the vulnerability (buffer bounds check in v3/v5/v6 when `buf` is provided) is not exploitable. Will resolve when Expo upgrades `xcode`.
@@ -228,6 +229,10 @@ Editorial design contracts:
 - The subscription run / `VOL.` streak surface is client-derived by `lib/streak.ts` from `useDiscoveries()` `pick_date` values plus `overview.streak`. It operates on the pick's local `YYYY-MM-DD` calendar date strings and must not introduce UTC day-boundary conversions. Home renders a compact standing-order strip below the ballot and before any archive nudge; Profile renders the expanded strip in the identity/stat area. Copy stays gentle and low-pressure.
 - Do not use negative `letterSpacing`. It causes text clipping at large accessibility text sizes. Positive tracking values (0.8, 1.2, etc.) for mono/kicker labels are intentional editorial tracking.
 - Flowing accent is scarce: masthead `day`, hairline rules, and CTA arrow. Do not animate album titles, metadata, rows, body copy, skeletons, errors, or lists.
+
+Skia press motion contracts (C2):
+
+- The album cover plate carries an optional Skia halftone/riso overlay (`components/skins/editorial/skia/HalftoneOverlay.tsx`): a palette-tinted SkSL dot texture layered ON TOP of `CoverImage`, decorative, `pointerEvents="none"`, hidden from screen readers. It is static by default with a one-time fade-in settle that is Reduce-Motion gated (instant when Reduce Motion is on). The overlay reads its tint from the active palette so it works in both editions. `CoverImage` always renders underneath, so if Skia is unavailable or the effect fails the cover still shows — the overlay simply drops. Sized from the cover's measured `onLayout` width.
 
 Font contracts:
 

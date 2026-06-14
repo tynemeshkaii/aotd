@@ -1,4 +1,5 @@
-import { RefreshControl, View } from 'react-native';
+import { useState } from 'react';
+import { type LayoutChangeEvent, RefreshControl, View } from 'react-native';
 import Animated, { useAnimatedScrollHandler, useAnimatedStyle } from 'react-native-reanimated';
 
 import { BrandMark } from '@/components/brand/BrandMark';
@@ -10,6 +11,7 @@ import { EditorialMasthead } from '@/components/skins/editorial/EditorialMasthea
 import { EditorialSectionRule } from '@/components/skins/editorial/EditorialSectionRule';
 import { EditorialSpecLine } from '@/components/skins/editorial/EditorialSpecLine';
 import { PaperGrain } from '@/components/skins/editorial/PaperGrain';
+import { HalftoneOverlay } from '@/components/skins/editorial/skia/HalftoneOverlay';
 import { editorialType, space, tracking, zIndex } from '@/components/skins/shared/skinStyles';
 import { CoverImage } from '@/components/ui/CoverImage';
 import { Text } from '@/components/ui/Text';
@@ -27,6 +29,7 @@ export function EditorialAlbumDetailView(
   props: Parameters<SkinComponentSet['AlbumDetailView']>[0],
 ) {
   const palette = useEditorialPalette();
+  const [coverSide, setCoverSide] = useState(0);
   const date = formatIssueDate(props.album.pick_date);
   const markers = albumCoverMarkers(props.album);
   const showStandaloneKicker = !props.isToday && !props.header;
@@ -136,7 +139,12 @@ export function EditorialAlbumDetailView(
             </View>
             <View style={{ marginTop: -14, zIndex: zIndex.coverPlate }}>
               <EditorialIssueFrame>
-                <View className="aspect-square w-full">
+                <View
+                  className="aspect-square w-full"
+                  onLayout={(e: LayoutChangeEvent) =>
+                    setCoverSide(Math.round(e.nativeEvent.layout.width))
+                  }
+                >
                   <Animated.View style={[{ flex: 1 }, coverStyle]}>
                     {props.album.album_cover_url ? (
                       <CoverImage uri={props.album.album_cover_url} className="h-full w-full" />
@@ -152,6 +160,9 @@ export function EditorialAlbumDetailView(
                       </View>
                     )}
                   </Animated.View>
+                  {props.album.album_cover_url && coverSide > 0 ? (
+                    <HalftoneOverlay size={coverSide} tint={palette.ink} />
+                  ) : null}
                   {markers.length > 0 ? (
                     <View
                       className="absolute bottom-2 right-2 flex-row gap-2"
