@@ -44,13 +44,13 @@ export const nightPalette: Palette = {
   accent: '#ff5a3c',
   primary: '#b8485c',
   onPrimary: '#fff6e8',
-  red: '#cf5b6d',
+  red: '#d86a7b',
   ratingTone: {
     5: '#e8b84d',
     4: '#d99a4a',
     3: '#b0a098',
     2: '#c0757d',
-    1: '#a84d5a',
+    1: '#c06470',
   },
 };
 

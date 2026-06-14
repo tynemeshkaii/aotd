@@ -6,11 +6,14 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 import { useColorScheme } from 'react-native';
+import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
 import { dayPalette, nightPalette, type Palette } from '@/components/skins/shared/skinStyles';
+import { useReduceMotion } from '@/lib/hooks/useReduceMotion';
 
 const STORAGE_KEY = 'editorial-edition';
 
@@ -87,7 +90,34 @@ export function EditorialThemeProvider({
     [activeEdition, hydrated, palette, setEdition],
   );
 
-  return <EditorialThemeContext.Provider value={value}>{children}</EditorialThemeContext.Provider>;
+  return (
+    <EditorialThemeContext.Provider value={value}>
+      <EditionTransition>{children}</EditionTransition>
+    </EditorialThemeContext.Provider>
+  );
+}
+
+function EditionTransition({ children }: { children: ReactNode }) {
+  const reduceMotion = useReduceMotion();
+  const { edition } = useEdition();
+  const opacity = useSharedValue(1);
+  const isFirst = useRef(true);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: edition intentionally triggers the crossfade
+  useEffect(() => {
+    if (isFirst.current) {
+      isFirst.current = false;
+      return;
+    }
+    if (reduceMotion) return;
+    opacity.value = 0;
+    opacity.value = withTiming(1, { duration: 160 });
+  }, [edition, opacity, reduceMotion]);
+
+  const style = useAnimatedStyle(() => ({ opacity: opacity.value }));
+
+  if (reduceMotion) return children;
+  return <Animated.View style={[{ flex: 1 }, style]}>{children}</Animated.View>;
 }
 
 export function useEditorialPalette(): Palette {
