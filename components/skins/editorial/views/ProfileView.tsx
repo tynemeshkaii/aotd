@@ -18,7 +18,7 @@ import { relativeTime } from '@/lib/format';
 import { haptics } from '@/lib/haptics';
 import { getTabContentBottomPadding } from '@/lib/navigationChrome';
 import { romanNumeral } from '@/lib/streak';
-import { useEditorialPalette } from '@/theme/skins/EditorialThemeProvider';
+import { useEdition, useEditorialPalette } from '@/theme/skins/EditorialThemeProvider';
 import type { SkinComponentSet } from '@/theme/skins/types';
 import { EditorialSyncBanner } from './SyncBanner';
 
@@ -132,6 +132,63 @@ function listeningMoodLabel(avgScore: number | null | undefined) {
   if (avgScore >= 2.5) return 'It was alright';
   if (avgScore >= 1.5) return 'Not for me';
   return 'Bad';
+}
+
+const EDITION_OPTIONS = [
+  { value: 'day' as const, label: 'Day' },
+  { value: 'night' as const, label: 'Night' },
+  { value: 'system' as const, label: 'System' },
+];
+
+function EditionToggle() {
+  const palette = useEditorialPalette();
+  const { edition, setEdition } = useEdition();
+  const [pressedValue, setPressedValue] = React.useState<string | null>(null);
+
+  return (
+    <View
+      className="flex-row border-2"
+      accessibilityRole="radiogroup"
+      accessibilityLabel="Choose edition"
+      style={{ borderColor: palette.ink }}
+    >
+      {EDITION_OPTIONS.map((option, index) => {
+        const selected = edition === option.value;
+        const pressed = pressedValue === option.value;
+        const inverted = selected || pressed;
+        return (
+          <Pressable
+            key={option.value}
+            accessibilityRole="radio"
+            accessibilityState={{ selected }}
+            onPressIn={() => setPressedValue(option.value)}
+            onPressOut={() => setPressedValue(null)}
+            onPress={() => {
+              setPressedValue(null);
+              haptics.selection();
+              setEdition(option.value);
+            }}
+            className="min-h-11 flex-1 items-center justify-center px-2"
+            style={{
+              backgroundColor: inverted ? palette.ink : 'transparent',
+              borderLeftWidth: index === 0 ? 0 : 1,
+              borderLeftColor: palette.ink,
+            }}
+          >
+            <Text
+              className="font-mono-bold text-[10px] uppercase leading-4"
+              style={{
+                color: inverted ? palette.paper : palette.ink,
+                letterSpacing: tracking.label,
+              }}
+            >
+              {option.label}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
 }
 
 function LibrarySpanLine({ min, max }: { min: number | null; max: number | null }) {
@@ -565,6 +622,11 @@ export function EditorialProfileView(props: Parameters<SkinComponentSet['Profile
               Connected {relativeTime(props.connection.connected_at)}
             </Text>
           ) : null}
+        </View>
+
+        <View className="gap-4 border-t pt-5" style={{ borderColor: palette.ink }}>
+          <EditorialSectionRule title="Edition" aside="appearance" major />
+          <EditionToggle />
         </View>
 
         <View className="mt-3 border-t-2 pt-6" style={{ borderColor: palette.ink }}>
