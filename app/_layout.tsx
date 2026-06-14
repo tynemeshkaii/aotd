@@ -28,9 +28,11 @@ export default function RootLayout() {
     <AuthProvider>
       <QueryClientProvider client={queryClient}>
         <SafeAreaProvider>
-          <AccentFlowProvider>
-            <SkinGate />
-          </AccentFlowProvider>
+          <EditorialThemeProvider>
+            <AccentFlowProvider>
+              <SkinGate />
+            </AccentFlowProvider>
+          </EditorialThemeProvider>
         </SafeAreaProvider>
       </QueryClientProvider>
     </AuthProvider>
@@ -60,10 +62,10 @@ function SkinGate() {
   const components = useSkinComponents();
 
   return (
-    <EditorialThemeProvider>
+    <>
       <StatusBar style={components.chrome.statusBarStyle} />
       {fontsLoaded ? <RouterGuard /> : <BootSplash label="Loading" />}
-    </EditorialThemeProvider>
+    </>
   );
 }
 
