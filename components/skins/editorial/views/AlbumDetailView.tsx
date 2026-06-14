@@ -10,17 +10,12 @@ import { EditorialMasthead } from '@/components/skins/editorial/EditorialMasthea
 import { EditorialSectionRule } from '@/components/skins/editorial/EditorialSectionRule';
 import { EditorialSpecLine } from '@/components/skins/editorial/EditorialSpecLine';
 import { PaperGrain } from '@/components/skins/editorial/PaperGrain';
-import {
-  editorialColors,
-  editorialType,
-  space,
-  tracking,
-  zIndex,
-} from '@/components/skins/shared/skinStyles';
+import { editorialType, space, tracking, zIndex } from '@/components/skins/shared/skinStyles';
 import { CoverImage } from '@/components/ui/CoverImage';
 import { Text } from '@/components/ui/Text';
 import { getPageBottomPadding, getTabContentBottomPadding } from '@/lib/navigationChrome';
 import { formatSelectionReason } from '@/lib/recommendation';
+import { useEditorialPalette } from '@/theme/skins/EditorialThemeProvider';
 import type { SkinComponentSet } from '@/theme/skins/types';
 import { albumCoverMarkers, albumSpec, formatIssueDate, issueNo } from '../lib';
 import { EditorialRatingEditor } from './RatingEditor';
@@ -31,6 +26,7 @@ const type = editorialType;
 export function EditorialAlbumDetailView(
   props: Parameters<SkinComponentSet['AlbumDetailView']>[0],
 ) {
+  const palette = useEditorialPalette();
   const date = formatIssueDate(props.album.pick_date);
   const markers = albumCoverMarkers(props.album);
   const showStandaloneKicker = !props.isToday && !props.header;
@@ -49,14 +45,14 @@ export function EditorialAlbumDetailView(
   });
 
   return (
-    <View className="flex-1" style={{ backgroundColor: editorialColors.paper }}>
+    <View className="flex-1" style={{ backgroundColor: palette.paper }}>
       <View
         pointerEvents="none"
         className="absolute left-0 right-0 top-0"
         style={{
           zIndex: zIndex.safeAreaPatch,
           height: props.topInset,
-          backgroundColor: editorialColors.paper,
+          backgroundColor: palette.paper,
         }}
       />
       <Animated.ScrollView
@@ -71,8 +67,8 @@ export function EditorialAlbumDetailView(
             <RefreshControl
               refreshing={!!props.refreshing}
               onRefresh={props.onRefresh}
-              tintColor={editorialColors.ink}
-              colors={[editorialColors.ink]}
+              tintColor={palette.ink}
+              colors={[palette.ink]}
               progressViewOffset={props.topInset}
             />
           ) : undefined
@@ -94,7 +90,7 @@ export function EditorialAlbumDetailView(
               {props.header}
               <Text
                 className="shrink uppercase"
-                style={[type.monoKicker, { color: editorialColors.muted }]}
+                style={[type.monoKicker, { color: palette.muted }]}
                 numberOfLines={1}
               >
                 {`№${issueNo(props.album)} · ${date}`}
@@ -106,17 +102,14 @@ export function EditorialAlbumDetailView(
 
           <View>
             {showStandaloneKicker ? (
-              <Text
-                className="uppercase"
-                style={[type.monoKicker, { color: editorialColors.muted }]}
-              >
+              <Text className="uppercase" style={[type.monoKicker, { color: palette.muted }]}>
                 {`№${issueNo(props.album)} · ${date}`}
               </Text>
             ) : null}
             {props.isToday ? (
               <Text
                 className="mt-2 lowercase"
-                style={[type.display34, { color: editorialColors.ink }]}
+                style={[type.display34, { color: palette.ink }]}
                 maxFontSizeMultiplier={1.4}
               >
                 your album of the{'\n'}
@@ -132,7 +125,7 @@ export function EditorialAlbumDetailView(
             <View style={{ zIndex: zIndex.titleOverCover }}>
               <Text
                 className="uppercase"
-                style={[type.display34, { color: editorialColors.ink }]}
+                style={[type.display34, { color: palette.ink }]}
                 numberOfLines={4}
                 adjustsFontSizeToFit
                 minimumFontScale={0.8}
@@ -152,7 +145,7 @@ export function EditorialAlbumDetailView(
                         <BrandMark size={84} muted />
                         <Text
                           className="mt-5 text-center font-display text-3xl uppercase"
-                          style={{ color: editorialColors.muted }}
+                          style={{ color: palette.muted }}
                         >
                           Cover unavailable
                         </Text>
@@ -196,7 +189,7 @@ export function EditorialAlbumDetailView(
             />
             <Text
               className="mt-2 font-mono text-[10px] uppercase leading-4"
-              style={{ color: editorialColors.muted, letterSpacing: tracking.micro }}
+              style={{ color: palette.muted, letterSpacing: tracking.micro }}
             >
               Powered by Spotify
             </Text>
@@ -206,20 +199,17 @@ export function EditorialAlbumDetailView(
             <View
               className="mt-6 border-2 px-3 py-2"
               style={{
-                borderColor: editorialColors.ink,
-                backgroundColor: editorialColors.paperAlt,
+                borderColor: palette.ink,
+                backgroundColor: palette.paperAlt,
               }}
             >
               <Text
                 className="mb-1 font-mono-bold text-[10px] uppercase leading-4"
-                style={{ color: editorialColors.muted, letterSpacing: tracking.label }}
+                style={{ color: palette.muted, letterSpacing: tracking.label }}
               >
                 Spotify Free
               </Text>
-              <Text
-                className="font-prose-medium text-sm leading-5"
-                style={{ color: editorialColors.ink }}
-              >
+              <Text className="font-prose-medium text-sm leading-5" style={{ color: palette.ink }}>
                 Free Spotify may shuffle this album. Premium plays it in order.
               </Text>
             </View>

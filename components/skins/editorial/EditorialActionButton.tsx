@@ -1,30 +1,35 @@
 import * as React from 'react';
 import { ActivityIndicator, Pressable } from 'react-native';
 
-import { editorialColors, tracking } from '@/components/skins/shared/skinStyles';
+import { tracking } from '@/components/skins/shared/skinStyles';
 import { Text } from '@/components/ui/Text';
 import { haptics } from '@/lib/haptics';
 import { useReduceMotion } from '@/lib/hooks/useReduceMotion';
+import { useEditorialPalette } from '@/theme/skins/EditorialThemeProvider';
 
 type Tone = 'ink' | 'paper' | 'red';
 
 // Pressed state inverts ink<->paper like a print impression instead of fading
 // opacity. Disabled keeps the resting palette at reduced opacity.
-function palette(tone: Tone, pressed: boolean) {
-  const borderColor = tone === 'red' ? editorialColors.red : editorialColors.ink;
+function resolveTone(
+  palette: ReturnType<typeof useEditorialPalette>,
+  tone: Tone,
+  pressed: boolean,
+) {
+  const borderColor = tone === 'red' ? palette.red : palette.ink;
   if (tone === 'ink') {
     return pressed
-      ? { borderColor, backgroundColor: 'transparent', foreground: editorialColors.ink }
-      : { borderColor, backgroundColor: editorialColors.ink, foreground: editorialColors.paper };
+      ? { borderColor, backgroundColor: 'transparent', foreground: palette.ink }
+      : { borderColor, backgroundColor: palette.ink, foreground: palette.paper };
   }
   if (tone === 'red') {
     return pressed
-      ? { borderColor, backgroundColor: editorialColors.red, foreground: editorialColors.paper }
-      : { borderColor, backgroundColor: 'transparent', foreground: editorialColors.red };
+      ? { borderColor, backgroundColor: palette.red, foreground: palette.paper }
+      : { borderColor, backgroundColor: 'transparent', foreground: palette.red };
   }
   return pressed
-    ? { borderColor, backgroundColor: editorialColors.ink, foreground: editorialColors.paper }
-    : { borderColor, backgroundColor: 'transparent', foreground: editorialColors.ink };
+    ? { borderColor, backgroundColor: palette.ink, foreground: palette.paper }
+    : { borderColor, backgroundColor: 'transparent', foreground: palette.ink };
 }
 
 export function EditorialActionButton({
@@ -40,10 +45,11 @@ export function EditorialActionButton({
   disabled?: boolean;
   tone?: Tone;
 }) {
+  const palette = useEditorialPalette();
   const [pressed, setPressed] = React.useState(false);
   const reduceMotion = useReduceMotion();
   const isDisabled = disabled || loading;
-  const p = palette(tone, pressed && !isDisabled);
+  const p = resolveTone(palette, tone, pressed && !isDisabled);
   const shouldScale = pressed && !isDisabled && !reduceMotion;
   return (
     <Pressable

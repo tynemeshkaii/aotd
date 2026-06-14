@@ -3,8 +3,9 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Text as RNText, type TextProps, View } from 'react-native';
 import Animated, { interpolateColor, useAnimatedStyle } from 'react-native-reanimated';
 
-import { accentFlow, editorialColors } from '@/components/skins/shared/skinStyles';
+import { accentFlow } from '@/components/skins/shared/skinStyles';
 import { useAccentFlow } from '@/theme/skins/AccentFlowProvider';
+import { useEditorialPalette } from '@/theme/skins/EditorialThemeProvider';
 
 type Props = TextProps & {
   children: string;
@@ -21,6 +22,7 @@ export function AccentText({
   staticOnly = false,
   ...rest
 }: Props) {
+  const palette = useEditorialPalette();
   const { progress, reduceMotion } = useAccentFlow();
   const still = staticOnly || reduceMotion;
   const flowStyle = useAnimatedStyle(() => ({
@@ -28,7 +30,7 @@ export function AccentText({
   }));
   const fallbackStyle = useAnimatedStyle(() => ({
     color: still
-      ? editorialColors.accentStatic
+      ? palette.accentStatic
       : interpolateColor(progress.value, [0, 0.25, 0.5, 0.75, 1], [...accentFlow]),
   }));
 

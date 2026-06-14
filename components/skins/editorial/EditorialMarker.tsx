@@ -1,7 +1,8 @@
 import { View, type ViewProps } from 'react-native';
 
-import { editorialColors, tracking } from '@/components/skins/shared/skinStyles';
+import { tracking } from '@/components/skins/shared/skinStyles';
 import { Text } from '@/components/ui/Text';
+import { useEditorialPalette } from '@/theme/skins/EditorialThemeProvider';
 
 type Props = ViewProps & {
   label: string;
@@ -10,10 +11,11 @@ type Props = ViewProps & {
 };
 
 export function EditorialMarker({ label, tone = 'ink', className, style, ...rest }: Props) {
+  const palette = useEditorialPalette();
   const isInk = tone === 'ink';
-  const borderColor = tone === 'red' ? editorialColors.red : editorialColors.ink;
-  const backgroundColor = isInk ? editorialColors.ink : 'transparent';
-  const color = isInk ? editorialColors.paper : borderColor;
+  const borderColor = tone === 'red' ? palette.red : palette.ink;
+  const backgroundColor = isInk ? palette.ink : 'transparent';
+  const color = isInk ? palette.paper : borderColor;
 
   return (
     <View

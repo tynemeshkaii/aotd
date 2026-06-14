@@ -1,6 +1,6 @@
 import { View } from 'react-native';
 
-import { editorialColors } from '@/components/skins/shared/skinStyles';
+import { useEditorialPalette } from '@/theme/skins/EditorialThemeProvider';
 
 // Print registration crop marks at the four corners of the parent. Parent must
 // be position-relative; marks render in the paper margin around the cover plate.
@@ -11,7 +11,8 @@ export function EditorialCropMarks({
   length?: number;
   thickness?: number;
 }) {
-  const bar = { position: 'absolute' as const, backgroundColor: editorialColors.ink };
+  const palette = useEditorialPalette();
+  const bar = { position: 'absolute' as const, backgroundColor: palette.ink };
   return (
     <View pointerEvents="none" className="absolute inset-0">
       <View style={[bar, { left: 0, top: 0, width: length, height: thickness }]} />

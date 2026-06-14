@@ -2,8 +2,9 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { View, type ViewProps } from 'react-native';
 import Animated, { useAnimatedStyle } from 'react-native-reanimated';
 
-import { accentFlow, editorialColors } from '@/components/skins/shared/skinStyles';
+import { accentFlow } from '@/components/skins/shared/skinStyles';
 import { useAccentFlow } from '@/theme/skins/AccentFlowProvider';
+import { useEditorialPalette } from '@/theme/skins/EditorialThemeProvider';
 
 type Props = ViewProps & {
   thickness?: number;
@@ -11,6 +12,7 @@ type Props = ViewProps & {
 };
 
 export function AccentRule({ thickness = 2, staticOnly = false, style, ...rest }: Props) {
+  const palette = useEditorialPalette();
   const { progress, reduceMotion } = useAccentFlow();
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: `${-66 * progress.value}%` }],
@@ -24,7 +26,7 @@ export function AccentRule({ thickness = 2, staticOnly = false, style, ...rest }
         {
           height: thickness,
           overflow: 'hidden',
-          backgroundColor: editorialColors.accentStatic,
+          backgroundColor: palette.accentStatic,
         },
         style,
       ]}

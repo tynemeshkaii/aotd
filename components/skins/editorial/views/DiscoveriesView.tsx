@@ -9,12 +9,7 @@ import { BrandMark } from '@/components/brand/BrandMark';
 import { AccentRule } from '@/components/skins/editorial/accent/AccentRule';
 import { EditorialMasthead } from '@/components/skins/editorial/EditorialMasthead';
 import { PaperGrain } from '@/components/skins/editorial/PaperGrain';
-import {
-  editorialColors,
-  editorialType,
-  ratingTone,
-  tracking,
-} from '@/components/skins/shared/skinStyles';
+import { editorialType, tracking } from '@/components/skins/shared/skinStyles';
 import { CoverImage } from '@/components/ui/CoverImage';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { Text } from '@/components/ui/Text';
@@ -25,6 +20,7 @@ import {
   getDiscoveryStatusLabel,
   type RatingScore,
 } from '@/lib/recommendation';
+import { useEditorialPalette } from '@/theme/skins/EditorialThemeProvider';
 import type { SkinComponentSet } from '@/theme/skins/types';
 import { type ArchiveListItem, buildArchiveItems, filterLabels, issueNo } from '../lib';
 import { EditorialErrorState } from './states';
@@ -34,6 +30,7 @@ const seenDiscoveryRows = new Set<string>();
 const type = editorialType;
 
 function ListSkeleton() {
+  const palette = useEditorialPalette();
   return (
     <View className="mt-5">
       {skeletonRows.map((row, index) => (
@@ -41,7 +38,7 @@ function ListSkeleton() {
           key={row}
           className="min-h-[76px] flex-row items-center gap-3 py-3"
           style={{
-            borderColor: editorialColors.ink,
+            borderColor: palette.ink,
             borderTopWidth: index === 0 ? 2 : 1,
             borderBottomWidth: index === skeletonRows.length - 1 ? 2 : 0,
           }}
@@ -59,15 +56,16 @@ function ListSkeleton() {
 }
 
 function EditorialArchiveMonthHeader({ label }: { label: string }) {
+  const palette = useEditorialPalette();
   return (
     <View className="flex-row items-center gap-3 pb-2 pt-5">
       <Text
         className="font-mono-bold text-[11px] uppercase leading-4"
-        style={{ color: editorialColors.muted, letterSpacing: tracking.label }}
+        style={{ color: palette.muted, letterSpacing: tracking.label }}
       >
         {label}
       </Text>
-      <View className="h-[2px] flex-1" style={{ backgroundColor: editorialColors.ink }} />
+      <View className="h-[2px] flex-1" style={{ backgroundColor: palette.ink }} />
     </View>
   );
 }
@@ -83,6 +81,7 @@ function ArchiveFilterTab({
   isFirst: boolean;
   onPress: () => void;
 }) {
+  const palette = useEditorialPalette();
   const [pressed, setPressed] = React.useState(false);
   const inverted = selected || pressed;
   return (
@@ -94,14 +93,14 @@ function ArchiveFilterTab({
       onPressOut={() => setPressed(false)}
       className="min-h-11 flex-1 items-center justify-center px-2"
       style={{
-        backgroundColor: inverted ? editorialColors.ink : 'transparent',
+        backgroundColor: inverted ? palette.ink : 'transparent',
         borderLeftWidth: isFirst ? 0 : 1,
-        borderLeftColor: editorialColors.ink,
+        borderLeftColor: palette.ink,
       }}
     >
       <Text
         className="uppercase"
-        style={[type.monoLabel, { color: inverted ? editorialColors.paper : editorialColors.ink }]}
+        style={[type.monoLabel, { color: inverted ? palette.paper : palette.ink }]}
         numberOfLines={1}
         adjustsFontSizeToFit
       >
@@ -114,23 +113,24 @@ function ArchiveFilterTab({
 export function EditorialDiscoveriesView(
   props: Parameters<SkinComponentSet['DiscoveriesView']>[0],
 ) {
+  const palette = useEditorialPalette();
   const insets = useSafeAreaInsets();
   const bottomPadding = getTabContentBottomPadding(insets.bottom);
   const items = React.useMemo(() => buildArchiveItems(props.filtered), [props.filtered]);
 
   return (
-    <View className="flex-1" style={{ backgroundColor: editorialColors.paper }}>
+    <View className="flex-1" style={{ backgroundColor: palette.paper }}>
       <View
         pointerEvents="none"
         className="absolute left-0 right-0 top-0 z-10"
-        style={{ height: insets.top, backgroundColor: editorialColors.paper }}
+        style={{ height: insets.top, backgroundColor: palette.paper }}
       />
       <View className="flex-1 px-5" style={{ paddingTop: insets.top + 12 }}>
         <View>
           <EditorialMasthead issueLabel={`${props.discoveries.length} issues`} />
           <Text
             className="mt-3 uppercase"
-            style={[type.archiveMasthead, { color: editorialColors.ink }]}
+            style={[type.archiveMasthead, { color: palette.ink }]}
             maxFontSizeMultiplier={1.3}
             adjustsFontSizeToFit
             numberOfLines={1}
@@ -138,15 +138,12 @@ export function EditorialDiscoveriesView(
             Archive
           </Text>
           <View className="mt-[2px] flex-row items-end justify-between gap-4">
-            <Text
-              className="uppercase"
-              style={[type.archiveContents, { color: editorialColors.ink }]}
-            >
+            <Text className="uppercase" style={[type.archiveContents, { color: palette.ink }]}>
               Contents
             </Text>
             <Text
               className="shrink text-right uppercase"
-              style={[type.monoKicker, { color: editorialColors.muted }]}
+              style={[type.monoKicker, { color: palette.muted }]}
               numberOfLines={1}
             >
               {`${props.discoveries.length} issues`}
@@ -155,14 +152,14 @@ export function EditorialDiscoveriesView(
           <View className="mt-3 flex-row items-center gap-3">
             <Text
               className="font-mono-bold text-[10px] uppercase leading-4"
-              style={{ color: editorialColors.ink, letterSpacing: tracking.label }}
+              style={{ color: palette.ink, letterSpacing: tracking.label }}
             >
               Daily records
             </Text>
-            <View className="h-px flex-1" style={{ backgroundColor: editorialColors.ink }} />
+            <View className="h-px flex-1" style={{ backgroundColor: palette.ink }} />
             <Text
               className="font-mono text-[10px] uppercase leading-4"
-              style={{ color: editorialColors.muted, letterSpacing: tracking.label }}
+              style={{ color: palette.muted, letterSpacing: tracking.label }}
             >
               all / waiting / rated
             </Text>
@@ -173,7 +170,7 @@ export function EditorialDiscoveriesView(
         <View
           className="mt-5 flex-row border-2"
           accessibilityRole="tablist"
-          style={{ borderColor: editorialColors.ink }}
+          style={{ borderColor: palette.ink }}
         >
           {(Object.keys(filterLabels) as DiscoveryFilter[]).map((filter, index) => (
             <ArchiveFilterTab
@@ -208,8 +205,8 @@ export function EditorialDiscoveriesView(
               <RefreshControl
                 refreshing={props.retrying}
                 onRefresh={props.onRetry}
-                tintColor={editorialColors.ink}
-                colors={[editorialColors.ink]}
+                tintColor={palette.ink}
+                colors={[palette.ink]}
               />
             }
             data={items}
@@ -244,23 +241,24 @@ export function EditorialDiscoveriesView(
 }
 
 function EditorialArchiveEmptyState({ title, subtitle }: { title: string; subtitle?: string }) {
+  const palette = useEditorialPalette();
   return (
     <View className="flex-1 justify-center">
-      <View className="border-2 px-4 py-5" style={{ borderColor: editorialColors.ink }}>
+      <View className="border-2 px-4 py-5" style={{ borderColor: palette.ink }}>
         <View className="flex-row items-center gap-3">
-          <Text className="uppercase" style={[type.monoLabel, { color: editorialColors.muted }]}>
+          <Text className="uppercase" style={[type.monoLabel, { color: palette.muted }]}>
             No. 000
           </Text>
-          <View className="h-[2px] flex-1" style={{ backgroundColor: editorialColors.ink }} />
+          <View className="h-[2px] flex-1" style={{ backgroundColor: palette.ink }} />
         </View>
         <AccentRule />
         <Text
           className="mt-5 uppercase"
-          style={[type.archiveTitle, { color: editorialColors.ink, fontSize: 28, lineHeight: 28 }]}
+          style={[type.archiveTitle, { color: palette.ink, fontSize: 28, lineHeight: 28 }]}
         >
           Blank archive page
         </Text>
-        <Text className="mt-3" style={[type.proseSmall, { color: editorialColors.muted }]}>
+        <Text className="mt-3" style={[type.proseSmall, { color: palette.muted }]}>
           {title}
           {subtitle ? ` ${subtitle}` : ''}
         </Text>
@@ -289,17 +287,18 @@ function archiveStatus(album: AlbumDiscovery): {
 }
 
 function ArchiveRowMark({ ratingScore }: { ratingScore: RatingScore | null }) {
+  const palette = useEditorialPalette();
   if (ratingScore) {
     return (
       <View
         accessibilityElementsHidden
         importantForAccessibility="no-hide-descendants"
         className="min-w-12 items-center border-2 px-2 py-1"
-        style={{ borderColor: editorialColors.accentStatic }}
+        style={{ borderColor: palette.accentStatic }}
       >
         <Text
           className="font-mono-bold text-[11px] uppercase leading-4"
-          style={{ color: ratingTone[ratingScore], letterSpacing: tracking.label }}
+          style={{ color: palette.ratingTone[ratingScore], letterSpacing: tracking.label }}
         >
           {`0${ratingScore}`}
         </Text>
@@ -308,13 +307,10 @@ function ArchiveRowMark({ ratingScore }: { ratingScore: RatingScore | null }) {
   }
 
   return (
-    <View
-      className="min-w-16 items-center border px-2 py-1"
-      style={{ borderColor: editorialColors.ink }}
-    >
+    <View className="min-w-16 items-center border px-2 py-1" style={{ borderColor: palette.ink }}>
       <Text
         className="font-mono-bold text-[10px] uppercase leading-4"
-        style={{ color: editorialColors.muted, letterSpacing: tracking.label }}
+        style={{ color: palette.muted, letterSpacing: tracking.label }}
       >
         Waiting
       </Text>
@@ -335,6 +331,7 @@ function EditorialDiscoveryRow({
   isLast: boolean;
   onPress: () => void;
 }) {
+  const palette = useEditorialPalette();
   const reduceMotion = useReduceMotion();
   const [shouldAnimate] = React.useState(() => {
     if (reduceMotion || seenDiscoveryRows.has(album.aotd_id)) return false;
@@ -353,14 +350,14 @@ function EditorialDiscoveryRow({
       onPress={onPress}
       className="min-h-[76px] flex-row items-center gap-3 py-3 active:opacity-80"
       style={{
-        borderColor: editorialColors.ink,
+        borderColor: palette.ink,
         borderTopWidth: firstInGroup ? 0 : 1,
         borderBottomWidth: isLast ? 2 : 0,
       }}
     >
       <View
         className="h-10 w-10 overflow-hidden border"
-        style={{ borderColor: editorialColors.ink, backgroundColor: editorialColors.paperAlt }}
+        style={{ borderColor: palette.ink, backgroundColor: palette.paperAlt }}
       >
         {album.album_cover_url ? (
           <CoverImage uri={album.album_cover_url} className="h-full w-full" />
@@ -371,19 +368,19 @@ function EditorialDiscoveryRow({
         )}
       </View>
       <View className="min-w-0 flex-1 justify-center">
-        <Text className="uppercase" style={[type.archiveIssue, { color: editorialColors.muted }]}>
+        <Text className="uppercase" style={[type.archiveIssue, { color: palette.muted }]}>
           {`No. ${String(issueNo(album)).padStart(3, '0')}`}
         </Text>
         <Text
           className="mt-1 uppercase"
-          style={[type.archiveTitle, { color: editorialColors.ink }]}
+          style={[type.archiveTitle, { color: palette.ink }]}
           numberOfLines={2}
         >
           {album.album_title}
         </Text>
         <Text
           className="mt-1 uppercase"
-          style={[type.archiveMeta, { color: editorialColors.muted }]}
+          style={[type.archiveMeta, { color: palette.muted }]}
           numberOfLines={1}
         >
           {album.album_primary_artist_name} / {date}

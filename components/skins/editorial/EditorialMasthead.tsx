@@ -1,7 +1,8 @@
 import { View } from 'react-native';
 
-import { editorialColors, ruleWeight, tracking } from '@/components/skins/shared/skinStyles';
+import { ruleWeight, tracking } from '@/components/skins/shared/skinStyles';
 import { Text } from '@/components/ui/Text';
+import { useEditorialPalette } from '@/theme/skins/EditorialThemeProvider';
 
 type EditorialMastheadProps = {
   issueLabel?: string;
@@ -14,7 +15,7 @@ export function EditorialMasthead({
   dateLabel,
   rule = 'rule',
 }: EditorialMastheadProps) {
-  const palette = editorialColors;
+  const palette = useEditorialPalette();
   const aside = [issueLabel, dateLabel].filter(Boolean).join(' / ');
 
   return (

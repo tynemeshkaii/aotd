@@ -11,6 +11,7 @@ export type Palette = {
   primary: string;
   onPrimary: string;
   red: string;
+  ratingTone: Record<RatingScore, string>;
 };
 
 export const dayPalette: Palette = {
@@ -24,6 +25,13 @@ export const dayPalette: Palette = {
   primary: '#87263b',
   onPrimary: '#fff6e8',
   red: '#9f2637',
+  ratingTone: {
+    5: '#d9a441',
+    4: '#c98a3c',
+    3: '#9c8b86',
+    2: '#a8636b',
+    1: '#8e3b46',
+  },
 };
 
 export const nightPalette: Palette = {
@@ -37,6 +45,13 @@ export const nightPalette: Palette = {
   primary: '#b8485c',
   onPrimary: '#fff6e8',
   red: '#cf5b6d',
+  ratingTone: {
+    5: '#e8b84d',
+    4: '#d99a4a',
+    3: '#b0a098',
+    2: '#c0757d',
+    1: '#a84d5a',
+  },
 };
 
 // Back-compat alias: unmigrated files continue to compile against the day palette.

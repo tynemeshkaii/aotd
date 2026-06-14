@@ -1,7 +1,8 @@
 import { View, type ViewProps } from 'react-native';
 
-import { editorialColors, ruleWeight, tracking } from '@/components/skins/shared/skinStyles';
+import { ruleWeight, tracking } from '@/components/skins/shared/skinStyles';
 import { Text } from '@/components/ui/Text';
+import { useEditorialPalette } from '@/theme/skins/EditorialThemeProvider';
 
 type Props = ViewProps & {
   title?: string;
@@ -18,22 +19,23 @@ export function EditorialSectionRule({
   style,
   ...rest
 }: Props) {
+  const palette = useEditorialPalette();
   const height = ruleWeight[weight ?? (major ? 'rule' : 'hairline')];
   return (
     <View {...rest} className="flex-row items-center gap-3" style={[{ minHeight: 24 }, style]}>
       {title ? (
         <Text
           className="font-mono-bold text-[11px] uppercase leading-4"
-          style={{ color: editorialColors.ink, letterSpacing: tracking.label }}
+          style={{ color: palette.ink, letterSpacing: tracking.label }}
         >
           {title}
         </Text>
       ) : null}
-      <View className="flex-1" style={{ height, backgroundColor: editorialColors.rule }} />
+      <View className="flex-1" style={{ height, backgroundColor: palette.rule }} />
       {aside ? (
         <Text
           className="font-mono text-[11px] uppercase leading-4"
-          style={{ color: editorialColors.muted, letterSpacing: tracking.label }}
+          style={{ color: palette.muted, letterSpacing: tracking.label }}
         >
           {aside}
         </Text>

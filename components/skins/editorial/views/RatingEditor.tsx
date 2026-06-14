@@ -4,17 +4,13 @@ import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-na
 
 import { EditorialActionButton } from '@/components/skins/editorial/EditorialActionButton';
 import { EditorialSectionRule } from '@/components/skins/editorial/EditorialSectionRule';
-import {
-  editorialColors,
-  editorialType,
-  ratingTone,
-  tracking,
-} from '@/components/skins/shared/skinStyles';
+import { editorialType, tracking } from '@/components/skins/shared/skinStyles';
 import { Text } from '@/components/ui/Text';
 import { haptics } from '@/lib/haptics';
 import { useReduceMotion } from '@/lib/hooks/useReduceMotion';
 import { useSaveRating } from '@/lib/hooks/useSaveRating';
 import { type AlbumDiscovery, RATING_OPTIONS, type RatingScore } from '@/lib/recommendation';
+import { useEditorialPalette } from '@/theme/skins/EditorialThemeProvider';
 import { EditorialStamp } from './shared';
 
 const type = editorialType;
@@ -30,6 +26,7 @@ function RatingCell({
   selected: boolean;
   onSelect: () => void;
 }) {
+  const palette = useEditorialPalette();
   const [pressed, setPressed] = React.useState(false);
   const reduceMotion = useReduceMotion();
   const fill = useSharedValue(selected ? 1 : 0);
@@ -58,7 +55,7 @@ function RatingCell({
       className="min-h-12 flex-row items-center gap-3 overflow-hidden px-3 py-2"
       style={{
         borderTopWidth: index === 0 ? 0 : 1,
-        borderTopColor: editorialColors.ink,
+        borderTopColor: palette.ink,
         transform: [{ scale: shouldScale ? 0.98 : 1 }],
       }}
     >
@@ -66,12 +63,12 @@ function RatingCell({
         accessibilityElementsHidden
         importantForAccessibility="no-hide-descendants"
         className="absolute inset-0"
-        style={[{ backgroundColor: editorialColors.ink }, fillStyle]}
+        style={[{ backgroundColor: palette.ink }, fillStyle]}
       />
       <Text
         className="w-8 font-mono-bold text-xs uppercase"
         style={{
-          color: selected ? ratingTone[option.score] : editorialColors.muted,
+          color: selected ? palette.ratingTone[option.score] : palette.muted,
           letterSpacing: tracking.label,
           zIndex: 1,
         }}
@@ -81,7 +78,7 @@ function RatingCell({
       <Text
         className="flex-1 font-prose-bold text-base leading-5"
         style={{
-          color: selected ? editorialColors.paper : editorialColors.ink,
+          color: selected ? palette.paper : palette.ink,
           zIndex: 1,
         }}
       >
@@ -92,6 +89,7 @@ function RatingCell({
 }
 
 export function EditorialRatingEditor({ album }: { album: AlbumDiscovery }) {
+  const palette = useEditorialPalette();
   const [score, setScore] = React.useState<RatingScore | null>(album.rating_score);
   const [comment, setComment] = React.useState(album.rating_comment ?? '');
   const saveRating = useSaveRating(album.aotd_id);
@@ -131,7 +129,7 @@ export function EditorialRatingEditor({ album }: { album: AlbumDiscovery }) {
         style={[
           type.monoKicker,
           {
-            color: editorialColors.muted,
+            color: palette.muted,
             fontSize: 10,
             lineHeight: 16,
             letterSpacing: tracking.label,
@@ -140,7 +138,7 @@ export function EditorialRatingEditor({ album }: { album: AlbumDiscovery }) {
       >
         Private journal only · does not tune tomorrow's pick
       </Text>
-      <View className="border-2" style={{ borderColor: editorialColors.ink }}>
+      <View className="border-2" style={{ borderColor: palette.ink }}>
         {RATING_OPTIONS.map((option, index) => {
           const selected = score === option.score;
           return (
@@ -157,21 +155,21 @@ export function EditorialRatingEditor({ album }: { album: AlbumDiscovery }) {
           );
         })}
       </View>
-      <View className="border-2" style={{ borderColor: editorialColors.ink }}>
+      <View className="border-2" style={{ borderColor: palette.ink }}>
         <View
           className="flex-row items-center justify-between gap-3 border-b px-3 py-2"
-          style={{ borderColor: editorialColors.ink, backgroundColor: editorialColors.paperAlt }}
+          style={{ borderColor: palette.ink, backgroundColor: palette.paperAlt }}
         >
           <Text
             className="font-mono-bold text-[10px] uppercase leading-4"
-            style={{ color: editorialColors.ink, letterSpacing: tracking.label }}
+            style={{ color: palette.ink, letterSpacing: tracking.label }}
           >
             Private note
           </Text>
           <Text
             className="shrink text-right font-mono text-[10px] uppercase leading-4"
             style={{
-              color: saveRating.isError ? editorialColors.red : editorialColors.muted,
+              color: saveRating.isError ? palette.red : palette.muted,
               letterSpacing: tracking.label,
             }}
             numberOfLines={1}
@@ -185,10 +183,10 @@ export function EditorialRatingEditor({ album }: { album: AlbumDiscovery }) {
           value={comment}
           onChangeText={setComment}
           placeholder="Add a private note"
-          placeholderTextColor={editorialColors.muted}
+          placeholderTextColor={palette.muted}
           textAlignVertical="top"
           className="min-h-28 px-4 py-3 font-prose text-base leading-6"
-          style={{ color: editorialColors.ink }}
+          style={{ color: palette.ink }}
         />
       </View>
       <EditorialActionButton

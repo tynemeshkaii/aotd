@@ -2,10 +2,11 @@ import * as React from 'react';
 import { ActivityIndicator, Pressable, View } from 'react-native';
 
 import { EditorialActionButton } from '@/components/skins/editorial/EditorialActionButton';
-import { editorialColors, space, tracking } from '@/components/skins/shared/skinStyles';
+import { space, tracking } from '@/components/skins/shared/skinStyles';
 import { Text } from '@/components/ui/Text';
 import { haptics } from '@/lib/haptics';
 import { useReduceMotion } from '@/lib/hooks/useReduceMotion';
+import { useEditorialPalette } from '@/theme/skins/EditorialThemeProvider';
 import type { ShareFormat } from '@/theme/skins/types';
 
 type Props = {
@@ -31,11 +32,12 @@ export function EditorialAlbumActions({
   onShare,
   onShareFormatChange,
 }: Props) {
+  const palette = useEditorialPalette();
   const [pressed, setPressed] = React.useState(false);
   const reduceMotion = useReduceMotion();
   const inverted = pressed && !opening;
-  const surface = inverted ? 'transparent' : editorialColors.ink;
-  const onSurface = inverted ? editorialColors.ink : editorialColors.paper;
+  const surface = inverted ? 'transparent' : palette.ink;
+  const onSurface = inverted ? palette.ink : palette.paper;
   const shouldScale = pressed && !opening && !reduceMotion;
 
   return (
@@ -54,25 +56,25 @@ export function EditorialAlbumActions({
         }}
         className="border-2 p-3"
         style={{
-          borderColor: editorialColors.ink,
+          borderColor: palette.ink,
           backgroundColor: surface,
           transform: [{ scale: shouldScale ? 0.98 : 1 }],
         }}
       >
         <View
           className="absolute left-0 right-0 top-0 h-[3px]"
-          style={{ backgroundColor: editorialColors.accentStatic }}
+          style={{ backgroundColor: palette.accentStatic }}
         />
         <View className="flex-row items-stretch gap-3 pt-[3px]">
           <View
             className="min-h-[62px] w-[62px] items-center justify-center border-2"
             style={{
-              borderColor: inverted ? editorialColors.ink : editorialColors.paper,
-              backgroundColor: inverted ? editorialColors.ink : editorialColors.paper,
+              borderColor: inverted ? palette.ink : palette.paper,
+              backgroundColor: inverted ? palette.ink : palette.paper,
             }}
           >
             {opening ? (
-              <ActivityIndicator color={inverted ? editorialColors.paper : editorialColors.ink} />
+              <ActivityIndicator color={inverted ? palette.paper : palette.ink} />
             ) : (
               <View
                 style={{
@@ -84,7 +86,7 @@ export function EditorialAlbumActions({
                   borderLeftWidth: 22,
                   borderTopColor: 'transparent',
                   borderBottomColor: 'transparent',
-                  borderLeftColor: inverted ? editorialColors.paper : editorialColors.ink,
+                  borderLeftColor: inverted ? palette.paper : palette.ink,
                 }}
               />
             )}
@@ -104,7 +106,7 @@ export function EditorialAlbumActions({
         loading={sharing}
         onPress={onShare}
       />
-      <View className="flex-row border-2" style={{ borderColor: editorialColors.ink }}>
+      <View className="flex-row border-2" style={{ borderColor: palette.ink }}>
         {shareFormats.map((format, index) => {
           const selected = shareFormat === format.value;
           return (
@@ -116,8 +118,8 @@ export function EditorialAlbumActions({
               className="min-h-11 flex-1 items-center justify-center px-2"
               style={{
                 borderLeftWidth: index === 0 ? 0 : 1,
-                borderLeftColor: editorialColors.ink,
-                backgroundColor: selected ? editorialColors.ink : editorialColors.paper,
+                borderLeftColor: palette.ink,
+                backgroundColor: selected ? palette.ink : palette.paper,
                 opacity: sharing ? 0.6 : 1,
               }}
               onPress={() => {
@@ -128,7 +130,7 @@ export function EditorialAlbumActions({
               <Text
                 className="font-mono-bold text-[10px] uppercase leading-4"
                 style={{
-                  color: selected ? editorialColors.paper : editorialColors.ink,
+                  color: selected ? palette.paper : palette.ink,
                   letterSpacing: tracking.label,
                 }}
               >
