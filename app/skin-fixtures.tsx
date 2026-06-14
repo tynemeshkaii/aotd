@@ -1,10 +1,16 @@
-import { ScrollView, View } from 'react-native';
+import { useState } from 'react';
+import { Pressable, ScrollView, View } from 'react-native';
 import { Text } from '@/components/ui/Text';
 import type { LibrarySyncStatus } from '@/lib/hooks/useLibrarySyncStatus';
 import type { MonthlyRecap } from '@/lib/hooks/useMonthlyRecap';
 import type { ProfileOverview } from '@/lib/hooks/useProfileOverview';
 import type { AlbumDiscovery, RatingScore } from '@/lib/recommendation';
 import { buildStreakSummary } from '@/lib/streak';
+import {
+  type Edition,
+  EditorialThemeProvider,
+  useEditorialPalette,
+} from '@/theme/skins/EditorialThemeProvider';
 import { useSkinComponents } from '@/theme/skins/registry';
 import type { ProfileViewProps } from '@/theme/skins/types';
 
@@ -254,6 +260,57 @@ const recapFixture: MonthlyRecap = {
 };
 
 export default function SkinFixturesScreen() {
+  // Local-only edition override so QA can sweep every scenario in Day or Night
+  // without touching the persisted app-wide preference. The nested provider
+  // overrides the outer one for this subtree.
+  const [edition, setEdition] = useState<Edition>('day');
+  return (
+    <EditorialThemeProvider forcedEdition={edition}>
+      <FixtureGallery edition={edition} onEditionChange={setEdition} />
+    </EditorialThemeProvider>
+  );
+}
+
+function EditionPicker({
+  edition,
+  onEditionChange,
+}: {
+  edition: Edition;
+  onEditionChange: (next: Edition) => void;
+}) {
+  const palette = useEditorialPalette();
+  const options: Edition[] = ['day', 'night'];
+  return (
+    <View className="flex-row gap-2">
+      {options.map((option) => {
+        const active = option === edition;
+        return (
+          <Pressable
+            key={option}
+            onPress={() => onEditionChange(option)}
+            className="border-2 px-3 py-2"
+            style={{
+              borderColor: palette.ink,
+              backgroundColor: active ? palette.ink : palette.paper,
+            }}
+          >
+            <Text variant="caption" style={{ color: active ? palette.paper : palette.ink }}>
+              {option === 'day' ? 'Day edition' : 'Night edition'}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+function FixtureGallery({
+  edition,
+  onEditionChange,
+}: {
+  edition: Edition;
+  onEditionChange: (next: Edition) => void;
+}) {
   const components = useSkinComponents();
 
   return (
@@ -264,6 +321,7 @@ export default function SkinFixturesScreen() {
     >
       <Text variant="screenTitle">Editorial Fixtures</Text>
       <Text variant="caption">Temporary gallery for editorial QA.</Text>
+      <EditionPicker edition={edition} onEditionChange={onEditionChange} />
       <View className="gap-3">
         <Text variant="caption">Onboarding / Issue №0</Text>
         <View

@@ -1,6 +1,9 @@
 import type { RatingScore } from '@/lib/recommendation';
 
 export type Palette = {
+  // True for evening editions; drives chrome (e.g. status-bar style) without
+  // brittle hex comparisons against a specific paper value.
+  isDark: boolean;
   paper: string;
   paperAlt: string;
   ink: string;
@@ -15,6 +18,7 @@ export type Palette = {
 };
 
 export const dayPalette: Palette = {
+  isDark: false,
   paper: '#f4ebe0',
   paperAlt: '#eadcc9',
   ink: '#1d1511',
@@ -35,6 +39,7 @@ export const dayPalette: Palette = {
 };
 
 export const nightPalette: Palette = {
+  isDark: true,
   paper: '#17120f',
   paperAlt: '#221a14',
   ink: '#f0e6d8',

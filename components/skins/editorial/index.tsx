@@ -24,7 +24,7 @@ export function useEditorialSkin(): SkinComponentSet {
       accent: palette.accentStatic,
       primary: palette.primary,
       onPrimary: palette.onPrimary,
-      statusBarStyle: palette.paper === '#17120f' ? 'light' : 'dark',
+      statusBarStyle: palette.isDark ? 'light' : 'dark',
       tabBar: {
         backgroundColor: palette.paper,
         borderTopColor: palette.ink,
