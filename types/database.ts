@@ -1189,7 +1189,12 @@ export type Database = {
           state: string
         }[]
       }
+      get_monthly_recap: {
+        Args: { p_month: string; p_user_id: string }
+        Returns: Json
+      }
       get_profile_overview: { Args: { p_user_id: string }; Returns: Json }
+      get_recap_months: { Args: { p_user_id: string }; Returns: Json }
       get_unrated_past_pick_count: {
         Args: { p_exclude_aotd_id?: string; p_user_id: string }
         Returns: number
