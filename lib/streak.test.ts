@@ -46,3 +46,10 @@ test('uses the server streak as the displayed volume when it is larger', () => {
   assert.equal(summary.volume, 12);
   assert.equal(romanNumeral(summary.volume), 'XII');
 });
+
+test('renders standard roman numerals beyond 89', () => {
+  assert.equal(romanNumeral(90), 'XC');
+  assert.equal(romanNumeral(99), 'XCIX');
+  assert.equal(romanNumeral(100), 'C');
+  assert.equal(romanNumeral(366), 'CCCLXVI');
+});
