@@ -233,6 +233,7 @@ Editorial design contracts:
 Skia press motion contracts (C2):
 
 - The album cover plate carries an optional Skia halftone/riso overlay (`components/skins/editorial/skia/HalftoneOverlay.tsx`): a palette-tinted SkSL dot texture layered ON TOP of `CoverImage`, decorative, `pointerEvents="none"`, hidden from screen readers. It is static by default with a one-time fade-in settle that is Reduce-Motion gated (instant when Reduce Motion is on). The overlay reads its tint from the active palette so it works in both editions. `CoverImage` always renders underneath, so if Skia is unavailable or the effect fails the cover still shows — the overlay simply drops. Sized from the cover's measured `onLayout` width.
+- The big "Open in Spotify" CTA and `EditorialActionButton` carry an optional Skia ink-spread on press (`components/skins/editorial/skia/InkPressOverlay.tsx`): a decorative ink disc that pulses outward from a press `trigger` counter, layered above the button background and below its label/content (button uses `overflow-hidden`), a11y hidden. It is STRICTLY ADDITIVE over the existing instant ink↔paper inversion — when Skia is unavailable or Reduce Motion is on the overlay renders nothing and the instant inversion is the full interaction. The spread color is the button's pressed foreground so it reads in both editions. Do not make the ink-spread the sole press feedback.
 
 Font contracts:
 

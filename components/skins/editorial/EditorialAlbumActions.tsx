@@ -1,7 +1,8 @@
 import * as React from 'react';
-import { ActivityIndicator, Pressable, View } from 'react-native';
+import { ActivityIndicator, type LayoutChangeEvent, Pressable, View } from 'react-native';
 
 import { EditorialActionButton } from '@/components/skins/editorial/EditorialActionButton';
+import { InkPressOverlay } from '@/components/skins/editorial/skia/InkPressOverlay';
 import { space, tracking } from '@/components/skins/shared/skinStyles';
 import { Text } from '@/components/ui/Text';
 import { haptics } from '@/lib/haptics';
@@ -34,6 +35,8 @@ export function EditorialAlbumActions({
 }: Props) {
   const palette = useEditorialPalette();
   const [pressed, setPressed] = React.useState(false);
+  const [size, setSize] = React.useState({ width: 0, height: 0 });
+  const [pressCount, setPressCount] = React.useState(0);
   const reduceMotion = useReduceMotion();
   const inverted = pressed && !opening;
   const surface = inverted ? 'transparent' : palette.ink;
@@ -47,20 +50,35 @@ export function EditorialAlbumActions({
         accessibilityLabel="Open in Spotify"
         accessibilityState={{ busy: opening }}
         disabled={opening}
-        onPressIn={() => setPressed(true)}
+        onLayout={(e: LayoutChangeEvent) =>
+          setSize({
+            width: Math.round(e.nativeEvent.layout.width),
+            height: Math.round(e.nativeEvent.layout.height),
+          })
+        }
+        onPressIn={() => {
+          setPressed(true);
+          if (!opening) setPressCount((c) => c + 1);
+        }}
         onPressOut={() => setPressed(false)}
         onPress={() => {
           setPressed(false);
           haptics.impactLight();
           onOpen();
         }}
-        className="border-2 p-3"
+        className="overflow-hidden border-2 p-3"
         style={{
           borderColor: palette.ink,
           backgroundColor: surface,
           transform: [{ scale: shouldScale ? 0.98 : 1 }],
         }}
       >
+        <InkPressOverlay
+          width={size.width}
+          height={size.height}
+          color={onSurface}
+          trigger={pressCount}
+        />
         <View
           className="absolute left-0 right-0 top-0 h-[3px]"
           style={{ backgroundColor: palette.accentStatic }}

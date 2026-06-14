@@ -1,6 +1,7 @@
 import * as React from 'react';
-import { ActivityIndicator, Pressable } from 'react-native';
+import { ActivityIndicator, type LayoutChangeEvent, Pressable } from 'react-native';
 
+import { InkPressOverlay } from '@/components/skins/editorial/skia/InkPressOverlay';
 import { tracking } from '@/components/skins/shared/skinStyles';
 import { Text } from '@/components/ui/Text';
 import { haptics } from '@/lib/haptics';
@@ -47,6 +48,8 @@ export function EditorialActionButton({
 }) {
   const palette = useEditorialPalette();
   const [pressed, setPressed] = React.useState(false);
+  const [size, setSize] = React.useState({ width: 0, height: 0 });
+  const [pressCount, setPressCount] = React.useState(0);
   const reduceMotion = useReduceMotion();
   const isDisabled = disabled || loading;
   const p = resolveTone(palette, tone, pressed && !isDisabled);
@@ -56,14 +59,23 @@ export function EditorialActionButton({
       accessibilityRole="button"
       accessibilityState={{ disabled: !!isDisabled, busy: !!loading }}
       disabled={isDisabled}
-      onPressIn={() => setPressed(true)}
+      onLayout={(e: LayoutChangeEvent) =>
+        setSize({
+          width: Math.round(e.nativeEvent.layout.width),
+          height: Math.round(e.nativeEvent.layout.height),
+        })
+      }
+      onPressIn={() => {
+        setPressed(true);
+        if (!isDisabled) setPressCount((c) => c + 1);
+      }}
       onPressOut={() => setPressed(false)}
       onPress={() => {
         setPressed(false);
         haptics.impactLight();
         onPress();
       }}
-      className={`min-h-12 flex-row items-center justify-center gap-2 border-2 px-4 py-3 ${
+      className={`min-h-12 flex-row items-center justify-center gap-2 overflow-hidden border-2 px-4 py-3 ${
         isDisabled ? 'opacity-60' : ''
       }`}
       style={{
@@ -72,6 +84,12 @@ export function EditorialActionButton({
         transform: [{ scale: shouldScale ? 0.98 : 1 }],
       }}
     >
+      <InkPressOverlay
+        width={size.width}
+        height={size.height}
+        color={p.foreground}
+        trigger={pressCount}
+      />
       {loading ? <ActivityIndicator color={p.foreground} size="small" /> : null}
       <Text
         className="font-mono-bold text-xs uppercase leading-4"
