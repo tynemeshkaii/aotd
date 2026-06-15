@@ -68,7 +68,6 @@ export function useLibrarySyncStatus(): {
           const next = payload.new as LibrarySyncStatus | null;
           if (next) {
             qc.setQueryData(queryKey, next);
-            qc.invalidateQueries({ queryKey: ['library-stats', userId] });
             qc.invalidateQueries({ queryKey: PROFILE_OVERVIEW_KEY(userId) });
           }
         },

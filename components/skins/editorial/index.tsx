@@ -15,7 +15,6 @@ import {
 import Animated, { useAnimatedScrollHandler, useAnimatedStyle } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import type { DiscoveryFilter } from '@/components/album/StatusTabs';
 import { SpotifyButton } from '@/components/auth/SpotifyButton';
 import { BrandMark } from '@/components/brand/BrandMark';
 import { AccentRule } from '@/components/skins/editorial/accent/AccentRule';
@@ -58,7 +57,7 @@ import {
   type RatingScore,
   spotifyAlbumUrl,
 } from '@/lib/recommendation';
-import type { SkinComponentSet } from '@/theme/skins/types';
+import type { DiscoveryFilter, SkinComponentSet } from '@/theme/skins/types';
 
 const filterLabels: Record<DiscoveryFilter, string> = {
   all: 'All',

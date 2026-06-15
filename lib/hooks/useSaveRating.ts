@@ -5,6 +5,7 @@ import { Alert } from 'react-native';
 import { useSession } from '@/components/auth/AuthProvider';
 import { DISCOVERIES_KEY } from '@/lib/hooks/useDiscoveries';
 import { DISCOVERY_DETAIL_KEY } from '@/lib/hooks/useDiscoveryDetail';
+import { PROFILE_OVERVIEW_KEY } from '@/lib/hooks/useProfileOverview';
 import { UNRATED_PAST_PICK_COUNT_PREFIX } from '@/lib/hooks/useUnratedPastPickCount';
 import type { RatingScore } from '@/lib/recommendation';
 import { supabase } from '@/lib/supabase';
@@ -58,6 +59,7 @@ export function useSaveRating(aotdId: string) {
       qc.invalidateQueries({ queryKey: DISCOVERIES_KEY(userId) });
       qc.invalidateQueries({ queryKey: DISCOVERY_DETAIL_KEY(userId, aotdId) });
       qc.invalidateQueries({ queryKey: UNRATED_PAST_PICK_COUNT_PREFIX(userId) });
+      qc.invalidateQueries({ queryKey: PROFILE_OVERVIEW_KEY(userId) });
 
       await showRatingMicrocopyOnce(userId);
     },

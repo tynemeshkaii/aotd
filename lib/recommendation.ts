@@ -119,7 +119,7 @@ function isAotdStatus(value: unknown): value is AotdStatus {
   return value === 'pending' || value === 'opened' || value === 'rated';
 }
 
-function isRatingScore(value: unknown): value is RatingScore {
+function isNullableRatingScore(value: unknown): value is RatingScore | null {
   return value === null || value === 1 || value === 2 || value === 3 || value === 4 || value === 5;
 }
 
@@ -145,7 +145,7 @@ export function isAlbumDiscovery(value: unknown): value is AlbumDiscovery {
     isNullableNumber(value.album_total_tracks) &&
     isNullableNumber(value.album_duration_ms) &&
     isNullableString(value.rating_id) &&
-    isRatingScore(value.rating_score) &&
+    isNullableRatingScore(value.rating_score) &&
     isNullableString(value.rating_comment) &&
     isNullableString(value.rating_created_at) &&
     isNullableString(value.rating_updated_at)

@@ -3,12 +3,12 @@ import type { ComponentProps, ReactNode, RefObject } from 'react';
 import type { StyleProp, View, ViewStyle } from 'react-native';
 import type { SharedValue } from 'react-native-reanimated';
 
-import type { DiscoveryFilter } from '@/components/album/StatusTabs';
 import type { LibrarySyncStatus } from '@/lib/hooks/useLibrarySyncStatus';
 import type { ProfileOverview } from '@/lib/hooks/useProfileOverview';
 import type { AlbumDiscovery } from '@/lib/recommendation';
 
 export type SkinId = 'editorial';
+export type DiscoveryFilter = 'all' | 'pending' | 'rated';
 
 export type SkinChrome = {
   id: SkinId;

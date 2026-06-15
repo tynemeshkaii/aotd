@@ -16,7 +16,6 @@ export function useTriggerLibrarySync() {
       // the active `['profile-overview', userId]` query — so manual sync left
       // the overview stale whenever Realtime was unavailable.
       qc.invalidateQueries({ queryKey: ['library-sync-status', userId] });
-      qc.invalidateQueries({ queryKey: ['library-stats', userId] });
       qc.invalidateQueries({ queryKey: PROFILE_OVERVIEW_KEY(userId) });
     },
   });

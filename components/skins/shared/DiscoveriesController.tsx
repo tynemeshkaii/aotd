@@ -1,11 +1,11 @@
 import { type RelativePathString, router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 
-import type { DiscoveryFilter } from '@/components/album/StatusTabs';
 import { useDiscoveries } from '@/lib/hooks/useDiscoveries';
 import type { AlbumDiscovery } from '@/lib/recommendation';
 import { useAccentFlowFocus } from '@/theme/skins/AccentFlowProvider';
 import { useSkinComponents } from '@/theme/skins/registry';
+import type { DiscoveryFilter } from '@/theme/skins/types';
 
 export function DiscoveriesController() {
   const components = useSkinComponents();

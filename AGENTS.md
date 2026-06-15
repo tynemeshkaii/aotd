@@ -238,7 +238,7 @@ Motion/accessibility contracts:
 - `components/ui/Text` allows system font scaling by default. Only opt out for specialized animated/masked text where scaling would break rendering; do not disable scaling for ordinary Profile/body text.
 - Large fixed-size editorial mastheads (e.g. "Colophon", "Archive", the Home title, the "your album of the day" headline, profile display name) cap Dynamic Type via `maxFontSizeMultiplier` (~1.3–1.4) and, for single-line mastheads, `adjustsFontSizeToFit numberOfLines={1}`. This keeps them from overflowing at large accessibility text sizes without fully disabling scaling. The masked `AccentText` "day" stays `allowFontScaling={false}` by design, so a slight size divergence at extreme Dynamic Type is expected and acceptable.
 - Haptics are best-effort and must never throw into a user action.
-- FlatList entrance animations should run once per item key per app session; see `DiscoveryListItem`.
+- FlatList entrance animations should run once per item key per app session; see the live editorial archive row implementation in `components/skins/editorial/index.tsx`.
 - iOS shadows need two layers when clipping rounded content: outer shadow view, inner `overflow-hidden` clip view.
 
 NativeWind/third-party component contracts:
@@ -289,7 +289,7 @@ Core files:
 
 - `sync-spotify-library` Edge Function.
 - `lib/library.ts`.
-- `useLibrarySyncStatus`, `useTriggerLibrarySync`, `useLibraryStats`.
+- `useLibrarySyncStatus` and `useTriggerLibrarySync`.
 - `components/library/SyncBanner.tsx` and the editorial `SyncBanner`, shown only in Profile through the skin component set.
 
 Modes:
@@ -309,7 +309,7 @@ Guards:
 - Realtime channel names must be unique per hook instance. Use `useId()` in channel names.
 - `ProfileController` passes the current `syncStatus` into `ProfileView`. The editorial `SyncBanner` accepts an optional `status` override so `app/skin-fixtures.tsx` can render syncing/failed states without starting a live subscription; when no override is provided it reads live status itself.
 - Query invalidation must survive Realtime being unavailable (Expo Go firewall / dropped WebSocket). React Query `invalidateQueries` is prefix-match by default, so the passed key must be a true prefix of the active query key:
-  - `useTriggerLibrarySync` reads `userId` from `useSession` and invalidates user-scoped keys (`['library-sync-status', userId]`, `['library-stats', userId]`, `PROFILE_OVERVIEW_KEY(userId)`). Do not regress to `PROFILE_OVERVIEW_KEY()` — `['profile-overview', undefined]` never matches the active `[..., userId]` query and silently leaves the overview stale offline.
+  - `useTriggerLibrarySync` reads `userId` from `useSession` and invalidates user-scoped keys (`['library-sync-status', userId]`, `PROFILE_OVERVIEW_KEY(userId)`). Do not regress to `PROFILE_OVERVIEW_KEY()` — `['profile-overview', undefined]` never matches the active `[..., userId]` query and silently leaves the overview stale offline.
   - `useLibrarySyncStatus` returns `refetch`; `ProfileController.handleRefresh` calls it so pull-to-refresh updates sync status without waiting for Realtime.
 - Sync failure UI should use concise user-facing copy and keep raw backend `error_message` details out of the primary Profile surface. First-sync failure copy (in `EditorialInitialSyncingView`) must reference the on-screen retry button, not Profile (which is unreachable during first sync). Profile-context sync failure copy should not reference Profile either — the user is already there.
 - Day-1 onboarding compute is ordered: after an `initial` sync completes, `sync-spotify-library` should call `prewarm-user-candidates` with `force: true`, wait for that result, resolve the current target date/timezone, then call `compute-album-of-the-day`. Do not revert this to parallel fire-and-forget prewarm and compute.

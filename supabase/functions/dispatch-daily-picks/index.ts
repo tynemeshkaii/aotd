@@ -40,6 +40,7 @@ Deno.serve(async (req) => {
   }
 
   let dispatched = 0;
+  let deferred = 0;
   const failed: DispatchFailure[] = [];
   const dueUsers = due as DueUser[];
   for (let i = 0; i < dueUsers.length; i += CONCURRENCY) {
@@ -59,11 +60,27 @@ Deno.serve(async (req) => {
               user_timezone: u.user_tz,
             }),
           });
-          if (res.ok) {
+          let parsed: Record<string, unknown> = {};
+          try {
+            const body = (await res.json()) as unknown;
+            if (body && typeof body === 'object' && !Array.isArray(body)) {
+              parsed = body as Record<string, unknown>;
+            }
+          } catch {
+            parsed = {};
+          }
+
+          if (res.status === 202 && parsed.status === 'deferred') {
+            deferred += 1;
+            console.warn(
+              `[dispatch] compute_deferred reason=${
+                typeof parsed.reason === 'string' ? parsed.reason : '?'
+              }`,
+            );
+          } else if (res.ok) {
             dispatched += 1;
           } else {
-            const body = await res.text().catch(() => '');
-            const errorBody = body.slice(0, 500);
+            const errorBody = JSON.stringify(parsed).slice(0, 500);
             failed.push({
               user_id: u.user_id,
               target_date: u.target_date,
@@ -89,6 +106,7 @@ Deno.serve(async (req) => {
     {
       ok: failed.length === 0,
       dispatched,
+      deferred_count: deferred,
       failed_count: failed.length,
       failed,
       total_due: due.length,

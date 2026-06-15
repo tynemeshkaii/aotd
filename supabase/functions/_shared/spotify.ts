@@ -82,7 +82,11 @@ export async function fetchSpotifyProfile(accessToken: string) {
   return (await response.json()) as SpotifyProfile;
 }
 
-export async function refreshSpotifyAccessToken(refreshToken: string) {
+export async function refreshSpotifyAccessToken(refreshToken: string | null | undefined) {
+  if (!refreshToken || refreshToken.trim().length === 0) {
+    throw new Error('missing_refresh_token');
+  }
+
   const clientId = Deno.env.get('SPOTIFY_CLIENT_ID');
   const clientSecret = Deno.env.get('SPOTIFY_CLIENT_SECRET');
 
