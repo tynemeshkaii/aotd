@@ -33,12 +33,10 @@ function EditorialTabIcon({ focused, color, label, icon, focusedIcon }: Editoria
 
   return (
     <View
-      className="items-center"
+      className="items-center justify-center"
       style={{
         height: itemHeight,
         minWidth: 96,
-        paddingTop: 9,
-        paddingBottom: 4,
       }}
     >
       {focused ? (
@@ -64,7 +62,6 @@ function EditorialTabIcon({ focused, color, label, icon, focusedIcon }: Editoria
         allowFontScaling
         maxFontSizeMultiplier={1.2}
         numberOfLines={1}
-        adjustsFontSizeToFit
         className="mt-1 text-center lowercase"
         style={{
           color,

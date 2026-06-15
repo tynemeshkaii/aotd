@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
+import { useState } from 'react';
 import { Pressable, View } from 'react-native';
 
 import { AlbumDetail } from '@/components/album/AlbumDetail';
@@ -26,15 +27,23 @@ function BackButton({
   borderColor: string;
   backgroundColor: string;
 }) {
+  // Pressed inverts ink<->paper (print impression) via local state, not
+  // active:opacity-* (unreliable under NativeWind v4).
+  const [pressed, setPressed] = useState(false);
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel="Back to Discoveries"
-      onPress={goBackToDiscoveries}
-      className="h-11 w-11 items-center justify-center border-2 active:opacity-80"
-      style={{ borderColor, backgroundColor }}
+      onPressIn={() => setPressed(true)}
+      onPressOut={() => setPressed(false)}
+      onPress={() => {
+        setPressed(false);
+        goBackToDiscoveries();
+      }}
+      className="h-11 w-11 items-center justify-center border-2"
+      style={{ borderColor, backgroundColor: pressed ? color : backgroundColor }}
     >
-      <Ionicons name="chevron-back" size={22} color={color} />
+      <Ionicons name="chevron-back" size={22} color={pressed ? backgroundColor : color} />
     </Pressable>
   );
 }

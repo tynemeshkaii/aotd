@@ -84,7 +84,7 @@ export default function HomeScreen() {
   if (isLoading) {
     return (
       <HomeStateShell>
-        <View className="mt-5">{components.States.AlbumDetailSkeleton()}</View>
+        <View className="mt-5 flex-1">{components.States.AlbumDetailSkeleton()}</View>
       </HomeStateShell>
     );
   }

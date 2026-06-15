@@ -1,5 +1,10 @@
 # Editorial Visual Polish Implementation Plan
 
+> **Superseded note (2026-06-15):** Task 7's corner crop marks (`EditorialCropMarks`) were
+> removed — they collided with the overlapping album title and the user disliked them. The
+> component file is deleted; the cover plate keeps its ink frame and title overlap. See
+> `plans/2026-06-15-editorial-ui-bug-fixes.md`. Do not reintroduce crop marks.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Tighten the editorial PRESS skin — tokenize spacing/tracking/rule weights, deepen the print metaphor (cover plate with crop marks, paper grain, initial cap, rated stamp, archive month headers, share-card barcode), replace opacity pressed-states with ink↔paper inversion, and fix small semantic/legibility issues.

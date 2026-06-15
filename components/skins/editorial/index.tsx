@@ -22,7 +22,6 @@ import { AccentRule } from '@/components/skins/editorial/accent/AccentRule';
 import { AccentText } from '@/components/skins/editorial/accent/AccentText';
 import { EditorialActionButton } from '@/components/skins/editorial/EditorialActionButton';
 import { EditorialAlbumActions } from '@/components/skins/editorial/EditorialAlbumActions';
-import { EditorialCropMarks } from '@/components/skins/editorial/EditorialCropMarks';
 import { EditorialMarker } from '@/components/skins/editorial/EditorialMarker';
 import { EditorialSectionRule } from '@/components/skins/editorial/EditorialSectionRule';
 import { EditorialSpecLine } from '@/components/skins/editorial/EditorialSpecLine';
@@ -100,6 +99,64 @@ function albumCoverMarkers(album: AlbumDiscovery) {
   ].filter((item): item is string => Boolean(item));
 }
 
+// Ballot row inverts ink<->paper on press (print impression) via local press
+// state, not active:opacity-* (unreliable under NativeWind v4). Selected rows
+// stay inverted; the accessible selected state lives on the Pressable.
+function BallotRow({
+  option,
+  selected,
+  isFirst,
+  onSelect,
+}: {
+  option: (typeof RATING_OPTIONS)[number];
+  selected: boolean;
+  isFirst: boolean;
+  onSelect: () => void;
+}) {
+  const [pressed, setPressed] = React.useState(false);
+  const inverted = selected || pressed;
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`Rate this album: ${option.label}`}
+      accessibilityState={{ selected }}
+      onPressIn={() => setPressed(true)}
+      onPressOut={() => setPressed(false)}
+      onPress={() => {
+        setPressed(false);
+        haptics.selection();
+        onSelect();
+      }}
+      className="min-h-12 flex-row items-center gap-3 px-3 py-2"
+      style={{
+        borderTopWidth: isFirst ? 0 : 1,
+        borderTopColor: editorialColors.ink,
+        backgroundColor: inverted ? editorialColors.ink : 'transparent',
+      }}
+    >
+      <Text
+        className="w-8 font-mono-bold text-xs uppercase"
+        style={{
+          color: selected
+            ? ratingTone[option.score]
+            : inverted
+              ? editorialColors.paper
+              : editorialColors.muted,
+          letterSpacing: tracking.label,
+        }}
+      >
+        {selected ? 'X' : `0${option.score}`}
+      </Text>
+      <Text
+        className="flex-1 font-prose-bold text-base leading-5"
+        style={{ color: inverted ? editorialColors.paper : editorialColors.ink }}
+      >
+        {option.label}
+      </Text>
+    </Pressable>
+  );
+}
+
 function EditorialRatingEditor({ album }: { album: AlbumDiscovery }) {
   const [score, setScore] = React.useState<RatingScore | null>(album.rating_score);
   const [comment, setComment] = React.useState(album.rating_comment ?? '');
@@ -150,43 +207,15 @@ function EditorialRatingEditor({ album }: { album: AlbumDiscovery }) {
         Private journal only · does not tune tomorrow's pick
       </Text>
       <View className="border-2" style={{ borderColor: editorialColors.ink }}>
-        {RATING_OPTIONS.map((option, index) => {
-          const selected = score === option.score;
-          return (
-            <Pressable
-              key={option.score}
-              accessibilityRole="button"
-              accessibilityLabel={`Rate this album: ${option.label}`}
-              accessibilityState={{ selected }}
-              onPress={() => {
-                haptics.selection();
-                setScore(option.score);
-              }}
-              className="min-h-12 flex-row items-center gap-3 px-3 py-2 active:opacity-75"
-              style={{
-                borderTopWidth: index === 0 ? 0 : 1,
-                borderTopColor: editorialColors.ink,
-                backgroundColor: selected ? editorialColors.ink : 'transparent',
-              }}
-            >
-              <Text
-                className="w-8 font-mono-bold text-xs uppercase"
-                style={{
-                  color: selected ? ratingTone[option.score] : editorialColors.muted,
-                  letterSpacing: tracking.label,
-                }}
-              >
-                {selected ? 'X' : `0${option.score}`}
-              </Text>
-              <Text
-                className="flex-1 font-prose-bold text-base leading-5"
-                style={{ color: selected ? editorialColors.paper : editorialColors.ink }}
-              >
-                {option.label}
-              </Text>
-            </Pressable>
-          );
-        })}
+        {RATING_OPTIONS.map((option, index) => (
+          <BallotRow
+            key={option.score}
+            option={option}
+            selected={score === option.score}
+            isFirst={index === 0}
+            onSelect={() => setScore(option.score)}
+          />
+        ))}
       </View>
       <View className="border-2" style={{ borderColor: editorialColors.ink }}>
         <View
@@ -304,7 +333,6 @@ function EditorialIssueFrame({
 }) {
   return (
     <View style={{ padding }}>
-      <EditorialCropMarks />
       <View
         className="overflow-hidden border-2"
         style={{ borderColor: editorialColors.ink, backgroundColor: editorialColors.paperAlt }}
@@ -611,18 +639,18 @@ function ListSkeleton() {
       {skeletonRows.map((row, index) => (
         <View
           key={row}
-          className="min-h-[98px] flex-row gap-3 py-3"
+          className="min-h-[104px] flex-row gap-3 py-3"
           style={{
             borderColor: editorialColors.ink,
             borderTopWidth: index === 0 ? 2 : 1,
             borderBottomWidth: index === skeletonRows.length - 1 ? 2 : 0,
           }}
         >
-          <View className="w-11 pt-1">
+          <View className="w-12 pt-1">
             <Skeleton className="h-3 w-8 rounded-none" />
             <Skeleton className="mt-2 h-4 w-9 rounded-none" />
           </View>
-          <Skeleton className="h-[72px] w-[72px] rounded-none" />
+          <Skeleton className="h-[78px] w-[78px] rounded-none" />
           <View className="flex-1 justify-center gap-2">
             <Skeleton className="h-5 w-3/4 rounded-none" />
             <Skeleton className="h-3 w-2/3 rounded-none" />
@@ -710,7 +738,6 @@ function ArchiveFilterTab({
         className="uppercase"
         style={[type.monoLabel, { color: inverted ? editorialColors.paper : editorialColors.ink }]}
         numberOfLines={1}
-        adjustsFontSizeToFit
       >
         {label}
       </Text>
@@ -927,6 +954,7 @@ function EditorialDiscoveryRow({
   onPress: () => void;
 }) {
   const reduceMotion = useReduceMotion();
+  const [pressed, setPressed] = React.useState(false);
   const [shouldAnimate] = React.useState(() => {
     if (reduceMotion || seenDiscoveryRows.has(album.aotd_id)) return false;
     seenDiscoveryRows.add(album.aotd_id);
@@ -941,12 +969,18 @@ function EditorialDiscoveryRow({
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={`${album.album_title} by ${album.album_primary_artist_name}, ${date}, ${status.accessibilityLabel}`}
-      onPress={onPress}
-      className="min-h-[104px] flex-row gap-3 py-3 active:opacity-80"
+      onPressIn={() => setPressed(true)}
+      onPressOut={() => setPressed(false)}
+      onPress={() => {
+        setPressed(false);
+        onPress();
+      }}
+      className="min-h-[104px] flex-row gap-3 py-3"
       style={{
         borderColor: editorialColors.ink,
         borderTopWidth: firstInGroup ? 0 : 1,
         borderBottomWidth: isLast ? 2 : 0,
+        backgroundColor: pressed ? editorialColors.paperAlt : 'transparent',
       }}
     >
       <View className="w-12 pt-1">

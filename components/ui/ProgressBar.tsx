@@ -27,7 +27,7 @@ export function ProgressBar({
 
   return (
     <View
-      className={`overflow-hidden ${bordered ? 'border' : 'rounded-full'} ${className ?? ''}`}
+      className={`overflow-hidden ${bordered ? 'border-2' : 'rounded-full'} ${className ?? ''}`}
       style={{
         height,
         backgroundColor: trackColor,

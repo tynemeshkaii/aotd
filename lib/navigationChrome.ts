@@ -1,6 +1,6 @@
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-const TAB_BAR_TOP_PADDING = 0;
+const TAB_BAR_TOP_PADDING = 8;
 const TAB_BAR_ITEM_HEIGHT = 60;
 const TAB_BAR_MIN_BOTTOM_PADDING = 10;
 const TAB_BAR_CONTENT_GAP = 24;
